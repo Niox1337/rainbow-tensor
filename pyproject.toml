@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rainbow-tensor"
+version = "0.1.0"
+description = "A Python package for IPython/Jupyter notebooks with numpy support"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "Niox1337"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Framework :: IPython",
+    "Framework :: Jupyter",
+]
+dependencies = [
+    "numpy>=1.19.0",
+    "ipython>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Niox1337/rainbow-tensor"
