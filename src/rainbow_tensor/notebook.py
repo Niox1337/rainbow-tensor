@@ -7,7 +7,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 
 from .indexing import (
     explain_index,
-    format_index,
+    format_slice,
     result_shape,
     selected_coordinates,
     validate_index,
@@ -15,6 +15,7 @@ from .indexing import (
 from .render_svg import (
     AXIS_FRAME_COLORS,
     NEUTRAL_COLOR,
+    SELECT_VALUE_COLOR,
     render_svg,
 )
 from .shape import extract_shape
@@ -84,6 +85,28 @@ def _shape_label_parts(shape):
     return parts
 
 
+def _index_label_parts(index):
+    """Build coloured label parts for an index.
+
+    Each token is coloured to match its axis. Frame axes use their axis
+    colour and the leaf axis uses the selected value colour, so the label
+    mirrors the colours drawn on the tensor.
+    """
+    ndim = len(index)
+    parts = [("Index (", NEUTRAL_COLOR)]
+    for axis, entry in enumerate(index):
+        token = format_slice(entry) if isinstance(entry, slice) else str(entry)
+        if axis < ndim - 1:
+            color = AXIS_FRAME_COLORS.get(axis, NEUTRAL_COLOR)
+        else:
+            color = SELECT_VALUE_COLOR
+        parts.append((token, color))
+        if axis < ndim - 1:
+            parts.append((", ", NEUTRAL_COLOR))
+    parts.append((")", NEUTRAL_COLOR))
+    return parts
+
+
 def _display(visual):
     """Display a visual in IPython when available, otherwise do nothing."""
     try:
@@ -125,12 +148,12 @@ def show_index(tensor_or_shape, index):
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
     value_fn = _value_fn_for(tensor_or_shape)
-    label = f"Index [{format_index(index)}]"
+    label_parts = _index_label_parts(index)
     svg = render_svg(
         normalized,
         selected=selected,
         value_fn=value_fn,
-        label=label,
+        label_parts=label_parts,
         explanation=explanation,
     )
     visual = TensorVisual(

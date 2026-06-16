@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+### Changed
+
+- Redesigned the visualisation so each axis has its own colour, with axis 0 frames red, axis 1 frames orange, and selected leaf values green
+- The shape label numbers and the index label tokens are now coloured to match the frames and the selected values
+- In an index view the unselected frames and values are drawn in a neutral dark tone instead of being faded
+
 ## 0.1.0
 
 First version.
