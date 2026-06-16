@@ -6,11 +6,11 @@ rainbow-tensor is made for people who are learning how a tensor is structured an
 
 ## Examples
 
-`show_shape((2, 2, 2))`
+`rt.show_shape((2, 2, 2))`
 
 ![Shape (2, 2, 2)](examples/images/shape_2x2x2.svg)
 
-`show_index((2, 2, 2), (0, slice(None), 1))`
+`rt.show_index((2, 2, 2), (0, slice(None), 1))`
 
 ![Index (0, :, 1)](examples/images/index_0_all_1.svg)
 
@@ -37,6 +37,12 @@ In an index view only the selected frames keep their axis colour. The rest of th
 
 ## Installation
 
+Install from PyPI.
+
+```bash
+pip install rainbow-tensor
+```
+
 Install from source for development.
 
 ```bash
@@ -51,24 +57,28 @@ Install with the development tools (pytest, ruff, build).
 pip install -e ".[dev]"
 ```
 
+The distribution name is `rainbow-tensor` and the import name is `rainbow_tensor`.
+
 ## Usage
 
 Run the examples in a Jupyter notebook or an IPython shell so the SVG is displayed.
 
+The convention is to import the package as `rt`.
+
 Visualise a shape.
 
 ```python
-from rainbow_tensor import show_shape
+import rainbow_tensor as rt
 
-show_shape((2, 2, 2))
+rt.show_shape((2, 2, 2))
 ```
 
 Visualise how an index selects elements.
 
 ```python
-from rainbow_tensor import show_index
+import rainbow_tensor as rt
 
-show_index((2, 2, 2), (0, slice(None), 1))
+rt.show_index((2, 2, 2), (0, slice(None), 1))
 ```
 
 For the shape `(2, 2, 2)` the index `(0, slice(None), 1)` selects the values `1` and `3`, the selected coordinates are `(0, 0, 1)` and `(0, 1, 1)`, and the result shape is `(2,)`.
@@ -77,11 +87,11 @@ Use a real NumPy array to display its actual values.
 
 ```python
 import numpy as np
-from rainbow_tensor import show_shape, show_index
+import rainbow_tensor as rt
 
 x = np.arange(8).reshape(2, 2, 2)
-show_shape(x)
-show_index(x, (0, slice(None), 1))
+rt.show_shape(x)
+rt.show_index(x, (0, slice(None), 1))
 ```
 
 Each function returns a small result object. Its `svg` attribute holds the SVG string, so the package can be inspected and tested outside a notebook.

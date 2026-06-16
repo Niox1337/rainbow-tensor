@@ -6,10 +6,10 @@ tensor is structured and how an indexing expression selects elements.
 
 Public API:
 
-    from rainbow_tensor import show_shape, show_index
+    import rainbow_tensor as rt
 
-    show_shape((2, 2, 2))
-    show_index((2, 2, 2), (0, slice(None), 1))
+    rt.show_shape((2, 2, 2))
+    rt.show_index((2, 2, 2), (0, slice(None), 1))
 """
 
 from .notebook import show_index, show_shape
