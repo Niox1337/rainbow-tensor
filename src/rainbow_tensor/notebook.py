@@ -5,6 +5,13 @@ Each returns a small object that renders as SVG in a notebook and stays
 inspectable in plain Python, so the package is testable outside a notebook.
 """
 
+from .indexing import (
+    explain_index,
+    format_index,
+    result_shape,
+    selected_coordinates,
+    validate_index,
+)
 from .render_svg import render_svg
 from .shape import extract_shape, format_shape_label
 
@@ -82,6 +89,28 @@ def show_shape(shape):
 def show_index(tensor_or_shape, index):
     """Visualise how an index selects elements from a tensor.
 
-    Not implemented yet.
+    ``tensor_or_shape`` may be a shape tuple or an array-like object with a
+    ``.shape`` attribute. ``index`` must be a tuple of integers and slices
+    whose length matches the tensor rank. Selected elements are highlighted,
+    unselected elements stay visible but de-emphasised, and an explanation of
+    the result shape is drawn below the tensor.
     """
-    raise NotImplementedError("show_index is not implemented yet")
+    normalized = extract_shape(tensor_or_shape)
+    validate_index(index, normalized)
+    selected = selected_coordinates(normalized, index)
+    result = result_shape(normalized, index)
+    explanation = explain_index(normalized, index)
+    value_fn = _value_fn_for(tensor_or_shape)
+    label = f"Index [{format_index(index)}]"
+    svg = render_svg(
+        normalized,
+        selected=selected,
+        value_fn=value_fn,
+        label=label,
+        explanation=explanation,
+    )
+    visual = TensorVisual(
+        svg, normalized, selected=selected, result=result, explanation=explanation
+    )
+    _display(visual)
+    return visual
