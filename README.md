@@ -12,6 +12,17 @@ rainbow-tensor is made for people who are learning how a tensor is structured an
 - Works with shape tuples and with array-like objects that expose a `.shape` attribute, such as NumPy arrays
 - No tensor library is imported by the core, so the package stays lightweight
 
+## Colour scheme
+
+Each axis has its own colour so the structure and a selection are easy to read.
+
+- Axis 0 is the outer frame, drawn red
+- Axis 1 is the inner row frame, drawn orange
+- The leaf axis elements are plain text, and a selected element is drawn green
+- The numbers in the shape label and the tokens in the index label are coloured to match
+
+In an index view only the selected frames keep their axis colour. The rest of the tensor is drawn in a neutral dark tone so the selected path stands out.
+
 ## Installation
 
 Install from source for development.
