@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+
+- show_shape and show_index no longer render twice in a notebook cell. The result renders once through _repr_svg_ and is still returned for inspection
+- The SVG width now grows to fit the label and explanation lines, so longer text is no longer clipped at the edge of the frame
+
 ## 0.2.0
 
 ### Changed

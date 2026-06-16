@@ -14,5 +14,5 @@ Public API:
 
 from .notebook import show_index, show_shape
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = ["show_shape", "show_index", "__version__"]
