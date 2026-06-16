@@ -12,8 +12,12 @@ from .indexing import (
     selected_coordinates,
     validate_index,
 )
-from .render_svg import render_svg
-from .shape import extract_shape, format_shape_label
+from .render_svg import (
+    AXIS_FRAME_COLORS,
+    NEUTRAL_COLOR,
+    render_svg,
+)
+from .shape import extract_shape
 
 
 class TensorVisual:
@@ -60,6 +64,26 @@ def _value_fn_for(obj):
     return value_fn
 
 
+def _shape_label_parts(shape):
+    """Build coloured label parts for a shape.
+
+    Each dimension is coloured to match its frame. Frame axes use their axis
+    colour and the leaf axis stays neutral, since it has no frame.
+    """
+    ndim = len(shape)
+    parts = [("Shape (", NEUTRAL_COLOR)]
+    for axis, dim in enumerate(shape):
+        if axis < ndim - 1:
+            color = AXIS_FRAME_COLORS.get(axis, NEUTRAL_COLOR)
+        else:
+            color = NEUTRAL_COLOR
+        parts.append((str(dim), color))
+        if axis < ndim - 1:
+            parts.append((", ", NEUTRAL_COLOR))
+    parts.append((")", NEUTRAL_COLOR))
+    return parts
+
+
 def _display(visual):
     """Display a visual in IPython when available, otherwise do nothing."""
     try:
@@ -79,8 +103,8 @@ def show_shape(shape):
     """
     normalized = extract_shape(shape)
     value_fn = _value_fn_for(shape)
-    label = f"Shape {format_shape_label(normalized)}"
-    svg = render_svg(normalized, value_fn=value_fn, label=label)
+    label_parts = _shape_label_parts(normalized)
+    svg = render_svg(normalized, value_fn=value_fn, label_parts=label_parts)
     visual = TensorVisual(svg, normalized)
     _display(visual)
     return visual

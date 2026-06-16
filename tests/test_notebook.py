@@ -25,7 +25,15 @@ def test_show_shape_returns_visual_with_svg():
 def test_show_shape_repr_svg_matches_svg():
     visual = show_shape((3,))
     assert visual._repr_svg_() == visual.svg
-    assert "Shape (3)" in visual.svg
+    assert "Shape (" in visual.svg
+
+
+def test_show_shape_label_colours_frame_axes():
+    visual = show_shape((2, 2, 2))
+    # axis 0 red and axis 1 orange appear both as frames and as label numbers
+    assert "#dc2626" in visual.svg
+    assert "#f97316" in visual.svg
+    assert "<tspan" in visual.svg
 
 
 def test_show_shape_uses_array_values():
@@ -43,7 +51,7 @@ def test_show_index_computes_selection_and_result_shape():
 
 def test_show_index_highlights_selected_values():
     visual = show_index((2, 2, 2), (0, slice(None), 1))
-    assert "#fde68a" in visual.svg
+    assert "#16a34a" in visual.svg
     assert visual.svg.startswith("<svg")
 
 

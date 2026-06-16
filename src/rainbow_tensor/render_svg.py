@@ -1,24 +1,23 @@
 """SVG rendering.
 
 This module turns a :class:`~rainbow_tensor.layout.Layout` into an SVG
-string. It draws the tensor blocks, cells, values, and a label. Selected
-cells are highlighted and, when a selection exists, the unselected cells are
-de-emphasised but still readable. An optional explanation is drawn below.
+string. Each axis has its own colour. Axis 0 frames are red and axis 1
+frames are orange. The leaf axis elements are plain text. Selected elements
+are drawn green and, in an index view, only the selected frames keep their
+axis colour while the rest are drawn in a neutral dark tone.
 """
 
 from .layout import build_layout
 
-CELL_FILL = "#ffffff"
-CELL_STROKE = "#94a3b8"
-BLOCK_STROKE = "#cbd5e1"
-HIGHLIGHT_FILL = "#fde68a"
-HIGHLIGHT_STROKE = "#d97706"
-TEXT_COLOR = "#0f172a"
+AXIS_FRAME_COLORS = {0: "#dc2626", 1: "#f97316"}
+SELECT_VALUE_COLOR = "#16a34a"
+NEUTRAL_COLOR = "#111827"
+TEXT_COLOR = "#111827"
 LABEL_COLOR = "#334155"
-DIM_OPACITY = 0.3
 
-LABEL_HEIGHT = 28
+LABEL_HEIGHT = 30
 LINE_HEIGHT = 20
+FRAME_WIDTH = 3
 FONT_FAMILY = "ui-monospace, Menlo, Consolas, monospace"
 
 
@@ -45,12 +44,44 @@ def svg_document(content, width, height):
     )
 
 
-def render_svg(shape, selected=None, value_fn=None, label="", explanation=None):
+def _frame_color(frame, has_selection):
+    """Pick the stroke colour for a frame.
+
+    In a shape view every frame uses its axis colour. In an index view only
+    selected frames keep their axis colour, the rest are neutral.
+    """
+    axis_color = AXIS_FRAME_COLORS.get(frame.axis, NEUTRAL_COLOR)
+    if not has_selection:
+        return axis_color
+    return axis_color if frame.selected else NEUTRAL_COLOR
+
+
+def _cell_color(cell, has_selection):
+    """Pick the text colour for a cell value."""
+    if has_selection and cell.selected:
+        return SELECT_VALUE_COLOR
+    return TEXT_COLOR
+
+
+def _label_element(x, y, parts):
+    """Build a label text element from coloured parts."""
+    spans = "".join(
+        f'<tspan fill="{escape(color)}">{escape(text)}</tspan>' for text, color in parts
+    )
+    return (
+        f'<text x="{x:.0f}" y="{y:.0f}" font-size="16" font-weight="600">{spans}</text>'
+    )
+
+
+def render_svg(
+    shape, selected=None, value_fn=None, label="", label_parts=None, explanation=None
+):
     """Render a tensor as an SVG string.
 
     ``selected`` is an iterable of selected coordinates. ``value_fn`` maps a
-    coordinate to its display value. ``label`` is drawn under the tensor and
-    ``explanation`` is an optional list of lines drawn below the label.
+    coordinate to its display value. ``label`` is a plain label string while
+    ``label_parts`` is an optional list of ``(text, colour)`` pairs for a
+    coloured label. ``explanation`` is an optional list of lines drawn below.
     """
     explanation = explanation or []
     selected_list = list(selected or [])
@@ -59,49 +90,32 @@ def render_svg(shape, selected=None, value_fn=None, label="", explanation=None):
 
     parts = []
 
-    for block in layout.blocks:
-        if has_selection:
-            block_selected = any(
-                cell.selected for cell in layout.cells if cell.coord[0] == block.index
-            )
-            opacity = 1.0 if block_selected else DIM_OPACITY
-        else:
-            opacity = 1.0
+    for frame in layout.frames:
+        color = _frame_color(frame, has_selection)
         parts.append(
-            f'<rect x="{block.x:.0f}" y="{block.y:.0f}" '
-            f'width="{block.width:.0f}" height="{block.height:.0f}" '
-            f'rx="8" fill="none" stroke="{BLOCK_STROKE}" stroke-width="1.5" '
-            f'opacity="{opacity:.2f}"/>'
+            f'<rect x="{frame.x:.0f}" y="{frame.y:.0f}" '
+            f'width="{frame.width:.0f}" height="{frame.height:.0f}" '
+            f'rx="6" fill="none" stroke="{color}" stroke-width="{FRAME_WIDTH}"/>'
         )
 
     for cell in layout.cells:
-        if cell.selected:
-            fill = HIGHLIGHT_FILL
-            stroke = HIGHLIGHT_STROKE
-            opacity = 1.0
-            weight = "700"
-        else:
-            fill = CELL_FILL
-            stroke = CELL_STROKE
-            opacity = DIM_OPACITY if has_selection else 1.0
-            weight = "400"
+        color = _cell_color(cell, has_selection)
+        weight = "700" if (has_selection and cell.selected) else "400"
         cx = cell.x + cell.width / 2
         cy = cell.y + cell.height / 2
         parts.append(
-            f'<g opacity="{opacity:.2f}">'
-            f'<rect x="{cell.x:.0f}" y="{cell.y:.0f}" '
-            f'width="{cell.width:.0f}" height="{cell.height:.0f}" '
-            f'rx="6" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>'
             f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
             f'dominant-baseline="central" font-size="15" font-weight="{weight}" '
-            f'fill="{TEXT_COLOR}">{escape(cell.value)}</text>'
-            f"</g>"
+            f'fill="{color}">{escape(cell.value)}</text>'
         )
 
     width = layout.width
     y = layout.height + LABEL_HEIGHT
 
-    if label:
+    if label_parts:
+        parts.append(_label_element(20, y, label_parts))
+        y += LINE_HEIGHT
+    elif label:
         parts.append(
             f'<text x="20" y="{y:.0f}" font-size="16" font-weight="600" '
             f'fill="{LABEL_COLOR}">{escape(label)}</text>'

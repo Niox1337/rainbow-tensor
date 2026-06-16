@@ -6,16 +6,23 @@ from rainbow_tensor.layout import build_layout
 def test_one_dimensional_layout_cell_count():
     layout = build_layout((3,))
     assert len(layout.cells) == 3
+    assert len(layout.frames) == 1
+    assert layout.frames[0].axis is None
 
 
 def test_two_dimensional_layout_cell_count():
     layout = build_layout((2, 3))
     assert len(layout.cells) == 6
+    assert len(layout.frames) == 2
+    assert all(frame.axis == 0 for frame in layout.frames)
 
 
 def test_three_dimensional_layout_structure():
     layout = build_layout((2, 2, 2))
-    assert len(layout.blocks) == 2
+    block_frames = [f for f in layout.frames if f.axis == 0]
+    row_frames = [f for f in layout.frames if f.axis == 1]
+    assert len(block_frames) == 2
+    assert len(row_frames) == 4
     assert len(layout.cells) == 8
     by_value = {cell.value: cell.coord for cell in layout.cells}
     assert by_value[0] == (0, 0, 0)
@@ -42,7 +49,10 @@ def test_value_fn_overrides_generated_values():
     assert values == [0, 10, 20]
 
 
-def test_selected_coordinates_are_marked():
-    layout = build_layout((2, 2, 2), selected=[(0, 0, 1)])
-    selected = [cell.coord for cell in layout.cells if cell.selected]
-    assert selected == [(0, 0, 1)]
+def test_selected_block_and_row_frames_are_marked():
+    layout = build_layout((2, 2, 2), selected=[(0, 0, 1), (0, 1, 1)])
+    block_frames = [f for f in layout.frames if f.axis == 0]
+    assert block_frames[0].selected is True
+    assert block_frames[1].selected is False
+    selected_cells = [cell.coord for cell in layout.cells if cell.selected]
+    assert selected_cells == [(0, 0, 1), (0, 1, 1)]
