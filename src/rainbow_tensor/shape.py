@@ -7,6 +7,22 @@ generates the display values used when only a shape is provided.
 SUPPORTED_NDIM = (1, 2, 3)
 
 
+def extract_shape(obj):
+    """Extract a validated shape from a tuple or an array-like object.
+
+    A tuple is treated as a literal shape. Any other object is expected to
+    expose a ``.shape`` attribute (for example a NumPy array). No tensor
+    library is imported, so this works for any object with ``.shape``.
+    """
+    if isinstance(obj, tuple):
+        raw = obj
+    elif hasattr(obj, "shape"):
+        raw = obj.shape
+    else:
+        raw = obj
+    return validate_shape(raw)
+
+
 def validate_shape(shape):
     """Validate a shape and return it as a ``tuple[int, ...]``.
 
