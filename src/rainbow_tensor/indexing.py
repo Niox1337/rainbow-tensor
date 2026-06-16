@@ -5,6 +5,8 @@ positions, computes the selected coordinates, and computes the result shape
 after indexing.
 """
 
+import itertools
+
 
 def validate_index(index, shape):
     """Validate an index tuple against a tensor shape.
@@ -45,3 +47,20 @@ def validate_index(index, shape):
             )
 
     return index
+
+
+def expand_slice(sl, size):
+    """Expand a slice into the list of integer positions it selects."""
+    return list(range(*sl.indices(size)))
+
+
+def selected_coordinates(shape, index):
+    """Compute every coordinate selected by ``index`` in row-major order."""
+    validate_index(index, shape)
+    axes = []
+    for entry, size in zip(index, shape):
+        if isinstance(entry, int):
+            axes.append([entry])
+        else:
+            axes.append(expand_slice(entry, size))
+    return list(itertools.product(*axes))
