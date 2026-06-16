@@ -2,7 +2,14 @@
 
 import pytest
 
-from rainbow_tensor.shape import extract_shape, validate_shape
+from rainbow_tensor.shape import (
+    extract_shape,
+    flat_index,
+    format_shape,
+    format_shape_label,
+    generate_values,
+    validate_shape,
+)
 
 
 class FakeArray:
@@ -56,3 +63,27 @@ def test_reject_boolean_dimension():
 def test_reject_four_dimensions():
     with pytest.raises(ValueError):
         validate_shape((2, 2, 2, 2))
+
+
+def test_generate_values_for_three_dimensions():
+    values = generate_values((2, 2, 2))
+    assert values[(0, 0, 0)] == 0
+    assert values[(0, 0, 1)] == 1
+    assert values[(0, 1, 0)] == 2
+    assert values[(0, 1, 1)] == 3
+    assert values[(1, 0, 0)] == 4
+    assert values[(1, 1, 1)] == 7
+
+
+def test_flat_index_row_major():
+    assert flat_index((1, 0, 1), (2, 2, 2)) == 5
+
+
+def test_format_shape_uses_tuple_form():
+    assert format_shape((2,)) == "(2,)"
+    assert format_shape((2, 2, 2)) == "(2, 2, 2)"
+
+
+def test_format_shape_label_has_no_trailing_comma():
+    assert format_shape_label((3,)) == "(3)"
+    assert format_shape_label((2, 2, 2)) == "(2, 2, 2)"

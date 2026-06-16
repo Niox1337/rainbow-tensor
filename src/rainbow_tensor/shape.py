@@ -4,6 +4,8 @@ This module turns user input into a validated ``tuple[int, ...]`` shape and
 generates the display values used when only a shape is provided.
 """
 
+import itertools
+
 SUPPORTED_NDIM = (1, 2, 3)
 
 
@@ -53,3 +55,38 @@ def validate_shape(shape):
         )
 
     return shape
+
+
+def coordinates(shape):
+    """Yield every coordinate in row-major order for the given shape."""
+    return itertools.product(*[range(dim) for dim in shape])
+
+
+def flat_index(coord, shape):
+    """Return the row-major flat index of ``coord`` inside ``shape``."""
+    index = 0
+    for value, dim in zip(coord, shape):
+        index = index * dim + value
+    return index
+
+
+def generate_values(shape):
+    """Map every coordinate of ``shape`` to a sequential value from 0.
+
+    For shape ``(2, 2, 2)`` this produces the values 0 through 7 in
+    row-major order.
+    """
+    return {coord: flat_index(coord, shape) for coord in coordinates(shape)}
+
+
+def format_shape(shape):
+    """Format a shape the way Python prints a tuple, for example ``(2,)``."""
+    return str(tuple(shape))
+
+
+def format_shape_label(shape):
+    """Format a shape for an on-screen label without a trailing comma.
+
+    For shape ``(3,)`` this returns ``(3)`` rather than ``(3,)``.
+    """
+    return "(" + ", ".join(str(dim) for dim in shape) + ")"
