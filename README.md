@@ -4,6 +4,18 @@ Visualise tensor shape, indexing, and slicing as SVG inside IPython and Jupyter 
 
 rainbow-tensor is made for people who are learning how a tensor is structured and how an indexing expression selects elements. It draws the tensor as nested blocks, rows, and cells, then highlights exactly which elements an index picks out.
 
+## Examples
+
+`show_shape((2, 2, 2))`
+
+![Shape (2, 2, 2)](examples/images/shape_2x2x2.svg)
+
+`show_index((2, 2, 2), (0, slice(None), 1))`
+
+![Index (0, :, 1)](examples/images/index_0_all_1.svg)
+
+More sample images live in `examples/images`, and runnable notebooks live in `examples`.
+
 ## Features
 
 - Static SVG output that stays sharp at any zoom level in a notebook
