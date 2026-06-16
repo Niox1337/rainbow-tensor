@@ -33,3 +33,8 @@ def test_reject_non_integer_dimension():
 def test_reject_boolean_dimension():
     with pytest.raises(TypeError):
         validate_shape((2, True))
+
+
+def test_reject_four_dimensions():
+    with pytest.raises(ValueError):
+        validate_shape((2, 2, 2, 2))
