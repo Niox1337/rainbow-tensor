@@ -34,6 +34,35 @@ def test_show_shape_uses_array_values():
     assert ">20<" in visual.svg
 
 
-def test_show_index_not_implemented_yet():
-    with pytest.raises(NotImplementedError):
-        show_index((2, 2, 2), (0, slice(None), 1))
+def test_show_index_computes_selection_and_result_shape():
+    visual = show_index((2, 2, 2), (0, slice(None), 1))
+    assert visual.selected == [(0, 0, 1), (0, 1, 1)]
+    assert visual.result_shape == (2,)
+    assert "Result shape: (2,)" in visual.svg
+
+
+def test_show_index_highlights_selected_values():
+    visual = show_index((2, 2, 2), (0, slice(None), 1))
+    assert "#fde68a" in visual.svg
+    assert visual.svg.startswith("<svg")
+
+
+def test_show_index_uses_array_values():
+    values = {}
+    for i in range(2):
+        for j in range(2):
+            for k in range(2):
+                values[(i, j, k)] = (i * 4 + j * 2 + k) * 100
+    array = FakeArray((2, 2, 2), values)
+    visual = show_index(array, (0, slice(None), 1))
+    assert ">100<" in visual.svg
+    assert ">300<" in visual.svg
+
+
+def test_show_index_with_numpy_array():
+    np = pytest.importorskip("numpy")
+    x = np.arange(8).reshape(2, 2, 2)
+    visual = show_index(x, (0, slice(None), 1))
+    assert ">1<" in visual.svg
+    assert ">3<" in visual.svg
+    assert visual.result_shape == (2,)
