@@ -1,17 +1,82 @@
 """Notebook display layer.
 
 This module exposes the public functions ``show_shape`` and ``show_index``.
-The real rendering is added in later changes. For now these are placeholders
-so the public API can be imported and wired up.
+Each returns a small object that renders as SVG in a notebook and stays
+inspectable in plain Python, so the package is testable outside a notebook.
 """
+
+from .render_svg import render_svg
+from .shape import extract_shape, format_shape_label
+
+
+class TensorVisual:
+    """A rendered tensor visualisation.
+
+    The ``svg`` attribute holds the SVG string. In a notebook the object is
+    shown as an image through ``_repr_svg_``. Outside a notebook the same
+    string is available for inspection and testing.
+    """
+
+    def __init__(self, svg, shape, selected=None, result=None, explanation=None):
+        self.svg = svg
+        self.shape = shape
+        self.selected = selected
+        self.result_shape = result
+        self.explanation = explanation or []
+
+    def _repr_svg_(self):
+        return self.svg
+
+    def __str__(self):
+        return self.svg
+
+
+def _value_fn_for(obj):
+    """Build a coordinate to value function for array-like input.
+
+    A tuple carries no values, so generated values are used. Any object with
+    a ``.shape`` attribute is read by coordinate, which covers NumPy arrays
+    and any compatible array-like without importing a tensor library.
+    """
+    if isinstance(obj, tuple):
+        return None
+    if not hasattr(obj, "shape"):
+        return None
+
+    def value_fn(coord):
+        value = obj[coord]
+        item = getattr(value, "item", None)
+        if callable(item):
+            return item()
+        return value
+
+    return value_fn
+
+
+def _display(visual):
+    """Display a visual in IPython when available, otherwise do nothing."""
+    try:
+        from IPython.display import display
+    except Exception:
+        return
+    display(visual)
 
 
 def show_shape(shape):
     """Visualise the structure of a tensor shape.
 
-    Not implemented yet.
+    ``shape`` may be a tuple such as ``(2, 2, 2)`` or an array-like object
+    with a ``.shape`` attribute such as a NumPy array. The tensor is rendered
+    as SVG and displayed in a notebook. The returned :class:`TensorVisual`
+    also exposes the SVG string.
     """
-    raise NotImplementedError("show_shape is not implemented yet")
+    normalized = extract_shape(shape)
+    value_fn = _value_fn_for(shape)
+    label = f"Shape {format_shape_label(normalized)}"
+    svg = render_svg(normalized, value_fn=value_fn, label=label)
+    visual = TensorVisual(svg, normalized)
+    _display(visual)
+    return visual
 
 
 def show_index(tensor_or_shape, index):
