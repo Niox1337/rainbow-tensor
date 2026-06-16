@@ -1,16 +1,16 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "rainbow-tensor"
 version = "0.1.0"
-description = "A Python package for IPython/Jupyter notebooks with numpy support"
+description = "Visualise tensor shape, indexing, and slicing as SVG in Jupyter notebooks"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Niox1337"}
+    {name = "Zhixiang Feng", email = "contact@zhixiangfeng.com"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -26,3 +26,23 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/Niox1337/rainbow-tensor"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+    "build>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
