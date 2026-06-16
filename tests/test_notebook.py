@@ -43,7 +43,7 @@ def test_show_index_computes_selection_and_result_shape():
 
 def test_show_index_highlights_selected_values():
     visual = show_index((2, 2, 2), (0, slice(None), 1))
-    assert "#fde68a" in visual.svg
+    assert "#16a34a" in visual.svg
     assert visual.svg.startswith("<svg")
 
 
