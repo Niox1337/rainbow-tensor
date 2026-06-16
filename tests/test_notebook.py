@@ -55,6 +55,14 @@ def test_show_index_highlights_selected_values():
     assert visual.svg.startswith("<svg")
 
 
+def test_show_index_label_colours_tokens_by_axis():
+    visual = show_index((2, 2, 2), (0, slice(None), 1))
+    # red axis 0 token, orange axis 1 token, green leaf token, all as tspans
+    assert '<tspan fill="#dc2626">0</tspan>' in visual.svg
+    assert '<tspan fill="#f97316">:</tspan>' in visual.svg
+    assert '<tspan fill="#16a34a">1</tspan>' in visual.svg
+
+
 def test_show_index_uses_array_values():
     values = {}
     for i in range(2):
