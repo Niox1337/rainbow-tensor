@@ -107,30 +107,19 @@ def _index_label_parts(index):
     return parts
 
 
-def _display(visual):
-    """Display a visual in IPython when available, otherwise do nothing."""
-    try:
-        from IPython.display import display
-    except Exception:
-        return
-    display(visual)
-
-
 def show_shape(shape):
     """Visualise the structure of a tensor shape.
 
     ``shape`` may be a tuple such as ``(2, 2, 2)`` or an array-like object
-    with a ``.shape`` attribute such as a NumPy array. The tensor is rendered
-    as SVG and displayed in a notebook. The returned :class:`TensorVisual`
-    also exposes the SVG string.
+    with a ``.shape`` attribute such as a NumPy array. The returned
+    :class:`TensorVisual` renders as SVG in a notebook through ``_repr_svg_``
+    and also exposes the SVG string for inspection and testing.
     """
     normalized = extract_shape(shape)
     value_fn = _value_fn_for(shape)
     label_parts = _shape_label_parts(normalized)
     svg = render_svg(normalized, value_fn=value_fn, label_parts=label_parts)
-    visual = TensorVisual(svg, normalized)
-    _display(visual)
-    return visual
+    return TensorVisual(svg, normalized)
 
 
 def show_index(tensor_or_shape, index):
@@ -140,7 +129,9 @@ def show_index(tensor_or_shape, index):
     ``.shape`` attribute. ``index`` must be a tuple of integers and slices
     whose length matches the tensor rank. Selected elements are highlighted,
     unselected elements stay visible but de-emphasised, and an explanation of
-    the result shape is drawn below the tensor.
+    the result shape is drawn below the tensor. The returned
+    :class:`TensorVisual` renders as SVG in a notebook through ``_repr_svg_``
+    and also exposes the SVG string for inspection and testing.
     """
     normalized = extract_shape(tensor_or_shape)
     validate_index(index, normalized)
@@ -156,8 +147,6 @@ def show_index(tensor_or_shape, index):
         label_parts=label_parts,
         explanation=explanation,
     )
-    visual = TensorVisual(
+    return TensorVisual(
         svg, normalized, selected=selected, result=result, explanation=explanation
     )
-    _display(visual)
-    return visual

@@ -28,6 +28,21 @@ def test_show_shape_repr_svg_matches_svg():
     assert "Shape (" in visual.svg
 
 
+def test_show_functions_do_not_call_display(monkeypatch):
+    # The result renders once through _repr_svg_, so the functions must not
+    # call display themselves, otherwise a notebook cell shows it twice.
+    import sys
+
+    calls = []
+    fake_module = type(sys)("IPython.display")
+    fake_module.display = lambda *args, **kwargs: calls.append(args)
+    monkeypatch.setitem(sys.modules, "IPython.display", fake_module)
+
+    show_shape((2, 2, 2))
+    show_index((2, 2, 2), (0, slice(None), 1))
+    assert calls == []
+
+
 def test_show_shape_label_colours_frame_axes():
     visual = show_shape((2, 2, 2))
     # axis 0 red and axis 1 orange appear both as frames and as label numbers

@@ -18,6 +18,11 @@ LABEL_COLOR = "#334155"
 LABEL_HEIGHT = 30
 LINE_HEIGHT = 20
 FRAME_WIDTH = 3
+TEXT_MARGIN = 20
+LABEL_FONT_SIZE = 16
+EXPLANATION_FONT_SIZE = 13
+# Approximate width of one monospace character relative to the font size.
+CHAR_WIDTH_RATIO = 0.62
 FONT_FAMILY = "ui-monospace, Menlo, Consolas, monospace"
 
 
@@ -61,6 +66,19 @@ def _cell_color(cell, has_selection):
     if has_selection and cell.selected:
         return SELECT_VALUE_COLOR
     return TEXT_COLOR
+
+
+def _text_width(char_count, font_size):
+    """Estimate the rendered width of a monospace string."""
+    return char_count * font_size * CHAR_WIDTH_RATIO
+
+
+def _text_block_width(label_len, explanation):
+    """Estimate the width needed so the label and explanation are not clipped."""
+    widest = _text_width(label_len, LABEL_FONT_SIZE)
+    for line in explanation:
+        widest = max(widest, _text_width(len(line), EXPLANATION_FONT_SIZE))
+    return 2 * TEXT_MARGIN + widest
 
 
 def _label_element(x, y, parts):
@@ -109,7 +127,12 @@ def render_svg(
             f'fill="{color}">{escape(cell.value)}</text>'
         )
 
-    width = layout.width
+    if label_parts:
+        label_len = sum(len(text) for text, _ in label_parts)
+    else:
+        label_len = len(label)
+    text_width = _text_block_width(label_len, explanation)
+    width = max(layout.width, text_width)
     y = layout.height + LABEL_HEIGHT
 
     if label_parts:
