@@ -60,9 +60,9 @@ def test_reject_boolean_dimension():
         validate_shape((2, True))
 
 
-def test_reject_four_dimensions():
-    with pytest.raises(ValueError):
-        validate_shape((2, 2, 2, 2))
+def test_accepts_high_dimensions():
+    assert validate_shape((2, 2, 2, 2)) == (2, 2, 2, 2)
+    assert validate_shape((2, 2, 2, 2, 2)) == (2, 2, 2, 2, 2)
 
 
 def test_generate_values_for_three_dimensions():

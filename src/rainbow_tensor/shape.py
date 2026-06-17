@@ -6,8 +6,6 @@ generates the display values used when only a shape is provided.
 
 import itertools
 
-SUPPORTED_NDIM = (1, 2, 3)
-
 
 def extract_shape(obj):
     """Extract a validated shape from a tuple or an array-like object.
@@ -28,8 +26,8 @@ def extract_shape(obj):
 def validate_shape(shape):
     """Validate a shape and return it as a ``tuple[int, ...]``.
 
-    The shape must be a non-empty sequence of positive integers with a
-    supported number of dimensions (1D, 2D, or 3D in this version).
+    The shape must be a non-empty sequence of positive integers. Any rank is
+    accepted; the layout nests frames to arbitrary depth.
     """
     if not isinstance(shape, tuple):
         try:
@@ -47,12 +45,6 @@ def validate_shape(shape):
             raise TypeError(f"shape dimensions must be integers, got {dim!r}")
         if dim <= 0:
             raise ValueError(f"shape dimensions must be positive, got {dim!r}")
-
-    if len(shape) not in SUPPORTED_NDIM:
-        raise ValueError(
-            f"only 1D, 2D, and 3D tensors are supported in this version, "
-            f"got {len(shape)} dimensions"
-        )
 
     return shape
 
