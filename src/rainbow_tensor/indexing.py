@@ -236,10 +236,10 @@ def advanced_index(shape, index):
 
     Returns ``(selected_coords, result_shape, explanation_lines)``. A standalone
     boolean mask of matching shape selects every True position. Integer index
-    arrays gather coordinates; with slices they follow NumPy as long as the
-    advanced axes are contiguous (a slice between them moves the result axes to
-    the front, which is refused with a clear error). Index arrays are 1D and
-    broadcast against each other by length.
+    arrays gather coordinates and follow NumPy: the gathered axis stays in place
+    when the advanced axes are contiguous and moves to the front when a slice
+    separates them. Index arrays are 1D and broadcast against each other by
+    length.
     """
     if not isinstance(index, tuple):
         return _mask_index(shape, index)
@@ -328,15 +328,11 @@ def _array_index(shape, index):
         )
 
     arr_axes = [a for a, (kind, _) in enumerate(entries) if kind == "arr"]
-    # ponytail: contiguous advanced axes only. NumPy moves the gathered axes to
-    # the front when a slice separates them; refuse that here rather than render
-    # a layout that would mislead. Upgrade: handle the front-moved block.
+    # NumPy keeps the gathered axis where the advanced block is when the
+    # advanced axes are contiguous, but moves it to the front when a slice
+    # separates them. An int between arrays does not count as a separator.
     between = entries[arr_axes[0]: arr_axes[-1] + 1]
-    if any(kind == "slice" for kind, _ in between):
-        raise IndexError(
-            "advanced indices separated by a slice are not supported yet; "
-            "NumPy would move the gathered axes to the front of the result"
-        )
+    contiguous = not any(kind == "slice" for kind, _ in between)
 
     lengths = {len(entries[a][1]) for a in arr_axes}
     broadcast = {n for n in lengths if n != 1}
@@ -352,15 +348,18 @@ def _array_index(shape, index):
     slice_axes = [a for a, (kind, _) in enumerate(entries) if kind == "slice"]
     slice_pos = {a: expand_slice(entries[a][1], shape[a]) for a in slice_axes}
 
-    result = []
-    placed = False
-    for axis_, (kind, value) in enumerate(entries):
-        if kind == "slice":
-            result.append(len(slice_pos[axis_]))
-        elif kind == "arr" and not placed:
-            result.append(length)
-            placed = True
-    result_shape_ = tuple(result)
+    if contiguous:
+        result = []
+        placed = False
+        for axis_, (kind, _) in enumerate(entries):
+            if kind == "slice":
+                result.append(len(slice_pos[axis_]))
+            elif kind == "arr" and not placed:
+                result.append(length)
+                placed = True
+        result_shape_ = tuple(result)
+    else:
+        result_shape_ = (length,) + tuple(len(slice_pos[a]) for a in slice_axes)
 
     selected = []
     seen = set()
@@ -385,6 +384,10 @@ def _array_index(shape, index):
         f"Index: {format_index(index)}",
         "Advanced indexing with integer arrays.",
         f"Axes {axes_text} gather {length} position{'s' if length != 1 else ''} together.",
-        f"Result shape: {format_shape(result_shape_)}",
     ]
+    if not contiguous:
+        explanation.append(
+            "A slice separates the gathered axes, so the gathered axis moves to the front."
+        )
+    explanation.append(f"Result shape: {format_shape(result_shape_)}")
     return selected, result_shape_, explanation

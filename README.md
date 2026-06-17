@@ -142,11 +142,10 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - `Ellipsis` (`...`) to fill the remaining axes, such as `(0, ..., 1)`
 - `None` (newaxis) to insert a size 1 axis, shown in the result shape and label
 - A full-shape boolean mask, highlighting every True position
-- Integer array (fancy) indexing, including with slices, as long as the advanced axes are next to each other
+- Integer array (fancy) indexing, including mixed with slices, with the gathered axis placed as NumPy does
 
 ## Not supported yet
 
-- Advanced indices separated by a slice, where NumPy moves the gathered axes to the front
 - Multi-dimensional index arrays and per-axis boolean arrays
 - Interactive controls and animation
 

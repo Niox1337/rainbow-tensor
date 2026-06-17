@@ -21,6 +21,8 @@ CASES = [
     ((3, 4, 5), ([0, 2], [1, 3], slice(None))),  # adjacent arrays + slice
     ((3, 4, 5), ([0, 2], 1, [0, 4])),  # an int between arrays does not separate
     ((4,), ([-1, -2],)),  # negative array values
+    ((3, 4, 5), ([0, 2], slice(None), [1, 3])),  # slice between arrays: front moved
+    ((2, 3, 4, 5), (slice(None), [0, 1], slice(None), [2, 4])),  # front moved, slices kept
 ]
 
 
@@ -51,9 +53,6 @@ def test_detects_advanced():
 
 
 def test_refuses_unsupported():
-    # slice between advanced axes: NumPy moves the block to the front
-    with pytest.raises(IndexError):
-        advanced_index((3, 4, 5), ([0, 2], slice(None), [1, 3]))
     # mask shape must match the tensor
     with pytest.raises(IndexError):
         advanced_index((2, 3), np.array([True, False, True]))
