@@ -4,6 +4,7 @@
 
 ### Added
 
+- Shape changing views. Reshape draws the same values flowing from the old layout into the new one, transpose reorders the axes with each axis keeping its colour, and sum and mean collapse a chosen axis and mark the elements that fold into each result. The source and the result sit side by side in one figure through a new multi panel renderer
 - Render tensors of any rank. Frames nest to arbitrary depth, alternating across and down so a 4D or 5D tensor stays compact, with per axis truncation at every level
 - Advanced indexing. A full-shape boolean mask highlights every True position, and integer index arrays highlight the gathered coordinates. The result shape matches NumPy for mixed basic and advanced indexing, including moving the gathered axis to the front when a slice separates the advanced axes
 
