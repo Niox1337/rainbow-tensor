@@ -21,11 +21,6 @@ def test_reject_non_tuple_index(index):
         validate_index(index, (2, 2, 2))
 
 
-def test_reject_none_entry():
-    with pytest.raises(TypeError):
-        validate_index((0, None, 1), (2, 2, 2))
-
-
 def test_reject_wrong_length():
     with pytest.raises(ValueError):
         validate_index((0, slice(None)), (2, 2, 2))
@@ -36,11 +31,25 @@ def test_reject_out_of_range_integer():
         validate_index((2, slice(None), 1), (2, 2, 2))
     with pytest.raises(IndexError):
         validate_index((0, slice(None), 2), (2, 2, 2))
-
-
-def test_reject_negative_integer():
     with pytest.raises(IndexError):
-        validate_index((-1, slice(None), 1), (2, 2, 2))
+        validate_index((-3, slice(None), 1), (2, 2, 2))
+
+
+def test_negative_integer_resolves():
+    assert validate_index((-1, slice(None), -2), (2, 2, 2)) == (1, slice(None), 0)
+    assert selected_coordinates((4,), (-1,)) == [(3,)]
+
+
+def test_ellipsis_expands_to_full_slices():
+    assert validate_index((0, Ellipsis, 1), (2, 3, 2)) == (0, slice(None), 1)
+    assert validate_index((Ellipsis,), (2, 2)) == (slice(None), slice(None))
+    with pytest.raises(IndexError):
+        validate_index((Ellipsis, 0, Ellipsis), (2, 2))
+
+
+def test_newaxis_kept_and_skipped_in_selection():
+    assert validate_index((None, slice(None)), (3,)) == (None, slice(None))
+    assert selected_coordinates((3,), (None, slice(None))) == [(0,), (1,), (2,)]
 
 
 def test_expand_slice():

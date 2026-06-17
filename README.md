@@ -146,15 +146,15 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 
 - 1D, 2D, and 3D tensors
 - Shape tuples and array-like objects with a `.shape` attribute
-- Integer indexing
-- Basic slicing with `slice(None)`, `slice(start, stop)`, and `slice(start, stop, step)`
+- Integer indexing, including negatives such as `-1`
+- Basic slicing with `slice(None)`, `slice(start, stop)`, and `slice(start, stop, step)`, including negative bounds and steps such as `slice(None, None, -1)`
+- `Ellipsis` (`...`) to fill the remaining axes, such as `(0, ..., 1)`
+- `None` (newaxis) to insert a size 1 axis, shown in the result shape and label
 
 ## Not supported yet
 
 - Advanced NumPy indexing
 - Boolean masks
-- `None` and `newaxis`
-- Ellipsis
 - 4D or higher tensors
 - Interactive controls and animation
 

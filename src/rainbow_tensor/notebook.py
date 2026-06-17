@@ -7,7 +7,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 
 from .indexing import (
     explain_index,
-    format_slice,
+    format_token,
     result_shape,
     selected_coordinates,
     validate_index,
@@ -103,7 +103,7 @@ def _index_label_parts(index, theme):
     neutral = theme.heading
     parts = [("Index (", neutral)]
     for axis, entry in enumerate(index):
-        token = format_slice(entry) if isinstance(entry, slice) else str(entry)
+        token = format_token(entry)
         if axis < ndim - 1:
             color = theme.axis_color(axis)
         else:
