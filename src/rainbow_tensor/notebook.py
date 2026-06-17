@@ -5,6 +5,8 @@ Each returns a small object that renders as SVG in a notebook and stays
 inspectable in plain Python, so the package is testable outside a notebook.
 """
 
+import builtins
+
 from .indexing import (
     advanced_index,
     explain_index,
@@ -15,9 +17,22 @@ from .indexing import (
     selected_coordinates,
     validate_index,
 )
-from .render_svg import render_svg
-from .shape import extract_shape
+from .ops import (
+    reduce_result_shape,
+    reduce_source_coords,
+    reshape_result_shape,
+    reshape_source_coord,
+    transpose_axes,
+    transpose_result_shape,
+    transpose_source_coord,
+)
+from .render_svg import render_panels, render_svg
+from .shape import coordinates, extract_shape, flat_index, format_shape
 from .theme import resolve_theme
+
+# The public ``sum`` below shadows the builtin in this module, so keep a handle
+# to the real one for the reduction maths.
+_py_sum = builtins.sum
 
 
 class TensorVisual:
@@ -199,3 +214,191 @@ def index(array, index, theme=None, precision=2):
     return TensorVisual(
         svg, normalized, selected=selected, result=result, explanation=explanation
     )
+
+
+def _source_value(array, shape):
+    """Return a coordinate to value function for ``array``.
+
+    An array-like is read by coordinate. A bare shape tuple carries no values,
+    so the row major flat index stands in, matching :func:`shape`.
+    """
+    value_fn = _value_fn_for(array)
+    if value_fn is None:
+        return lambda coord: flat_index(coord, shape)
+    return value_fn
+
+
+def _shape_caption_parts(name, shape, theme, color_for=None):
+    """Build a coloured caption naming a panel and its shape.
+
+    ``color_for`` maps an axis to its colour, defaulting to the axis ramp with
+    a muted leaf axis. Passing a custom map lets a transpose colour each axis
+    by where it came from.
+    """
+    ndim = len(shape)
+
+    def default_color(axis):
+        return theme.axis_color(axis) if axis < ndim - 1 else theme.text_muted
+
+    color_for = color_for or default_color
+    neutral = theme.heading
+    parts = [(f"{name} (", neutral)]
+    for axis, dim in enumerate(shape):
+        parts.append((str(dim), color_for(axis)))
+        if axis < ndim - 1:
+            parts.append((", ", neutral))
+    parts.append((")", neutral))
+    return parts
+
+
+def reshape(array, new_shape, theme=None, precision=2):
+    """Visualise a reshape from the source layout into a new one.
+
+    ``array`` is an array-like with a ``.shape`` attribute or a shape tuple.
+    ``new_shape`` is the target shape and may use a single ``-1`` to infer one
+    axis. The source and the result are drawn side by side. Reshape keeps the
+    row major order, so the element at a flat position stays at that flat
+    position, which the figure makes visible by carrying the same values into
+    the new layout.
+    """
+    theme = resolve_theme(theme)
+    old = extract_shape(array)
+    new = reshape_result_shape(old, new_shape)
+    source_value = _source_value(array, old)
+
+    def result_value(coord):
+        return source_value(reshape_source_coord(coord, old, new))
+
+    explanation = [
+        f"Original shape: {format_shape(old)}",
+        f"New shape: {format_shape(new)}",
+        "Values keep their row major order, so element k stays element k.",
+    ]
+    panels = [
+        {
+            "shape": old,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", old, theme),
+        },
+        {
+            "shape": new,
+            "value_fn": result_value,
+            "caption_parts": _shape_caption_parts("reshape", new, theme),
+        },
+    ]
+    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, old, result=new, explanation=explanation)
+
+
+def transpose(array, axes=None, theme=None, precision=2):
+    """Visualise a transpose or permute, with axis colours following the move.
+
+    ``axes`` is a permutation of the source axes, or ``None`` to reverse them
+    like ``numpy.transpose``. The result panel colours each axis by the source
+    axis it came from, so a colour can be traced across the swap.
+    """
+    theme = resolve_theme(theme)
+    shape = extract_shape(array)
+    perm = transpose_axes(len(shape), axes)
+    result = transpose_result_shape(shape, perm)
+    source_value = _source_value(array, shape)
+
+    def result_value(coord):
+        return source_value(transpose_source_coord(coord, perm))
+
+    # Result axis r came from source axis perm[r], so it borrows that colour.
+    result_theme = theme.variant(
+        axis_colors=tuple(theme.axis_color(perm[r]) for r in range(len(perm)))
+    )
+
+    def result_color(axis):
+        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Axes order: {perm}",
+        f"Result shape: {format_shape(result)}",
+        "Each axis keeps its colour as it moves to its new position.",
+    ]
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                "transpose", result, theme, color_for=result_color
+            ),
+        },
+    ]
+    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shape, result=result, explanation=explanation)
+
+
+def _reduce(array, axis, op_name, combine, theme, precision):
+    """Shared body for axis reductions such as sum and mean."""
+    theme = resolve_theme(theme)
+    shape = extract_shape(array)
+    result = reduce_result_shape(shape, axis)
+    source_value = _source_value(array, shape)
+    axis = axis + len(shape) if axis < 0 else axis
+
+    values = {}
+    for rc in coordinates(result):
+        contributing = list(reduce_source_coords(rc, shape, axis))
+        values[rc] = combine([source_value(sc) for sc in contributing])
+
+    # Mark the source elements that collapse into the first result element.
+    first = next(iter(coordinates(result)))
+    selected = list(reduce_source_coords(first, shape, axis))
+
+    disp = result or (1,)
+
+    def result_value(coord):
+        return values[() if not result else coord]
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Reducing axis {axis} with {op_name}.",
+        f"Result shape: {format_shape(result)}",
+        f"Each result element combines {shape[axis]} values from axis {axis}.",
+    ]
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "selected": selected,
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": disp,
+            "value_fn": result_value,
+            "caption_parts": _shape_caption_parts(op_name, disp, theme),
+        },
+    ]
+    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shape, selected=selected, result=result, explanation=explanation)
+
+
+def sum(array, axis, theme=None, precision=2):
+    """Visualise a sum reduction over ``axis``.
+
+    The source panel marks the elements that collapse into the first result
+    element, and the result panel holds the per group sums with the reduced
+    axis gone.
+    """
+    return _reduce(array, axis, "sum", _py_sum, theme, precision)
+
+
+def mean(array, axis, theme=None, precision=2):
+    """Visualise a mean reduction over ``axis``.
+
+    The source panel marks the elements that collapse into the first result
+    element, and the result panel holds the per group means with the reduced
+    axis gone.
+    """
+    return _reduce(array, axis, "mean", lambda vs: _py_sum(vs) / len(vs), theme, precision)
