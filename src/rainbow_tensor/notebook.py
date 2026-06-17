@@ -12,13 +12,9 @@ from .indexing import (
     selected_coordinates,
     validate_index,
 )
-from .render_svg import (
-    AXIS_FRAME_COLORS,
-    NEUTRAL_COLOR,
-    SELECT_VALUE_COLOR,
-    render_svg,
-)
+from .render_svg import render_svg
 from .shape import extract_shape
+from .theme import resolve_theme
 
 
 class TensorVisual:
@@ -41,6 +37,16 @@ class TensorVisual:
 
     def __str__(self):
         return self.svg
+
+    def save(self, path):
+        """Write the SVG to ``path`` and return the path.
+
+        The text is written as UTF-8 so the ellipsis and legend glyphs survive
+        the round trip. ``path`` may be a string or a path-like object.
+        """
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(self.svg)
+        return path
 
 
 def _value_fn_for(obj):
@@ -65,27 +71,28 @@ def _value_fn_for(obj):
     return value_fn
 
 
-def _shape_label_parts(shape):
+def _shape_label_parts(shape, theme):
     """Build coloured label parts for a shape.
 
     Each dimension is coloured to match its frame. Frame axes use their axis
     colour and the leaf axis stays neutral, since it has no frame.
     """
     ndim = len(shape)
-    parts = [("Shape (", NEUTRAL_COLOR)]
+    neutral = theme.heading
+    parts = [("Shape (", neutral)]
     for axis, dim in enumerate(shape):
         if axis < ndim - 1:
-            color = AXIS_FRAME_COLORS.get(axis, NEUTRAL_COLOR)
+            color = theme.axis_color(axis)
         else:
-            color = NEUTRAL_COLOR
+            color = theme.text_muted
         parts.append((str(dim), color))
         if axis < ndim - 1:
-            parts.append((", ", NEUTRAL_COLOR))
-    parts.append((")", NEUTRAL_COLOR))
+            parts.append((", ", neutral))
+    parts.append((")", neutral))
     return parts
 
 
-def _index_label_parts(index):
+def _index_label_parts(index, theme):
     """Build coloured label parts for an index.
 
     Each token is coloured to match its axis. Frame axes use their axis
@@ -93,59 +100,74 @@ def _index_label_parts(index):
     mirrors the colours drawn on the tensor.
     """
     ndim = len(index)
-    parts = [("Index (", NEUTRAL_COLOR)]
+    neutral = theme.heading
+    parts = [("Index (", neutral)]
     for axis, entry in enumerate(index):
         token = format_slice(entry) if isinstance(entry, slice) else str(entry)
         if axis < ndim - 1:
-            color = AXIS_FRAME_COLORS.get(axis, NEUTRAL_COLOR)
+            color = theme.axis_color(axis)
         else:
-            color = SELECT_VALUE_COLOR
+            color = theme.surface_selected
         parts.append((token, color))
         if axis < ndim - 1:
-            parts.append((", ", NEUTRAL_COLOR))
-    parts.append((")", NEUTRAL_COLOR))
+            parts.append((", ", neutral))
+    parts.append((")", neutral))
     return parts
 
 
-def show_shape(shape):
+def show_shape(shape, theme=None, precision=2):
     """Visualise the structure of a tensor shape.
 
     ``shape`` may be a tuple such as ``(2, 2, 2)`` or an array-like object
-    with a ``.shape`` attribute such as a NumPy array. The returned
-    :class:`TensorVisual` renders as SVG in a notebook through ``_repr_svg_``
-    and also exposes the SVG string for inspection and testing.
+    with a ``.shape`` attribute such as a NumPy array. ``theme`` chooses the
+    palette and geometry, accepting a :class:`~rainbow_tensor.theme.Theme`, a
+    theme name, or ``None`` for the module default. ``precision`` controls how
+    floats are formatted. The returned :class:`TensorVisual` renders as SVG in
+    a notebook through ``_repr_svg_`` and also exposes the SVG string for
+    inspection and testing.
     """
+    theme = resolve_theme(theme)
     normalized = extract_shape(shape)
     value_fn = _value_fn_for(shape)
-    label_parts = _shape_label_parts(normalized)
-    svg = render_svg(normalized, value_fn=value_fn, label_parts=label_parts)
+    label_parts = _shape_label_parts(normalized, theme)
+    svg = render_svg(
+        normalized,
+        value_fn=value_fn,
+        label_parts=label_parts,
+        theme=theme,
+        precision=precision,
+    )
     return TensorVisual(svg, normalized)
 
 
-def show_index(tensor_or_shape, index):
+def show_index(tensor_or_shape, index, theme=None, precision=2):
     """Visualise how an index selects elements from a tensor.
 
     ``tensor_or_shape`` may be a shape tuple or an array-like object with a
     ``.shape`` attribute. ``index`` must be a tuple of integers and slices
     whose length matches the tensor rank. Selected elements are highlighted,
     unselected elements stay visible but de-emphasised, and an explanation of
-    the result shape is drawn below the tensor. The returned
-    :class:`TensorVisual` renders as SVG in a notebook through ``_repr_svg_``
-    and also exposes the SVG string for inspection and testing.
+    the result shape is drawn below the tensor. ``theme`` and ``precision``
+    behave as in :func:`show_shape`. The returned :class:`TensorVisual`
+    renders as SVG in a notebook through ``_repr_svg_`` and also exposes the
+    SVG string for inspection and testing.
     """
+    theme = resolve_theme(theme)
     normalized = extract_shape(tensor_or_shape)
     validate_index(index, normalized)
     selected = selected_coordinates(normalized, index)
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
     value_fn = _value_fn_for(tensor_or_shape)
-    label_parts = _index_label_parts(index)
+    label_parts = _index_label_parts(index, theme)
     svg = render_svg(
         normalized,
         selected=selected,
         value_fn=value_fn,
         label_parts=label_parts,
         explanation=explanation,
+        theme=theme,
+        precision=precision,
     )
     return TensorVisual(
         svg, normalized, selected=selected, result=result, explanation=explanation

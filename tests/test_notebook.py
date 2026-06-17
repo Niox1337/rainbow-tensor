@@ -47,7 +47,7 @@ def test_show_shape_label_colours_frame_axes():
     visual = show_shape((2, 2, 2))
     # axis 0 red and axis 1 orange appear both as frames and as label numbers
     assert "#dc2626" in visual.svg
-    assert "#f97316" in visual.svg
+    assert "#ea580c" in visual.svg
     assert "<tspan" in visual.svg
 
 
@@ -74,7 +74,7 @@ def test_show_index_label_colours_tokens_by_axis():
     visual = show_index((2, 2, 2), (0, slice(None), 1))
     # red axis 0 token, orange axis 1 token, green leaf token, all as tspans
     assert '<tspan fill="#dc2626">0</tspan>' in visual.svg
-    assert '<tspan fill="#f97316">:</tspan>' in visual.svg
+    assert '<tspan fill="#ea580c">:</tspan>' in visual.svg
     assert '<tspan fill="#16a34a">1</tspan>' in visual.svg
 
 
