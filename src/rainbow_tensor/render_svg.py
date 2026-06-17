@@ -250,6 +250,38 @@ def _label_element(x, y, parts):
     )
 
 
+def _render_body(shape, selected_list, value_fn, theme, precision, hover):
+    """Render the frames and cells of one tensor in local coordinates.
+
+    Returns ``(body_svg, width, height, theme)``. The cells may grow to fit a
+    wide value, which yields a theme variant, so the caller uses the returned
+    theme for any later measurement. Coordinates start at the theme padding,
+    so a panel renderer can translate the whole body by an offset.
+    """
+    has_selection = len(selected_list) > 0
+    layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
+
+    # Grow the cells if any value is wider than the default, then lay out again
+    # so the widened cells sit on the correct grid.
+    fitted = _fit_cell_width(layout, theme, precision)
+    if fitted > theme.cell_w:
+        theme = theme.variant(cell_w=fitted)
+        layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
+
+    parts = []
+    for frame in layout.frames:
+        color = _frame_color(frame, has_selection, theme)
+        parts.append(
+            f'<rect x="{frame.x:.0f}" y="{frame.y:.0f}" '
+            f'width="{frame.width:.0f}" height="{frame.height:.0f}" '
+            f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{color}" '
+            f'stroke-width="{theme.frame_width}"/>'
+        )
+    for cell in layout.cells:
+        parts.append(_render_cell(cell, has_selection, theme, precision, hover))
+    return "".join(parts), layout.width, layout.height, theme
+
+
 def render_svg(
     shape,
     selected=None,
@@ -275,31 +307,12 @@ def render_svg(
     theme = resolve_theme(theme)
     explanation = explanation or []
     selected_list = list(selected or [])
+
+    body, body_w, body_h, theme = _render_body(
+        shape, selected_list, value_fn, theme, precision, hover
+    )
     has_selection = len(selected_list) > 0
-    layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
-
-    # Grow the cells if any value is wider than the default, then lay out again
-    # so the widened cells sit on the correct grid.
-    fitted = _fit_cell_width(layout, theme, precision)
-    if fitted > theme.cell_w:
-        theme = theme.variant(cell_w=fitted)
-        layout = build_layout(
-            shape, selected=selected_list, value_fn=value_fn, theme=theme
-        )
-
-    parts = []
-
-    for frame in layout.frames:
-        color = _frame_color(frame, has_selection, theme)
-        parts.append(
-            f'<rect x="{frame.x:.0f}" y="{frame.y:.0f}" '
-            f'width="{frame.width:.0f}" height="{frame.height:.0f}" '
-            f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{color}" '
-            f'stroke-width="{theme.frame_width}"/>'
-        )
-
-    for cell in layout.cells:
-        parts.append(_render_cell(cell, has_selection, theme, precision, hover))
+    parts = [body]
 
     if label_parts:
         label_len = sum(len(text) for text, _ in label_parts)
@@ -317,8 +330,8 @@ def render_svg(
     if legend_items:
         content_width = max(content_width, _legend_width(legend_items))
 
-    width = max(layout.width, content_width)
-    y = layout.height + LABEL_HEIGHT - 8
+    width = max(body_w, content_width)
+    y = body_h + LABEL_HEIGHT - 8
 
     if label_parts:
         parts.append(_label_element(TEXT_MARGIN, y, label_parts))
@@ -345,3 +358,99 @@ def render_svg(
 
     height = y + 18
     return svg_document("".join(parts), width, height, theme=theme)
+
+
+PANEL_GAP = 64  # horizontal room between panels, holding the connector glyph
+CONNECTOR_FONT_SIZE = 26
+CAPTION_FONT_SIZE = 14
+CAPTION_HEIGHT = 26
+
+
+def _centered_parts(cx, y, parts, font_size, weight="700"):
+    """Render coloured ``parts`` centred on ``cx`` at baseline ``y``."""
+    spans = "".join(
+        f'<tspan fill="{escape(color)}">{escape(text)}</tspan>' for text, color in parts
+    )
+    return (
+        f'<text x="{cx:.0f}" y="{y:.0f}" text-anchor="middle" '
+        f'font-size="{font_size}" font-weight="{weight}">{spans}</text>'
+    )
+
+
+def render_panels(panels, connectors=None, explanation=None, theme=None, precision=2, hover=True):
+    """Render several tensors side by side in one SVG.
+
+    Each panel is a dict with a ``shape``, an optional ``value_fn`` and
+    ``selected`` iterable, an optional ``theme`` override used to tint an
+    operand, and optional ``caption_parts`` drawn under the panel as coloured
+    ``(text, colour)`` pairs. ``connectors`` is a list of glyph strings drawn
+    between consecutive panels, for example ``"->"`` or ``"+"``. ``explanation``
+    is a shared list of lines drawn below every panel. This composes the
+    existing single tensor body, so the source and the result of an operation,
+    or several operands, sit in one figure.
+    """
+    theme = resolve_theme(theme)
+    connectors = connectors or []
+    explanation = explanation or []
+
+    bodies = []
+    for panel in panels:
+        ptheme = panel.get("theme") or theme
+        body, w, h, ptheme = _render_body(
+            panel["shape"],
+            list(panel.get("selected") or []),
+            panel.get("value_fn"),
+            ptheme,
+            precision,
+            hover,
+        )
+        bodies.append((body, w, h, panel))
+
+    row_height = max(h for _, _, h, _ in bodies)
+    has_caption = any(p.get("caption_parts") for _, _, _, p in bodies)
+
+    parts = []
+    centers = []
+    cursor = 0.0
+    for i, (body, w, h, _) in enumerate(bodies):
+        dy = (row_height - h) / 2
+        parts.append(f'<g transform="translate({cursor:.0f}, {dy:.0f})">{body}</g>')
+        centers.append(cursor + w / 2)
+        cursor += w
+        if i < len(bodies) - 1:
+            glyph = connectors[i] if i < len(connectors) else "->"
+            cx = cursor + PANEL_GAP / 2
+            parts.append(
+                f'<text x="{cx:.0f}" y="{row_height / 2:.0f}" text-anchor="middle" '
+                f'dominant-baseline="central" font-size="{CONNECTOR_FONT_SIZE}" '
+                f'fill="{escape(theme.text_muted)}">{escape(glyph)}</text>'
+            )
+            cursor += PANEL_GAP
+
+    row_width = cursor
+    y = row_height
+
+    if has_caption:
+        y += CAPTION_HEIGHT - 8
+        for center, (_, _, _, panel) in zip(centers, bodies):
+            caption = panel.get("caption_parts")
+            if caption:
+                parts.append(_centered_parts(center, y, caption, CAPTION_FONT_SIZE))
+        y += 6
+
+    for line in explanation:
+        y += LINE_HEIGHT - 4
+        parts.append(
+            f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{EXPLANATION_FONT_SIZE}" '
+            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
+            f"{escape(line)}</text>"
+        )
+
+    content_width = row_width
+    for line in explanation:
+        content_width = max(
+            content_width,
+            _text_width(len(line), EXPLANATION_FONT_SIZE, MONO_CHAR_RATIO) + 2 * TEXT_MARGIN,
+        )
+
+    return svg_document("".join(parts), content_width, y + 18, theme=theme)
