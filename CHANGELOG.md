@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Renamed `show_shape` to `shape` and `show_index` to `index`. The first argument is an array-like object whose own values are rendered, or a shape tuple as before
+
 ## 0.2.1
 
 ### Fixed

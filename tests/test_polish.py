@@ -30,13 +30,13 @@ def test_visible_positions_truncates_long_axis():
 
 
 def test_long_axis_draws_ellipsis_cell():
-    visual = rt.show_shape((30,))
+    visual = rt.shape((30,))
     assert COL_ELLIPSIS in visual.svg
 
 
 def test_long_axis_stays_bounded_in_width():
-    narrow = _width(rt.show_shape((6,)).svg)
-    wide = _width(rt.show_shape((300,)).svg)
+    narrow = _width(rt.shape((6,)).svg)
+    wide = _width(rt.shape((300,)).svg)
     # a far larger axis must not grow the canvas without bound
     assert wide < narrow * 3
 
@@ -59,14 +59,14 @@ def test_two_dimensional_long_axis_truncates_rows():
 
 
 def test_legend_names_each_axis():
-    svg = rt.show_shape((2, 3, 4)).svg
+    svg = rt.shape((2, 3, 4)).svg
     assert "axis 0" in svg
     assert "axis 1" in svg
     assert "axis 2" in svg
 
 
 def test_legend_uses_axis_colours():
-    svg = rt.show_shape((2, 3)).svg
+    svg = rt.shape((2, 3)).svg
     # the axis 0 swatch carries the red ramp colour
     assert 'rx="3" fill="#dc2626"' in svg
 
@@ -74,16 +74,16 @@ def test_legend_uses_axis_colours():
 def test_leaf_legend_swatch_matches_label_colour():
     # in an index view the leaf axis is green on the figure and in the tuple,
     # so its legend swatch must be green too, not a stray grey
-    index_svg = rt.show_index((2, 3), (slice(None), 1)).svg
+    index_svg = rt.index((2, 3), (slice(None), 1)).svg
     assert f'rx="3" fill="{rt.LIGHT.surface_selected}"' in index_svg
     assert f'rx="3" fill="{rt.LIGHT.text_muted}"' not in index_svg
     # in a shape view there is no selection, so the leaf swatch stays muted
-    shape_svg = rt.show_shape((2, 3)).svg
+    shape_svg = rt.shape((2, 3)).svg
     assert f'rx="3" fill="{rt.LIGHT.text_muted}"' in shape_svg
 
 
 def test_hover_titles_carry_coordinate_and_flat_index():
-    svg = rt.show_shape((2, 2)).svg
+    svg = rt.shape((2, 2)).svg
     assert "<title>" in svg
     assert "flat" in svg
 
@@ -91,19 +91,19 @@ def test_hover_titles_carry_coordinate_and_flat_index():
 def test_float_values_use_precision():
     np = pytest.importorskip("numpy")
     x = np.array([0.123456, 1.5, 2.0])
-    two = rt.show_shape(x, precision=2).svg
-    four = rt.show_shape(x, precision=4).svg
+    two = rt.shape(x, precision=2).svg
+    four = rt.shape(x, precision=4).svg
     assert ">0.12<" in two
     assert ">0.1235<" in four
 
 
 def test_numeric_cells_are_right_aligned():
-    svg = rt.show_shape((4,)).svg
+    svg = rt.shape((4,)).svg
     assert 'text-anchor="end"' in svg
 
 
 def test_save_writes_svg_to_file(tmp_path):
-    visual = rt.show_shape((2, 2, 2), theme="dark")
+    visual = rt.shape((2, 2, 2), theme="dark")
     path = tmp_path / "tensor.svg"
     returned = visual.save(path)
     assert returned == path
@@ -121,7 +121,7 @@ def _cell_values(svg):
 def test_high_precision_value_fits_inside_cell():
     np = pytest.importorskip("numpy")
     x = np.array([0.123456789, 1.0, 2.0])
-    svg = rt.show_shape(x, precision=8).svg
+    svg = rt.shape(x, precision=8).svg
     longest = max(len(v) for v in _cell_values(svg))
     cell_w = _first_cell_width(svg)
     # the widest value plus its padding must fit within the cell it sits in
@@ -131,19 +131,19 @@ def test_high_precision_value_fits_inside_cell():
 def test_higher_precision_grows_the_cell():
     np = pytest.importorskip("numpy")
     x = np.array([0.123456789, 1.0, 2.0])
-    low = _first_cell_width(rt.show_shape(x, precision=2).svg)
-    high = _first_cell_width(rt.show_shape(x, precision=8).svg)
+    low = _first_cell_width(rt.shape(x, precision=2).svg)
+    high = _first_cell_width(rt.shape(x, precision=8).svg)
     assert high > low
 
 
 def test_short_values_keep_default_cell_width():
     # integers shorter than the default never shrink the cell below the theme
-    svg = rt.show_shape((2, 3)).svg
+    svg = rt.shape((2, 3)).svg
     assert _first_cell_width(svg) == rt.LIGHT.cell_w
 
 
-def test_precision_argument_reaches_show_index():
+def test_precision_argument_reaches_index():
     np = pytest.importorskip("numpy")
     x = np.linspace(0.0, 1.0, 6).reshape(2, 3)
-    svg = rt.show_index(x, (0, slice(None)), precision=1).svg
+    svg = rt.index(x, (0, slice(None)), precision=1).svg
     assert ">0.0<" in svg

@@ -1,6 +1,6 @@
 """Notebook display layer.
 
-This module exposes the public functions ``show_shape`` and ``show_index``.
+This module exposes the public functions ``shape`` and ``index``.
 Each returns a small object that renders as SVG in a notebook and stays
 inspectable in plain Python, so the package is testable outside a notebook.
 """
@@ -115,20 +115,21 @@ def _index_label_parts(index, theme):
     return parts
 
 
-def show_shape(shape, theme=None, precision=2):
+def shape(array, theme=None, precision=2):
     """Visualise the structure of a tensor shape.
 
-    ``shape`` may be a tuple such as ``(2, 2, 2)`` or an array-like object
-    with a ``.shape`` attribute such as a NumPy array. ``theme`` chooses the
-    palette and geometry, accepting a :class:`~rainbow_tensor.theme.Theme`, a
-    theme name, or ``None`` for the module default. ``precision`` controls how
-    floats are formatted. The returned :class:`TensorVisual` renders as SVG in
-    a notebook through ``_repr_svg_`` and also exposes the SVG string for
-    inspection and testing.
+    ``array`` may be an array-like object with a ``.shape`` attribute such as
+    a NumPy array, in which case its own values are rendered, or a tuple such
+    as ``(2, 2, 2)``, in which case placeholder values are generated. ``theme``
+    chooses the palette and geometry, accepting a
+    :class:`~rainbow_tensor.theme.Theme`, a theme name, or ``None`` for the
+    module default. ``precision`` controls how floats are formatted. The
+    returned :class:`TensorVisual` renders as SVG in a notebook through
+    ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
     """
     theme = resolve_theme(theme)
-    normalized = extract_shape(shape)
-    value_fn = _value_fn_for(shape)
+    normalized = extract_shape(array)
+    value_fn = _value_fn_for(array)
     label_parts = _shape_label_parts(normalized, theme)
     svg = render_svg(
         normalized,
@@ -140,25 +141,25 @@ def show_shape(shape, theme=None, precision=2):
     return TensorVisual(svg, normalized)
 
 
-def show_index(tensor_or_shape, index, theme=None, precision=2):
+def index(array, index, theme=None, precision=2):
     """Visualise how an index selects elements from a tensor.
 
-    ``tensor_or_shape`` may be a shape tuple or an array-like object with a
-    ``.shape`` attribute. ``index`` must be a tuple of integers and slices
-    whose length matches the tensor rank. Selected elements are highlighted,
-    unselected elements stay visible but de-emphasised, and an explanation of
-    the result shape is drawn below the tensor. ``theme`` and ``precision``
-    behave as in :func:`show_shape`. The returned :class:`TensorVisual`
-    renders as SVG in a notebook through ``_repr_svg_`` and also exposes the
-    SVG string for inspection and testing.
+    ``array`` may be an array-like object with a ``.shape`` attribute, in
+    which case its own values are rendered, or a shape tuple. ``index`` must
+    be a tuple of integers and slices whose length matches the tensor rank.
+    Selected elements are highlighted, unselected elements stay visible but
+    de-emphasised, and an explanation of the result shape is drawn below the
+    tensor. ``theme`` and ``precision`` behave as in :func:`shape`. The
+    returned :class:`TensorVisual` renders as SVG in a notebook through
+    ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
     """
     theme = resolve_theme(theme)
-    normalized = extract_shape(tensor_or_shape)
+    normalized = extract_shape(array)
     validate_index(index, normalized)
     selected = selected_coordinates(normalized, index)
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
-    value_fn = _value_fn_for(tensor_or_shape)
+    value_fn = _value_fn_for(array)
     label_parts = _index_label_parts(index, theme)
     svg = render_svg(
         normalized,

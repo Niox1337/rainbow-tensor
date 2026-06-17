@@ -6,17 +6,17 @@ rainbow-tensor is made for people who are learning how a tensor is structured an
 
 ## Examples
 
-`rt.show_shape((2, 2, 2))`
+`rt.shape(np.arange(8).reshape(2, 2, 2))`
 
 ![Shape (2, 2, 2)](examples/images/shape_2x2x2.svg)
 
-`rt.show_index((2, 2, 2), (0, slice(None), 1))`
+`rt.index(np.arange(8).reshape(2, 2, 2), (0, slice(None), 1))`
 
 ![Index (0, :, 1)](examples/images/index_0_all_1.svg)
 
 The same view also renders in a dark theme.
 
-`rt.show_shape((2, 2, 2), theme="dark")`
+`rt.shape(np.arange(8).reshape(2, 2, 2), theme="dark")`
 
 ![Shape (2, 2, 2) dark](examples/images/shape_2x2x2_dark.svg)
 
@@ -53,19 +53,21 @@ In an index view only the selected frames keep their axis colour. The rest of th
 Pass `theme="light"` or `theme="dark"` to any call, or set a module default that every later call follows.
 
 ```python
+import numpy as np
 import rainbow_tensor as rt
 
-rt.show_shape((2, 2, 2), theme="dark")
+x = np.arange(8).reshape(2, 2, 2)
+rt.shape(x, theme="dark")
 
 rt.set_default_theme("dark")
-rt.show_index((2, 2, 2), (0, slice(None), 1))
+rt.index(x, (0, slice(None), 1))
 ```
 
 A theme bundles the colours, fonts, cell size, stroke width, and the truncation limit. Derive a tweaked copy with `variant` and pass it directly.
 
 ```python
 roomy = rt.LIGHT.variant(cell_w=64, max_cells=8)
-rt.show_shape((2, 4), theme=roomy)
+rt.shape(np.arange(8).reshape(2, 4), theme=roomy)
 ```
 
 ## Float precision and saving
@@ -77,7 +79,7 @@ import numpy as np
 import rainbow_tensor as rt
 
 x = np.linspace(0, 1, 6).reshape(2, 3)
-visual = rt.show_shape(x, precision=3)
+visual = rt.shape(x, precision=3)
 visual.save("tensor.svg")
 ```
 
@@ -114,31 +116,20 @@ The convention is to import the package as `rt`.
 Visualise a shape.
 
 ```python
+import numpy as np
 import rainbow_tensor as rt
 
-rt.show_shape((2, 2, 2))
+x = np.arange(8).reshape(2, 2, 2)
+rt.shape(x)
 ```
 
 Visualise how an index selects elements.
 
 ```python
-import rainbow_tensor as rt
-
-rt.show_index((2, 2, 2), (0, slice(None), 1))
+rt.index(x, (0, slice(None), 1))
 ```
 
-For the shape `(2, 2, 2)` the index `(0, slice(None), 1)` selects the values `1` and `3`, the selected coordinates are `(0, 0, 1)` and `(0, 1, 1)`, and the result shape is `(2,)`.
-
-Use a real NumPy array to display its actual values.
-
-```python
-import numpy as np
-import rainbow_tensor as rt
-
-x = np.arange(8).reshape(2, 2, 2)
-rt.show_shape(x)
-rt.show_index(x, (0, slice(None), 1))
-```
+For the array `np.arange(8).reshape(2, 2, 2)` the index `(0, slice(None), 1)` selects the values `1` and `3`, the selected coordinates are `(0, 0, 1)` and `(0, 1, 1)`, and the result shape is `(2,)`.
 
 Each function returns a small result object. Its `svg` attribute holds the SVG string, so the package can be inspected and tested outside a notebook.
 
