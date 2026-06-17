@@ -1,29 +1,45 @@
 """SVG rendering.
 
 This module turns a :class:`~rainbow_tensor.layout.Layout` into an SVG
-string. Each axis has its own colour. Axis 0 frames are red and axis 1
-frames are orange. The leaf axis elements are plain text. Selected elements
-are drawn green and, in an index view, only the selected frames keep their
-axis colour while the rest are drawn in a neutral dark tone.
+string. Every visual choice comes from the active
+:class:`~rainbow_tensor.theme.Theme`, so the same tensor renders in the light
+or the dark preset without any change here.
+
+Each non-leaf axis draws a frame in its rainbow colour. Leaf elements sit in
+rounded cells. In a shape view every frame keeps its axis colour. In an index
+view the selected elements fill green, the selected frames keep their colour,
+and the rest are dimmed so the selection stands out. An axis legend below the
+tensor names each axis with its size in the matching colour, and each cell
+carries an optional hover title with its coordinate and flat index.
 """
 
+import math
+
 from .layout import build_layout
+from .theme import LIGHT, resolve_theme
 
-AXIS_FRAME_COLORS = {0: "#dc2626", 1: "#f97316"}
-SELECT_VALUE_COLOR = "#16a34a"
-NEUTRAL_COLOR = "#111827"
-TEXT_COLOR = "#111827"
-LABEL_COLOR = "#334155"
+# Back-compatible colour constants, sourced from the light preset so existing
+# imports and the notebook layer keep working.
+AXIS_FRAME_COLORS = {0: LIGHT.axis_colors[0], 1: LIGHT.axis_colors[1]}
+SELECT_VALUE_COLOR = LIGHT.surface_selected
+NEUTRAL_COLOR = LIGHT.neutral
+TEXT_COLOR = LIGHT.text
+LABEL_COLOR = LIGHT.heading
 
-LABEL_HEIGHT = 30
+LABEL_HEIGHT = 34
 LINE_HEIGHT = 20
-FRAME_WIDTH = 3
+LEGEND_HEIGHT = 30
+LEGEND_GAP = 18
+SWATCH = 13
 TEXT_MARGIN = 20
 LABEL_FONT_SIZE = 16
+LEGEND_FONT_SIZE = 13
 EXPLANATION_FONT_SIZE = 13
-# Approximate width of one monospace character relative to the font size.
-CHAR_WIDTH_RATIO = 0.62
-FONT_FAMILY = "ui-monospace, Menlo, Consolas, monospace"
+VALUE_FONT_SIZE = 15
+VALUE_PAD = 10
+# Approximate glyph width relative to the font size, per family.
+MONO_CHAR_RATIO = 0.6
+SANS_CHAR_RATIO = 0.55
 
 
 def escape(text):
@@ -37,48 +53,190 @@ def escape(text):
     )
 
 
-def svg_document(content, width, height):
-    """Wrap rendered elements in a complete SVG document."""
+def svg_document(content, width, height, theme=None):
+    """Wrap rendered elements in a complete SVG document.
+
+    A background rectangle in the theme colour fills the whole canvas so the
+    dark preset reads as dark even on a transparent host page.
+    """
+    t = theme or LIGHT
+    background = (
+        f'<rect x="0" y="0" width="{width:.0f}" height="{height:.0f}" '
+        f'rx="14" fill="{escape(t.background)}" stroke="{escape(t.card_border)}"/>'
+    )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{width:.0f}" height="{height:.0f}" '
         f'viewBox="0 0 {width:.0f} {height:.0f}" '
-        f'font-family="{FONT_FAMILY}">'
-        f"{content}"
+        f'font-family="{t.sans_family}">'
+        f"{background}{content}"
         f"</svg>"
     )
 
 
-def _frame_color(frame, has_selection):
+def format_value(value, precision):
+    """Format a cell value for display.
+
+    Floats use a fixed number of decimals so a column lines up. Integers and
+    other values are shown as their plain string.
+    """
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, float):
+        if value != value:
+            return "nan"
+        if value in (float("inf"), float("-inf")):
+            return "inf" if value > 0 else "-inf"
+        return f"{value:.{precision}f}"
+    return str(value)
+
+
+def _is_numeric(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _frame_color(frame, has_selection, theme):
     """Pick the stroke colour for a frame.
 
-    In a shape view every frame uses its axis colour. In an index view only
-    selected frames keep their axis colour, the rest are neutral.
+    A neutral container frame (an ellipsis gap) is always drawn muted. In a
+    shape view every axis frame uses its colour. In an index view only
+    selected frames keep their colour, the rest are dimmed.
     """
-    axis_color = AXIS_FRAME_COLORS.get(frame.axis, NEUTRAL_COLOR)
+    if frame.axis is None:
+        return theme.neutral
+    axis_color = theme.axis_color(frame.axis)
     if not has_selection:
         return axis_color
-    return axis_color if frame.selected else NEUTRAL_COLOR
+    return axis_color if frame.selected else theme.neutral
 
 
-def _cell_color(cell, has_selection):
-    """Pick the text colour for a cell value."""
-    if has_selection and cell.selected:
-        return SELECT_VALUE_COLOR
-    return TEXT_COLOR
+def _text_width(char_count, font_size, ratio):
+    """Estimate the rendered width of a string."""
+    return char_count * font_size * ratio
 
 
-def _text_width(char_count, font_size):
-    """Estimate the rendered width of a monospace string."""
-    return char_count * font_size * CHAR_WIDTH_RATIO
+def _fit_cell_width(layout, theme, precision):
+    """Return a cell width wide enough for the widest formatted value.
+
+    The base width comes from the theme. A wider value, for example a float
+    drawn at a higher precision, grows every cell uniformly so the number
+    never spills past its frame, while a short value leaves the default size
+    untouched.
+    """
+    widest = 0
+    for cell in layout.cells:
+        if cell.ellipsis:
+            continue
+        widest = max(widest, len(format_value(cell.value, precision)))
+    needed = widest * VALUE_FONT_SIZE * MONO_CHAR_RATIO + 2 * VALUE_PAD
+    return max(theme.cell_w, math.ceil(needed))
 
 
-def _text_block_width(label_len, explanation):
-    """Estimate the width needed so the label and explanation are not clipped."""
-    widest = _text_width(label_len, LABEL_FONT_SIZE)
-    for line in explanation:
-        widest = max(widest, _text_width(len(line), EXPLANATION_FONT_SIZE))
-    return 2 * TEXT_MARGIN + widest
+def _legend_items(shape, theme, has_selection):
+    """Build the legend entries: one swatch and label per axis.
+
+    The leaf axis has no frame, so it borrows the colour used for its label
+    token: the selected green in an index view, a muted tone in a shape view.
+    This keeps the legend swatch consistent with the figure and the label.
+    """
+    ndim = len(shape)
+    leaf_color = theme.surface_selected if has_selection else theme.text_muted
+    items = []
+    for axis, size in enumerate(shape):
+        color = theme.axis_color(axis) if axis < ndim - 1 else leaf_color
+        items.append((color, f"axis {axis}", f"· {size}"))
+    return items
+
+
+def _legend_width(items):
+    """Estimate the width the legend row needs."""
+    total = TEXT_MARGIN
+    for _, name, size in items:
+        label = f"{name} {size}"
+        total += SWATCH + 7 + _text_width(len(label), LEGEND_FONT_SIZE, SANS_CHAR_RATIO)
+        total += LEGEND_GAP
+    return total - LEGEND_GAP + TEXT_MARGIN
+
+
+def _render_legend(items, x, y, theme):
+    """Render the legend row at ``(x, y)``."""
+    parts = []
+    cursor = x
+    sy = y - SWATCH + 2
+    ty = y + 2
+    for color, name, size in items:
+        parts.append(
+            f'<rect x="{cursor:.0f}" y="{sy:.0f}" width="{SWATCH}" height="{SWATCH}" '
+            f'rx="3" fill="{escape(color)}"/>'
+        )
+        cursor += SWATCH + 7
+        label = f"{name} {size}"
+        parts.append(
+            f'<text x="{cursor:.0f}" y="{ty:.0f}" font-size="{LEGEND_FONT_SIZE}" '
+            f'fill="{escape(theme.text_muted)}">'
+            f'<tspan fill="{escape(color)}" font-weight="600">{escape(name)}</tspan>'
+            f" {escape(size)}</text>"
+        )
+        cursor += _text_width(len(label), LEGEND_FONT_SIZE, SANS_CHAR_RATIO) + LEGEND_GAP
+    return "".join(parts)
+
+
+def _render_cell(cell, has_selection, theme, precision, hover):
+    """Render one cell, its surface, value, and optional hover title."""
+    if cell.ellipsis:
+        cx = cell.x + cell.width / 2
+        cy = cell.y + cell.height / 2
+        return (
+            f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
+            f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
+            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
+            f"{escape(cell.value)}</text>"
+        )
+
+    selected = has_selection and cell.selected
+    if selected:
+        fill = theme.surface_selected
+        border = theme.selected_border
+        text_color = theme.text_selected
+        weight = "700"
+    elif has_selection:
+        fill = theme.surface_muted
+        border = theme.cell_border
+        text_color = theme.text_muted
+        weight = "400"
+    else:
+        fill = theme.surface
+        border = theme.cell_border
+        text_color = theme.text
+        weight = "500"
+
+    display = format_value(cell.value, precision)
+    if _is_numeric(cell.value):
+        tx = cell.x + cell.width - VALUE_PAD
+        anchor = "end"
+    else:
+        tx = cell.x + cell.width / 2
+        anchor = "middle"
+    ty = cell.y + cell.height / 2
+
+    rect = (
+        f'<rect x="{cell.x:.0f}" y="{cell.y:.0f}" '
+        f'width="{cell.width:.0f}" height="{cell.height:.0f}" '
+        f'rx="{theme.cell_radius:.0f}" fill="{escape(fill)}" '
+        f'stroke="{escape(border)}" stroke-width="1"/>'
+    )
+    text = (
+        f'<text x="{tx:.0f}" y="{ty:.0f}" text-anchor="{anchor}" '
+        f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
+        f'font-family="{theme.mono_family}" font-weight="{weight}" '
+        f'fill="{escape(text_color)}">{escape(display)}</text>'
+    )
+
+    if hover and cell.coord is not None:
+        coord = ", ".join(str(c) for c in cell.coord)
+        title = f"[{coord}]  value {display}  ·  flat {cell.flat}"
+        return f"<g><title>{escape(title)}</title>{rect}{text}</g>"
+    return f"{rect}{text}"
 
 
 def _label_element(x, y, parts):
@@ -87,70 +245,103 @@ def _label_element(x, y, parts):
         f'<tspan fill="{escape(color)}">{escape(text)}</tspan>' for text, color in parts
     )
     return (
-        f'<text x="{x:.0f}" y="{y:.0f}" font-size="16" font-weight="600">{spans}</text>'
+        f'<text x="{x:.0f}" y="{y:.0f}" font-size="{LABEL_FONT_SIZE}" '
+        f'font-weight="700">{spans}</text>'
     )
 
 
 def render_svg(
-    shape, selected=None, value_fn=None, label="", label_parts=None, explanation=None
+    shape,
+    selected=None,
+    value_fn=None,
+    label="",
+    label_parts=None,
+    explanation=None,
+    theme=None,
+    precision=2,
+    legend=True,
+    hover=True,
 ):
     """Render a tensor as an SVG string.
 
-    ``selected`` is an iterable of selected coordinates. ``value_fn`` maps a
-    coordinate to its display value. ``label`` is a plain label string while
+    ``selected`` is an iterable of selected coordinates and ``value_fn`` maps a
+    coordinate to its display value. ``label`` is a plain label while
     ``label_parts`` is an optional list of ``(text, colour)`` pairs for a
     coloured label. ``explanation`` is an optional list of lines drawn below.
+    ``theme`` chooses the palette and geometry, ``precision`` controls float
+    formatting, ``legend`` toggles the axis legend, and ``hover`` toggles the
+    per-cell title used for tooltips.
     """
+    theme = resolve_theme(theme)
     explanation = explanation or []
     selected_list = list(selected or [])
     has_selection = len(selected_list) > 0
-    layout = build_layout(shape, selected=selected_list, value_fn=value_fn)
+    layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
+
+    # Grow the cells if any value is wider than the default, then lay out again
+    # so the widened cells sit on the correct grid.
+    fitted = _fit_cell_width(layout, theme, precision)
+    if fitted > theme.cell_w:
+        theme = theme.variant(cell_w=fitted)
+        layout = build_layout(
+            shape, selected=selected_list, value_fn=value_fn, theme=theme
+        )
 
     parts = []
 
     for frame in layout.frames:
-        color = _frame_color(frame, has_selection)
+        color = _frame_color(frame, has_selection, theme)
         parts.append(
             f'<rect x="{frame.x:.0f}" y="{frame.y:.0f}" '
             f'width="{frame.width:.0f}" height="{frame.height:.0f}" '
-            f'rx="6" fill="none" stroke="{color}" stroke-width="{FRAME_WIDTH}"/>'
+            f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{color}" '
+            f'stroke-width="{theme.frame_width}"/>'
         )
 
     for cell in layout.cells:
-        color = _cell_color(cell, has_selection)
-        weight = "700" if (has_selection and cell.selected) else "400"
-        cx = cell.x + cell.width / 2
-        cy = cell.y + cell.height / 2
-        parts.append(
-            f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
-            f'dominant-baseline="central" font-size="15" font-weight="{weight}" '
-            f'fill="{color}">{escape(cell.value)}</text>'
-        )
+        parts.append(_render_cell(cell, has_selection, theme, precision, hover))
 
     if label_parts:
         label_len = sum(len(text) for text, _ in label_parts)
     else:
         label_len = len(label)
-    text_width = _text_block_width(label_len, explanation)
-    width = max(layout.width, text_width)
-    y = layout.height + LABEL_HEIGHT
+
+    legend_items = _legend_items(shape, theme, has_selection) if legend else []
+
+    content_width = _text_width(label_len, LABEL_FONT_SIZE, SANS_CHAR_RATIO) + 2 * TEXT_MARGIN
+    for line in explanation:
+        content_width = max(
+            content_width,
+            _text_width(len(line), EXPLANATION_FONT_SIZE, MONO_CHAR_RATIO) + 2 * TEXT_MARGIN,
+        )
+    if legend_items:
+        content_width = max(content_width, _legend_width(legend_items))
+
+    width = max(layout.width, content_width)
+    y = layout.height + LABEL_HEIGHT - 8
 
     if label_parts:
-        parts.append(_label_element(20, y, label_parts))
+        parts.append(_label_element(TEXT_MARGIN, y, label_parts))
         y += LINE_HEIGHT
     elif label:
         parts.append(
-            f'<text x="20" y="{y:.0f}" font-size="16" font-weight="600" '
-            f'fill="{LABEL_COLOR}">{escape(label)}</text>'
+            f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{LABEL_FONT_SIZE}" '
+            f'font-weight="700" fill="{escape(theme.heading)}">{escape(label)}</text>'
         )
         y += LINE_HEIGHT
+
+    if legend_items:
+        y += LEGEND_HEIGHT - LINE_HEIGHT + 8
+        parts.append(_render_legend(legend_items, TEXT_MARGIN, y, theme))
+        y += 6
 
     for line in explanation:
         y += LINE_HEIGHT - 4
         parts.append(
-            f'<text x="20" y="{y:.0f}" font-size="13" fill="{LABEL_COLOR}">'
+            f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{EXPLANATION_FONT_SIZE}" '
+            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
             f"{escape(line)}</text>"
         )
 
-    height = y + 16
-    return svg_document("".join(parts), width, height)
+    height = y + 18
+    return svg_document("".join(parts), width, height, theme=theme)

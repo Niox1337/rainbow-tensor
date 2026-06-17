@@ -1,5 +1,10 @@
 """Tests for SVG rendering."""
 
+import xml.etree.ElementTree as ET
+
+import pytest
+
+import rainbow_tensor as rt
 from rainbow_tensor.render_svg import (
     AXIS_FRAME_COLORS,
     SELECT_VALUE_COLOR,
@@ -7,6 +12,25 @@ from rainbow_tensor.render_svg import (
     render_svg,
     svg_document,
 )
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: render_svg((3,)),
+        lambda: render_svg((2, 3)),
+        lambda: render_svg((2, 2, 2)),
+        lambda: render_svg((2, 2, 2), theme="dark"),
+        lambda: render_svg((30,)),
+        lambda: rt.show_index((2, 2, 2), (0, slice(None), 1)).svg,
+        lambda: rt.show_index((3, 4), (1, slice(None)), theme="dark").svg,
+    ],
+)
+def test_rendered_svg_is_well_formed_xml(make):
+    # Parse the SVG as strict XML. A malformed attribute, such as an unescaped
+    # quote inside font-family, would raise here even though browsers recover.
+    svg = make()
+    ET.fromstring(svg)
 
 
 def test_escape_replaces_markup_characters():
@@ -37,9 +61,10 @@ def test_shape_view_colours_frames_by_axis():
 
 
 def test_three_dimensional_shape_draws_six_frames():
-    # two axis-0 block frames plus four axis-1 row frames
+    # two axis-0 block frames plus four axis-1 row frames; frames are the only
+    # rects drawn with no fill, so counting them ignores cells and the card
     svg = render_svg((2, 2, 2))
-    assert svg.count("<rect") == 6
+    assert svg.count('fill="none"') == 6
 
 
 def test_index_view_highlights_selected_values_green():
