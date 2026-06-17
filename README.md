@@ -26,7 +26,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 
 - Static SVG output that stays sharp at any zoom level in a notebook
 - Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
-- Index visualisation with highlighted selections and a plain text explanation
+- Index visualisation with highlighted selections and a plain text explanation, including boolean masks and integer array indexing
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
@@ -141,11 +141,13 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Basic slicing with `slice(None)`, `slice(start, stop)`, and `slice(start, stop, step)`, including negative bounds and steps such as `slice(None, None, -1)`
 - `Ellipsis` (`...`) to fill the remaining axes, such as `(0, ..., 1)`
 - `None` (newaxis) to insert a size 1 axis, shown in the result shape and label
+- A full-shape boolean mask, highlighting every True position
+- Integer array (fancy) indexing, including with slices, as long as the advanced axes are next to each other
 
 ## Not supported yet
 
-- Advanced NumPy indexing
-- Boolean masks
+- Advanced indices separated by a slice, where NumPy moves the gathered axes to the front
+- Multi-dimensional index arrays and per-axis boolean arrays
 - Interactive controls and animation
 
 ## Development
