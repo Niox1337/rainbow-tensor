@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Render tensors of any rank. Frames nest to arbitrary depth, alternating across and down so a 4D or 5D tensor stays compact, with per axis truncation at every level
+
 ### Changed
 
 - Renamed `show_shape` to `shape` and `show_index` to `index`. The first argument is an array-like object whose own values are rendered, or a shape tuple as before

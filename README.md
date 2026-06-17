@@ -25,7 +25,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 ## Features
 
 - Static SVG output that stays sharp at any zoom level in a notebook
-- Shape visualisation for 1D, 2D, and 3D tensors
+- Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
 - Index visualisation with highlighted selections and a plain text explanation
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
@@ -135,7 +135,7 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 
 ## Supported
 
-- 1D, 2D, and 3D tensors
+- Tensors of any rank, with frames nested to arbitrary depth
 - Shape tuples and array-like objects with a `.shape` attribute
 - Integer indexing, including negatives such as `-1`
 - Basic slicing with `slice(None)`, `slice(start, stop)`, and `slice(start, stop, step)`, including negative bounds and steps such as `slice(None, None, -1)`
@@ -146,7 +146,6 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 
 - Advanced NumPy indexing
 - Boolean masks
-- 4D or higher tensors
 - Interactive controls and animation
 
 ## Development
