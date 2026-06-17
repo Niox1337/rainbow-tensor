@@ -2,13 +2,15 @@
 
 This module validates indexing expressions, expands slices into integer
 positions, computes the selected coordinates, and computes the result shape
-after indexing. It supports negative integer indices, negative slice bounds
-and steps, ``Ellipsis`` (``...``), and ``None`` (newaxis).
+after indexing. Basic indexing supports negative integer indices, negative
+slice bounds and steps, ``Ellipsis`` (``...``), and ``None`` (newaxis).
+Advanced indexing supports a full-shape boolean mask and 1D integer index
+arrays; see :func:`advanced_index`.
 """
 
 import itertools
 
-from .shape import format_shape
+from .shape import coordinates, format_shape
 
 
 def _resolve_int(entry, size, axis):
@@ -19,6 +21,40 @@ def _resolve_int(entry, size, axis):
             f"axis {axis}: index {entry} is out of range for size {size}"
         )
     return resolved
+
+
+def _shape_of(obj):
+    """Best-effort shape of an array-like or a nested list."""
+    if hasattr(obj, "shape"):
+        return tuple(int(d) for d in obj.shape)
+    dims = []
+    cur = obj
+    while isinstance(cur, list):
+        dims.append(len(cur))
+        cur = cur[0] if cur else None
+    return tuple(dims)
+
+
+def _get(obj, coord):
+    """Read ``obj[coord]`` for a tuple coord, for arrays and nested lists."""
+    for i in coord:
+        obj = obj[i]
+    return obj
+
+
+def _is_array_like(entry):
+    """True for an index-array entry: a list or a shaped (non scalar) object.
+
+    Ints, slices, ``None``, and ``Ellipsis`` are not array entries.
+    """
+    if isinstance(entry, list):
+        return True
+    return hasattr(entry, "shape") and _shape_of(entry) != ()
+
+
+def _is_bool(value):
+    """True for a Python bool or a NumPy boolean scalar, without importing it."""
+    return isinstance(value, bool) or type(value).__name__.startswith("bool")
 
 
 def validate_index(index, shape):
@@ -150,6 +186,8 @@ def format_token(entry):
         return "None"
     if entry is Ellipsis:
         return "..."
+    if _is_array_like(entry):
+        return "[" + ", ".join(str(int(v)) for v in entry) + "]"
     return str(entry)
 
 
@@ -184,3 +222,169 @@ def explain_index(shape, index):
             out += 1
         axis += 1
     return lines
+
+
+def is_advanced(index, shape):
+    """True when ``index`` uses a boolean mask or integer index arrays."""
+    if not isinstance(index, tuple):
+        return _is_array_like(index)
+    return any(_is_array_like(e) for e in index)
+
+
+def advanced_index(shape, index):
+    """Compute selection, result shape, and explanation for advanced indexing.
+
+    Returns ``(selected_coords, result_shape, explanation_lines)``. A standalone
+    boolean mask of matching shape selects every True position. Integer index
+    arrays gather coordinates; with slices they follow NumPy as long as the
+    advanced axes are contiguous (a slice between them moves the result axes to
+    the front, which is refused with a clear error). Index arrays are 1D and
+    broadcast against each other by length.
+    """
+    if not isinstance(index, tuple):
+        return _mask_index(shape, index)
+    return _array_index(shape, index)
+
+
+def _mask_index(shape, mask):
+    mshape = _shape_of(mask)
+    if mshape != tuple(shape):
+        raise IndexError(
+            f"boolean mask shape {mshape} does not match tensor shape {tuple(shape)}"
+        )
+    selected = []
+    for coord in coordinates(shape):
+        value = _get(mask, coord)
+        if not _is_bool(value):
+            raise TypeError(
+                "a standalone array index must be a boolean mask; got value of "
+                f"type {type(value).__name__}"
+            )
+        if value:
+            selected.append(coord)
+    result = (len(selected),)
+    plural = "s" if len(selected) != 1 else ""
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        "Advanced indexing with a boolean mask.",
+        f"The mask keeps {len(selected)} element{plural} where it is True.",
+        f"Result shape: {format_shape(result)}",
+    ]
+    return selected, result, explanation
+
+
+def _array_index(shape, index):
+    ndim = len(shape)
+    if sum(e is Ellipsis for e in index) > 1:
+        raise IndexError("an index can have at most one ellipsis '...'")
+    if any(e is None for e in index):
+        raise IndexError("newaxis (None) is not supported with advanced indexing")
+
+    def consumes(e):
+        return (
+            isinstance(e, slice)
+            or _is_array_like(e)
+            or (isinstance(e, int) and not isinstance(e, bool))
+        )
+
+    consuming = sum(consumes(e) for e in index)
+    if consuming > ndim:
+        raise IndexError(
+            f"too many indices for tensor of rank {ndim}: {consuming} axes indexed"
+        )
+    fill = ndim - consuming
+
+    # One ("int"|"slice"|"arr", value) entry per source axis, in axis order.
+    entries = []
+    axis = 0
+    for e in index:
+        if e is Ellipsis:
+            entries.extend(("slice", slice(None)) for _ in range(fill))
+            axis += fill
+        elif isinstance(e, bool):
+            raise TypeError(f"axis {axis}: boolean scalar indices are not supported")
+        elif isinstance(e, int):
+            entries.append(("int", _resolve_int(e, shape[axis], axis)))
+            axis += 1
+        elif isinstance(e, slice):
+            entries.append(("slice", e))
+            axis += 1
+        elif _is_array_like(e):
+            values = list(e)
+            if any(_is_bool(v) for v in values):
+                raise IndexError(
+                    "a per-axis boolean array is not supported; pass a full "
+                    "boolean mask as the whole index instead"
+                )
+            entries.append(("arr", [_resolve_int(int(v), shape[axis], axis) for v in values]))
+            axis += 1
+        else:
+            raise TypeError(f"axis {axis}: unsupported index entry {e!r}")
+
+    if axis != ndim:
+        raise ValueError(
+            f"index covers {axis} axes but tensor has rank {ndim}. "
+            f"Use '...' to fill the remaining axes"
+        )
+
+    arr_axes = [a for a, (kind, _) in enumerate(entries) if kind == "arr"]
+    # ponytail: contiguous advanced axes only. NumPy moves the gathered axes to
+    # the front when a slice separates them; refuse that here rather than render
+    # a layout that would mislead. Upgrade: handle the front-moved block.
+    between = entries[arr_axes[0]: arr_axes[-1] + 1]
+    if any(kind == "slice" for kind, _ in between):
+        raise IndexError(
+            "advanced indices separated by a slice are not supported yet; "
+            "NumPy would move the gathered axes to the front of the result"
+        )
+
+    lengths = {len(entries[a][1]) for a in arr_axes}
+    broadcast = {n for n in lengths if n != 1}
+    if len(broadcast) > 1:
+        raise IndexError(
+            f"index arrays could not be broadcast together: lengths {sorted(lengths)}"
+        )
+    length = max(lengths)
+
+    def gathered(values, k):
+        return values[0] if len(values) == 1 else values[k]
+
+    slice_axes = [a for a, (kind, _) in enumerate(entries) if kind == "slice"]
+    slice_pos = {a: expand_slice(entries[a][1], shape[a]) for a in slice_axes}
+
+    result = []
+    placed = False
+    for axis_, (kind, value) in enumerate(entries):
+        if kind == "slice":
+            result.append(len(slice_pos[axis_]))
+        elif kind == "arr" and not placed:
+            result.append(length)
+            placed = True
+    result_shape_ = tuple(result)
+
+    selected = []
+    seen = set()
+    for k in range(length):
+        fixed = {}
+        for a, (kind, value) in enumerate(entries):
+            if kind == "int":
+                fixed[a] = value
+            elif kind == "arr":
+                fixed[a] = gathered(value, k)
+        for combo in itertools.product(*[slice_pos[a] for a in slice_axes]):
+            full = dict(fixed)
+            full.update(zip(slice_axes, combo))
+            key = tuple(full[a] for a in range(ndim))
+            if key not in seen:
+                seen.add(key)
+                selected.append(key)
+
+    axes_text = ", ".join(str(a) for a in arr_axes)
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Index: {format_index(index)}",
+        "Advanced indexing with integer arrays.",
+        f"Axes {axes_text} gather {length} position{'s' if length != 1 else ''} together.",
+        f"Result shape: {format_shape(result_shape_)}",
+    ]
+    return selected, result_shape_, explanation

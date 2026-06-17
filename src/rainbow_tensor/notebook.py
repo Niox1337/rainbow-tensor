@@ -6,8 +6,11 @@ inspectable in plain Python, so the package is testable outside a notebook.
 """
 
 from .indexing import (
+    advanced_index,
     explain_index,
+    format_index,
     format_token,
+    is_advanced,
     result_shape,
     selected_coordinates,
     validate_index,
@@ -37,6 +40,11 @@ class TensorVisual:
 
     def __str__(self):
         return self.svg
+
+    def __repr__(self):
+        # Stable text repr so a re-run notebook's text/plain output never churns
+        # on the object's memory address.
+        return f"TensorVisual(shape={self.shape}, result_shape={self.result_shape})"
 
     def save(self, path):
         """Write the SVG to ``path`` and return the path.
@@ -145,9 +153,10 @@ def index(array, index, theme=None, precision=2):
     """Visualise how an index selects elements from a tensor.
 
     ``array`` may be an array-like object with a ``.shape`` attribute, in
-    which case its own values are rendered, or a shape tuple. ``index`` must
-    be a tuple of integers and slices whose length matches the tensor rank.
-    Selected elements are highlighted, unselected elements stay visible but
+    which case its own values are rendered, or a shape tuple. ``index`` is a
+    tuple of integers and slices for basic indexing, a full-shape boolean mask,
+    or a tuple holding integer index arrays for advanced indexing. Selected
+    elements are highlighted, unselected elements stay visible but
     de-emphasised, and an explanation of the result shape is drawn below the
     tensor. ``theme`` and ``precision`` behave as in :func:`shape`. The
     returned :class:`TensorVisual` renders as SVG in a notebook through
@@ -155,11 +164,28 @@ def index(array, index, theme=None, precision=2):
     """
     theme = resolve_theme(theme)
     normalized = extract_shape(array)
+    value_fn = _value_fn_for(array)
+
+    if is_advanced(index, normalized):
+        selected, result, explanation = advanced_index(normalized, index)
+        label = "mask" if not isinstance(index, tuple) else f"Index ({format_index(index)})"
+        svg = render_svg(
+            normalized,
+            selected=selected,
+            value_fn=value_fn,
+            label=label,
+            explanation=explanation,
+            theme=theme,
+            precision=precision,
+        )
+        return TensorVisual(
+            svg, normalized, selected=selected, result=result, explanation=explanation
+        )
+
     validate_index(index, normalized)
     selected = selected_coordinates(normalized, index)
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
-    value_fn = _value_fn_for(array)
     label_parts = _index_label_parts(index, theme)
     svg = render_svg(
         normalized,
