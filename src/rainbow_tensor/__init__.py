@@ -8,14 +8,14 @@ Public API:
 
     import rainbow_tensor as rt
 
-    rt.show_shape((2, 2, 2))
-    rt.show_index((2, 2, 2), (0, slice(None), 1))
+    rt.shape((2, 2, 2))
+    rt.index((2, 2, 2), (0, slice(None), 1))
 
-    rt.show_shape((2, 2, 2), theme="dark")
+    rt.shape((2, 2, 2), theme="dark")
     rt.set_default_theme("dark")
 """
 
-from .notebook import TensorVisual, show_index, show_shape
+from .notebook import TensorVisual, index, shape
 from .theme import (
     DARK,
     LIGHT,
@@ -28,8 +28,8 @@ from .theme import (
 
 __version__ = "0.3.0"
 __all__ = [
-    "show_shape",
-    "show_index",
+    "shape",
+    "index",
     "TensorVisual",
     "Theme",
     "LIGHT",

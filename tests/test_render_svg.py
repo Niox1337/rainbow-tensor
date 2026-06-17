@@ -22,8 +22,8 @@ from rainbow_tensor.render_svg import (
         lambda: render_svg((2, 2, 2)),
         lambda: render_svg((2, 2, 2), theme="dark"),
         lambda: render_svg((30,)),
-        lambda: rt.show_index((2, 2, 2), (0, slice(None), 1)).svg,
-        lambda: rt.show_index((3, 4), (1, slice(None)), theme="dark").svg,
+        lambda: rt.index((2, 2, 2), (0, slice(None), 1)).svg,
+        lambda: rt.index((3, 4), (1, slice(None)), theme="dark").svg,
     ],
 )
 def test_rendered_svg_is_well_formed_xml(make):

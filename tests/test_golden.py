@@ -21,14 +21,14 @@ GOLDEN_DIR = Path(__file__).parent / "golden"
 # Canonical render cases, kept deterministic so the SVG is a pure function of
 # the inputs.
 CASES = {
-    "shape_1d_light": lambda: rt.show_shape((3,)),
-    "shape_2d_light": lambda: rt.show_shape((2, 3)),
-    "shape_3d_light": lambda: rt.show_shape((2, 2, 2)),
-    "shape_3d_dark": lambda: rt.show_shape((2, 2, 2), theme="dark"),
-    "index_3d_light": lambda: rt.show_index((2, 2, 2), (0, slice(None), 1)),
-    "index_2d_dark": lambda: rt.show_index((3, 4), (1, slice(None)), theme="dark"),
-    "truncate_1d_light": lambda: rt.show_shape((30,)),
-    "truncate_2d_light": lambda: rt.show_shape((20, 6)),
+    "shape_1d_light": lambda: rt.shape((3,)),
+    "shape_2d_light": lambda: rt.shape((2, 3)),
+    "shape_3d_light": lambda: rt.shape((2, 2, 2)),
+    "shape_3d_dark": lambda: rt.shape((2, 2, 2), theme="dark"),
+    "index_3d_light": lambda: rt.index((2, 2, 2), (0, slice(None), 1)),
+    "index_2d_dark": lambda: rt.index((3, 4), (1, slice(None)), theme="dark"),
+    "truncate_1d_light": lambda: rt.shape((30,)),
+    "truncate_2d_light": lambda: rt.shape((20, 6)),
 }
 
 

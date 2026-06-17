@@ -39,7 +39,7 @@ def test_set_default_theme_round_trips():
         set_default_theme("dark")
         assert get_default_theme() is DARK
         # a call with no theme now uses the dark default
-        assert DARK.background in rt.show_shape((2, 2)).svg
+        assert DARK.background in rt.shape((2, 2)).svg
     finally:
         set_default_theme(original)
     assert get_default_theme() is original
