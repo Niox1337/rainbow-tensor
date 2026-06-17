@@ -124,3 +124,6 @@ dmypy.json
 
 # Project private planning notes
 ignore/
+
+# Artifact written by the save() demo in examples/shape_demo.ipynb
+examples/shape_2x2x2.svg
