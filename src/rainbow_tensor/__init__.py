@@ -10,9 +10,33 @@ Public API:
 
     rt.show_shape((2, 2, 2))
     rt.show_index((2, 2, 2), (0, slice(None), 1))
+
+    rt.show_shape((2, 2, 2), theme="dark")
+    rt.set_default_theme("dark")
 """
 
-from .notebook import show_index, show_shape
+from .notebook import TensorVisual, show_index, show_shape
+from .theme import (
+    DARK,
+    LIGHT,
+    Theme,
+    get_default_theme,
+    register_theme,
+    resolve_theme,
+    set_default_theme,
+)
 
-__version__ = "0.2.1"
-__all__ = ["show_shape", "show_index", "__version__"]
+__version__ = "0.3.0"
+__all__ = [
+    "show_shape",
+    "show_index",
+    "TensorVisual",
+    "Theme",
+    "LIGHT",
+    "DARK",
+    "get_default_theme",
+    "set_default_theme",
+    "register_theme",
+    "resolve_theme",
+    "__version__",
+]
