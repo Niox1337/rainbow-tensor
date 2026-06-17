@@ -29,6 +29,10 @@ CASES = {
     "index_2d_dark": lambda: rt.index((3, 4), (1, slice(None)), theme="dark"),
     "truncate_1d_light": lambda: rt.shape((30,)),
     "truncate_2d_light": lambda: rt.shape((20, 6)),
+    "shape_4d_light": lambda: rt.shape((2, 2, 2, 2)),
+    "shape_5d_dark": lambda: rt.shape((2, 2, 2, 2, 2), theme="dark"),
+    "index_4d_light": lambda: rt.index((2, 2, 2, 2), (1, slice(None), 0, slice(None))),
+    "truncate_4d_light": lambda: rt.shape((2, 2, 2, 20)),
 }
 
 
