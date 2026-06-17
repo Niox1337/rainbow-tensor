@@ -91,12 +91,17 @@ def visible_positions(size, limit):
 
 
 def build_layout(shape, selected=None, value_fn=None, theme=None):
-    """Compute the layout for a tensor.
+    """Compute the layout for a tensor of any rank.
 
     ``selected`` is an iterable of coordinates to mark as selected.
     ``value_fn`` maps a coordinate to its display value. When it is ``None``
     sequential row-major values starting at 0 are used. ``theme`` supplies the
     geometry and the truncation limit, defaulting to the light preset.
+
+    The leaf axis is a horizontal row of cells. Every axis above it draws a
+    frame, alternating horizontal and vertical with depth so a deep tensor
+    stays compact. Each axis truncates independently through
+    :func:`visible_positions`, so a large N-D tensor still fits on screen.
     """
     t = theme or LIGHT
     sel = {tuple(coord) for coord in (selected or [])}
@@ -106,13 +111,12 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     block_pad, block_gap, pad = t.block_pad, t.block_gap, t.padding
     limit = t.max_cells
 
-    cols = shape[-1]
-    col_pos = visible_positions(cols, limit)
+    col_pos = visible_positions(shape[-1], limit)
     n_cols = len(col_pos)
-
     row_w = n_cols * cell_w + (n_cols - 1) * gap + 2 * row_pad
     row_h = cell_h + 2 * row_pad
 
+    ndim = len(shape)
     layout = Layout()
 
     def place_cells(rx, ry, prefix):
@@ -139,70 +143,70 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
                 )
             )
 
-    def place_gap_cell(rx, ry, glyph):
-        # A single centred cell standing in for a hidden row or block run.
-        x = rx + (row_w - cell_w) / 2
-        layout.cells.append(
-            Cell(x, ry + row_pad, cell_w, cell_h, glyph, None, ellipsis=True)
-        )
-
-    ndim = len(shape)
-
+    # 1D is a single neutral frame around one row of cells.
     if ndim == 1:
-        rx, ry = pad, pad
-        layout.frames.append(Frame(rx, ry, row_w, row_h, axis=None, selected=bool(sel)))
-        place_cells(rx, ry, ())
+        layout.frames.append(Frame(pad, pad, row_w, row_h, axis=None, selected=bool(sel)))
+        place_cells(pad, pad, ())
         layout.width = pad * 2 + row_w
         layout.height = pad * 2 + row_h
         return layout
 
-    if ndim == 2:
-        row_positions = visible_positions(shape[0], limit)
-        for i, r in enumerate(row_positions):
-            rx = pad
-            ry = pad + i * (row_h + row_gap)
-            if r is ELLIPSIS:
-                layout.frames.append(Frame(rx, ry, row_w, row_h, axis=None))
-                place_gap_cell(rx, ry, ROW_ELLIPSIS)
-                continue
-            row_sel = any(co[0] == r for co in sel)
-            layout.frames.append(Frame(rx, ry, row_w, row_h, axis=0, selected=row_sel))
-            place_cells(rx, ry, (r,))
-        n_rows = len(row_positions)
-        layout.width = pad * 2 + row_w
-        layout.height = pad * 2 + n_rows * row_h + (n_rows - 1) * row_gap
-        return layout
+    # Depth from the leaf decides orientation: even axes lay out horizontally,
+    # odd axes vertically. For 3D this is blocks across, rows down, cells across,
+    # matching the original hand-written layout.
+    def horizontal(axis):
+        return (ndim - 1 - axis) % 2 == 0
 
-    block_positions = visible_positions(shape[0], limit)
-    row_positions = visible_positions(shape[1], limit)
-    n_blocks, n_rows = len(block_positions), len(row_positions)
-    block_w = row_w + 2 * block_pad
-    block_h = n_rows * row_h + (n_rows - 1) * row_gap + 2 * block_pad
+    def group_size(axis):
+        """Size of the region drawn for one fixed value of ``axis - 1``."""
+        n = len(visible_positions(shape[axis], limit))
+        if axis == ndim - 2:
+            tile_w, tile_h = row_w, row_h
+        else:
+            iw, ih = group_size(axis + 1)
+            tile_w, tile_h = iw + 2 * block_pad, ih + 2 * block_pad
+        if horizontal(axis):
+            return n * tile_w + (n - 1) * block_gap, tile_h
+        return tile_w, n * tile_h + (n - 1) * row_gap
 
-    for bi, b in enumerate(block_positions):
-        bx = pad + bi * (block_w + block_gap)
-        by = pad
-        if b is ELLIPSIS:
-            layout.frames.append(Frame(bx, by, block_w, block_h, axis=None))
-            cx = bx + (block_w - cell_w) / 2
-            cy = by + (block_h - cell_h) / 2
-            layout.cells.append(
-                Cell(cx, cy, cell_w, cell_h, BLOCK_ELLIPSIS, None, ellipsis=True)
-            )
-            continue
-        block_sel = any(co[0] == b for co in sel)
-        layout.frames.append(Frame(bx, by, block_w, block_h, axis=0, selected=block_sel))
-        for ri, r in enumerate(row_positions):
-            rx = bx + block_pad
-            ry = by + block_pad + ri * (row_h + row_gap)
-            if r is ELLIPSIS:
-                layout.frames.append(Frame(rx, ry, row_w, row_h, axis=None))
-                place_gap_cell(rx, ry, ROW_ELLIPSIS)
-                continue
-            row_sel = any(co[0] == b and co[1] == r for co in sel)
-            layout.frames.append(Frame(rx, ry, row_w, row_h, axis=1, selected=row_sel))
-            place_cells(rx, ry, (b, r))
+    def render(axis, prefix, ox, oy):
+        """Draw ``axis`` and every inner axis for ``prefix``; return (w, h)."""
+        positions = visible_positions(shape[axis], limit)
+        is_row = axis == ndim - 2  # children are leaf rows of cells
+        inner_pad = 0 if is_row else block_pad
+        content_w, content_h = (row_w, row_h) if is_row else group_size(axis + 1)
+        tile_w, tile_h = content_w + 2 * inner_pad, content_h + 2 * inner_pad
+        horiz = horizontal(axis)
+        step = (tile_w + block_gap) if horiz else (tile_h + row_gap)
 
-    layout.width = pad * 2 + n_blocks * block_w + (n_blocks - 1) * block_gap
-    layout.height = pad * 2 + block_h
+        cursor = ox if horiz else oy
+        for p in positions:
+            tx = cursor if horiz else ox
+            ty = oy if horiz else cursor
+            if p is ELLIPSIS:
+                layout.frames.append(Frame(tx, ty, tile_w, tile_h, axis=None))
+                glyph = BLOCK_ELLIPSIS if horiz else ROW_ELLIPSIS
+                gx = tx + (tile_w - cell_w) / 2
+                gy = ty + (tile_h - cell_h) / 2
+                layout.cells.append(Cell(gx, gy, cell_w, cell_h, glyph, None, ellipsis=True))
+            else:
+                key = prefix + (p,)
+                frame_sel = any(co[: axis + 1] == key for co in sel)
+                layout.frames.append(
+                    Frame(tx, ty, tile_w, tile_h, axis=axis, selected=frame_sel)
+                )
+                if is_row:
+                    place_cells(tx, ty, key)
+                else:
+                    render(axis + 1, key, tx + inner_pad, ty + inner_pad)
+            cursor += step
+
+        n = len(positions)
+        if horiz:
+            return n * tile_w + (n - 1) * block_gap, tile_h
+        return tile_w, n * tile_h + (n - 1) * row_gap
+
+    w, h = render(0, (), pad, pad)
+    layout.width = pad * 2 + w
+    layout.height = pad * 2 + h
     return layout
