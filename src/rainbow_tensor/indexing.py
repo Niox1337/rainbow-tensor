@@ -166,10 +166,12 @@ def explain_index(shape, index):
         f"Index: {format_index(index)}",
         f"Result shape: {format_shape(result_shape(shape, index))}",
     ]
-    axis = 0
+    axis = 0  # source axis
+    out = 0  # result axis position
     for tok in tokens:
         if tok is None:
-            lines.append("A new size 1 axis is inserted by None.")
+            lines.append(f"A new size 1 axis is inserted by None at result position {out}.")
+            out += 1
             continue
         if isinstance(tok, int):
             lines.append(
@@ -179,5 +181,6 @@ def explain_index(shape, index):
             lines.append(
                 f"Axis {axis} is kept because slice {format_slice(tok)} is used."
             )
+            out += 1
         axis += 1
     return lines

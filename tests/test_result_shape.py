@@ -65,3 +65,9 @@ def test_explain_index():
     assert lines[3] == "Axis 0 is removed because integer index 0 is used."
     assert lines[4] == "Axis 1 is kept because slice : is used."
     assert lines[5] == "Axis 2 is removed because integer index 1 is used."
+
+
+def test_explain_newaxis_names_position():
+    lines = explain_index((3,), (None, slice(None), None))
+    assert "result position 0" in lines[3]
+    assert "result position 2" in lines[5]

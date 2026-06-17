@@ -155,9 +155,6 @@ def show_index(tensor_or_shape, index, theme=None, precision=2):
     theme = resolve_theme(theme)
     normalized = extract_shape(tensor_or_shape)
     validate_index(index, normalized)
-    # ponytail: None (newaxis) shows in the result shape, label, and explain
-    # lines but is not drawn as an extra frame on the tensor. Draw an inserted
-    # size 1 axis frame if the visual gap proves confusing.
     selected = selected_coordinates(normalized, index)
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
