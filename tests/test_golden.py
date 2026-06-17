@@ -35,6 +35,10 @@ CASES = {
     "truncate_4d_light": lambda: rt.shape((2, 2, 2, 20)),
     "mask_2d_light": lambda: rt.index((2, 3), [[True, False, True], [False, True, False]]),
     "fancy_2d_dark": lambda: rt.index((3, 4), ([0, 2], [1, 3]), theme="dark"),
+    "reshape_2d_light": lambda: rt.reshape((2, 3), (3, 2)),
+    "transpose_2d_dark": lambda: rt.transpose((2, 3), theme="dark"),
+    "sum_2d_light": lambda: rt.sum((3, 4), 0),
+    "mean_2d_light": lambda: rt.mean((3, 4), 1),
 }
 
 

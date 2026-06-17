@@ -27,6 +27,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Static SVG output that stays sharp at any zoom level in a notebook
 - Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
 - Index visualisation with highlighted selections and a plain text explanation, including boolean masks and integer array indexing
+- Shape changing views for reshape, transpose, and axis reductions, drawing the source and the result side by side
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
@@ -82,6 +83,25 @@ x = np.linspace(0, 1, 6).reshape(2, 3)
 visual = rt.shape(x, precision=3)
 visual.save("tensor.svg")
 ```
+
+## Shape changing operations
+
+Beyond viewing a single tensor, rainbow-tensor draws the operations that rearrange or summarise one. Each view places the source and the result in one figure with a connector, so the mapping is easy to follow.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+x = np.arange(12).reshape(3, 4)
+
+rt.reshape(x, (2, 6))      # the same values flow into a new layout
+rt.transpose(x)            # axes reverse, each keeping its colour
+rt.transpose(x, (1, 0))    # an explicit permutation
+rt.sum(x, 0)               # collapse axis 0, the result keeps the rest
+rt.mean(x, 1)              # collapse axis 1 into per group means
+```
+
+`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the swap. `sum` and `mean` mark the source elements that fold into the first result element and draw the surviving shape.
 
 ## Installation
 
@@ -143,6 +163,9 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - `None` (newaxis) to insert a size 1 axis, shown in the result shape and label
 - A full-shape boolean mask, highlighting every True position
 - Integer array (fancy) indexing, including mixed with slices, with the gathered axis placed as NumPy does
+- Reshape with row major order and one inferred `-1` axis
+- Transpose and permute with axis colours following the move
+- Sum and mean reductions over a chosen axis
 
 ## Not supported yet
 

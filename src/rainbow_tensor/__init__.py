@@ -15,7 +15,15 @@ Public API:
     rt.set_default_theme("dark")
 """
 
-from .notebook import TensorVisual, index, shape
+from .notebook import (
+    TensorVisual,
+    index,
+    mean,
+    reshape,
+    shape,
+    sum,
+    transpose,
+)
 from .theme import (
     DARK,
     LIGHT,
@@ -30,6 +38,10 @@ __version__ = "0.3.0"
 __all__ = [
     "shape",
     "index",
+    "reshape",
+    "transpose",
+    "sum",
+    "mean",
     "TensorVisual",
     "Theme",
     "LIGHT",
