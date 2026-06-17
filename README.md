@@ -28,6 +28,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
 - Index visualisation with highlighted selections and a plain text explanation, including boolean masks and integer array indexing
 - Shape changing views for reshape, transpose, and axis reductions, drawing the source and the result side by side
+- Combining views for concatenate and stack, tinting each operand so the seam or the new axis is clear
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
@@ -103,6 +104,24 @@ rt.mean(x, 1)              # collapse axis 1 into per group means
 
 `reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the swap. `sum` and `mean` mark the source elements that fold into the first result element and draw the surviving shape.
 
+## Combining tensors
+
+`concatenate` and `stack` join several operands into one. Each operand is drawn in its own tint, and the result colours every cell by the operand it came from, so the seam between operands or the new axis stays clear.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+a = np.arange(6).reshape(2, 3)
+b = np.arange(100, 106).reshape(2, 3)
+
+rt.concatenate([a, b], 0)   # join along an existing axis, (4, 3)
+rt.concatenate([a, b], 1)   # grow the columns instead, (2, 6)
+rt.stack([a, b], 0)         # place onto a new leading axis, (2, 2, 3)
+```
+
+`concatenate` needs the operands to match on every axis except the joined one, while `stack` needs them to share one shape. A mismatch raises a clear error rather than drawing a wrong figure.
+
 ## Installation
 
 Install from PyPI.
@@ -166,6 +185,8 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Reshape with row major order and one inferred `-1` axis
 - Transpose and permute with axis colours following the move
 - Sum and mean reductions over a chosen axis
+- Concatenate along an existing axis, with the seam tinted
+- Stack onto a brand new axis
 
 ## Not supported yet
 

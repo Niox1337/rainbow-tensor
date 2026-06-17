@@ -17,10 +17,12 @@ Public API:
 
 from .notebook import (
     TensorVisual,
+    concatenate,
     index,
     mean,
     reshape,
     shape,
+    stack,
     sum,
     transpose,
 )
@@ -42,6 +44,8 @@ __all__ = [
     "transpose",
     "sum",
     "mean",
+    "concatenate",
+    "stack",
     "TensorVisual",
     "Theme",
     "LIGHT",

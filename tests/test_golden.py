@@ -39,6 +39,9 @@ CASES = {
     "transpose_2d_dark": lambda: rt.transpose((2, 3), theme="dark"),
     "sum_2d_light": lambda: rt.sum((3, 4), 0),
     "mean_2d_light": lambda: rt.mean((3, 4), 1),
+    "concatenate_2d_light": lambda: rt.concatenate([(2, 3), (2, 3)], 0),
+    "concatenate_2d_dark": lambda: rt.concatenate([(2, 2), (2, 3)], 1, theme="dark"),
+    "stack_2d_light": lambda: rt.stack([(2, 3), (2, 3)], 0),
 }
 
 

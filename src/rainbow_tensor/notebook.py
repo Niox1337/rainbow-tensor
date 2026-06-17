@@ -18,10 +18,14 @@ from .indexing import (
     validate_index,
 )
 from .ops import (
+    concatenate_result_shape,
+    concatenate_source,
     reduce_result_shape,
     reduce_source_coords,
     reshape_result_shape,
     reshape_source_coord,
+    stack_result_shape,
+    stack_source,
     transpose_axes,
     transpose_result_shape,
     transpose_source_coord,
@@ -402,3 +406,120 @@ def mean(array, axis, theme=None, precision=2):
     axis gone.
     """
     return _reduce(array, axis, "mean", lambda vs: _py_sum(vs) / len(vs), theme, precision)
+
+
+# Soft operand tints, keyed by operand index, so a combined result can colour
+# each cell by where it came from. The first entry is the fill, the second the
+# matching border.
+_LIGHT_TINTS = [
+    ("#dbeafe", "#93c5fd"),  # blue
+    ("#fef3c7", "#fcd34d"),  # amber
+    ("#dcfce7", "#86efac"),  # green
+    ("#fce7f3", "#f9a8d4"),  # pink
+    ("#ede9fe", "#c4b5fd"),  # violet
+]
+_DARK_TINTS = [
+    ("#1e3a5f", "#3b82f6"),
+    ("#3f2d10", "#d97706"),
+    ("#14352a", "#22c55e"),
+    ("#3b1d2e", "#db2777"),
+    ("#2a2150", "#7c3aed"),
+]
+
+
+def _operand_tint(theme, i):
+    """Return the ``(fill, border)`` tint for operand ``i`` under ``theme``."""
+    ramp = _DARK_TINTS if theme.name == "dark" else _LIGHT_TINTS
+    return ramp[i % len(ramp)]
+
+
+def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precision):
+    """Render several operands and their combined result in one figure.
+
+    ``origin_fn`` maps a result coordinate to ``(operand_index, source_coord)``,
+    which drives both the result values and the per cell tint. Each operand is
+    tinted, and the result colours every cell by the operand it came from, so
+    the seam between operands stays clear.
+    """
+    source_values = [_source_value(a, s) for a, s in zip(arrays, shapes)]
+
+    def result_value(coord):
+        i, sc = origin_fn(coord)
+        return source_values[i](sc)
+
+    def result_tint(coord):
+        i, _ = origin_fn(coord)
+        return _operand_tint(theme, i)
+
+    panels = []
+    for i, (a, s) in enumerate(zip(arrays, shapes)):
+        fill, border = _operand_tint(theme, i)
+        panels.append(
+            {
+                "shape": s,
+                "value_fn": _value_fn_for(a),
+                "theme": theme.variant(surface=fill, cell_border=border),
+                "caption_parts": _shape_caption_parts(f"operand {i}", s, theme),
+            }
+        )
+    panels.append(
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "cell_tint": result_tint,
+            "caption_parts": _shape_caption_parts(name, result, theme),
+        }
+    )
+    connectors = ["+"] * (len(arrays) - 1) + ["->"]
+    svg = render_panels(panels, connectors, explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shapes[0], result=result, explanation=explanation)
+
+
+def concatenate(arrays, axis=0, theme=None, precision=2):
+    """Visualise concatenating several tensors along an existing axis.
+
+    ``arrays`` is a sequence of array-likes or shape tuples. They must match on
+    every axis except ``axis``. Each operand is tinted and the result colours
+    each cell by its operand, so the seam along the joined axis is clear.
+    """
+    theme = resolve_theme(theme)
+    shapes = [extract_shape(a) for a in arrays]
+    result = concatenate_result_shape(shapes, axis)
+    axis_r = axis + len(shapes[0]) if axis < 0 else axis
+
+    def origin_fn(coord):
+        return concatenate_source(coord, shapes, axis_r)
+
+    sizes = ", ".join(format_shape(s) for s in shapes)
+    explanation = [
+        f"Operand shapes: {sizes}",
+        f"Joining along axis {axis_r}.",
+        f"Result shape: {format_shape(result)}",
+        "Each operand keeps its tint, so the seam along the joined axis is clear.",
+    ]
+    return _combine(arrays, shapes, result, origin_fn, "concatenate", explanation, theme, precision)
+
+
+def stack(arrays, axis=0, theme=None, precision=2):
+    """Visualise stacking several tensors onto a brand new axis.
+
+    ``arrays`` is a sequence of array-likes or shape tuples that all share the
+    same shape. The new axis of length ``len(arrays)`` is inserted at ``axis``,
+    and each operand is tinted so the added dimension is visible.
+    """
+    theme = resolve_theme(theme)
+    shapes = [extract_shape(a) for a in arrays]
+    result = stack_result_shape(shapes, axis)
+    ndim = len(shapes[0])
+    axis_r = axis + ndim + 1 if axis < 0 else axis
+
+    def origin_fn(coord):
+        return stack_source(coord, axis_r, ndim)
+
+    explanation = [
+        f"Operand shape: {format_shape(shapes[0])}",
+        f"Stacking {len(arrays)} tensors on a new axis {axis_r}.",
+        f"Result shape: {format_shape(result)}",
+        "The new axis indexes the operands, each kept in its own tint.",
+    ]
+    return _combine(arrays, shapes, result, origin_fn, "stack", explanation, theme, precision)

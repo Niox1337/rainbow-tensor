@@ -181,8 +181,12 @@ def _render_legend(items, x, y, theme):
     return "".join(parts)
 
 
-def _render_cell(cell, has_selection, theme, precision, hover):
-    """Render one cell, its surface, value, and optional hover title."""
+def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
+    """Render one cell, its surface, value, and optional hover title.
+
+    ``tint`` is an optional ``(fill, border)`` pair that colours a resting cell,
+    used to mark which operand a result cell came from.
+    """
     if cell.ellipsis:
         cx = cell.x + cell.width / 2
         cy = cell.y + cell.height / 2
@@ -204,6 +208,10 @@ def _render_cell(cell, has_selection, theme, precision, hover):
         border = theme.cell_border
         text_color = theme.text_muted
         weight = "400"
+    elif tint is not None:
+        fill, border = tint
+        text_color = theme.text
+        weight = "500"
     else:
         fill = theme.surface
         border = theme.cell_border
@@ -250,13 +258,15 @@ def _label_element(x, y, parts):
     )
 
 
-def _render_body(shape, selected_list, value_fn, theme, precision, hover):
+def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_tint=None):
     """Render the frames and cells of one tensor in local coordinates.
 
     Returns ``(body_svg, width, height, theme)``. The cells may grow to fit a
     wide value, which yields a theme variant, so the caller uses the returned
     theme for any later measurement. Coordinates start at the theme padding,
-    so a panel renderer can translate the whole body by an offset.
+    so a panel renderer can translate the whole body by an offset. ``cell_tint``
+    is an optional function mapping a coordinate to a ``(fill, border)`` pair,
+    used to colour each result cell by the operand it came from.
     """
     has_selection = len(selected_list) > 0
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
@@ -278,7 +288,8 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover):
             f'stroke-width="{theme.frame_width}"/>'
         )
     for cell in layout.cells:
-        parts.append(_render_cell(cell, has_selection, theme, precision, hover))
+        tint = cell_tint(cell.coord) if cell_tint and cell.coord is not None else None
+        parts.append(_render_cell(cell, has_selection, theme, precision, hover, tint))
     return "".join(parts), layout.width, layout.height, theme
 
 
@@ -382,7 +393,8 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
 
     Each panel is a dict with a ``shape``, an optional ``value_fn`` and
     ``selected`` iterable, an optional ``theme`` override used to tint an
-    operand, and optional ``caption_parts`` drawn under the panel as coloured
+    operand, an optional ``cell_tint`` function colouring each cell by its
+    origin, and optional ``caption_parts`` drawn under the panel as coloured
     ``(text, colour)`` pairs. ``connectors`` is a list of glyph strings drawn
     between consecutive panels, for example ``"->"`` or ``"+"``. ``explanation``
     is a shared list of lines drawn below every panel. This composes the
@@ -403,6 +415,7 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
             ptheme,
             precision,
             hover,
+            panel.get("cell_tint"),
         )
         bodies.append((body, w, h, panel))
 
