@@ -33,6 +33,8 @@ CASES = {
     "shape_5d_dark": lambda: rt.shape((2, 2, 2, 2, 2), theme="dark"),
     "index_4d_light": lambda: rt.index((2, 2, 2, 2), (1, slice(None), 0, slice(None))),
     "truncate_4d_light": lambda: rt.shape((2, 2, 2, 20)),
+    "mask_2d_light": lambda: rt.index((2, 3), [[True, False, True], [False, True, False]]),
+    "fancy_2d_dark": lambda: rt.index((3, 4), ([0, 2], [1, 3]), theme="dark"),
 }
 
 
