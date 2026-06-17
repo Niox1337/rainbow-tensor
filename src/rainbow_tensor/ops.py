@@ -119,3 +119,73 @@ def _check_axis(axis, ndim):
     if not 0 <= resolved < ndim:
         raise ValueError(f"axis {axis} is out of range for a rank {ndim} tensor")
     return resolved
+
+
+# Concatenate --------------------------------------------------------------
+
+
+def concatenate_result_shape(shapes, axis):
+    """Return the shape after joining ``shapes`` along ``axis``.
+
+    Every operand must match on every axis except the joined one.
+    """
+    if not shapes:
+        raise ValueError("need at least one tensor to concatenate")
+    ndim = len(shapes[0])
+    axis = _check_axis(axis, ndim)
+    for s in shapes:
+        if len(s) != ndim:
+            raise ValueError("all tensors must have the same rank to concatenate")
+        for i in range(ndim):
+            if i != axis and s[i] != shapes[0][i]:
+                raise ValueError(
+                    f"all tensors must match on axis {i} to concatenate along "
+                    f"axis {axis}, got {s[i]} and {shapes[0][i]}"
+                )
+    out = list(shapes[0])
+    out[axis] = sum(s[axis] for s in shapes)
+    return tuple(out)
+
+
+def concatenate_source(result_coord, shapes, axis):
+    """Map a result coordinate to its ``(operand_index, source_coord)``."""
+    axis = _check_axis(axis, len(shapes[0]))
+    pos = result_coord[axis]
+    for i, s in enumerate(shapes):
+        if pos < s[axis]:
+            coord = result_coord[:axis] + (pos,) + result_coord[axis + 1:]
+            return i, coord
+        pos -= s[axis]
+    raise IndexError("result coordinate is past the end of the joined axis")
+
+
+# Stack --------------------------------------------------------------------
+
+
+def stack_result_shape(shapes, axis):
+    """Return the shape after stacking ``shapes`` on a new ``axis``.
+
+    Every operand must have the same shape. The new axis may sit anywhere from
+    ``0`` to the operand rank.
+    """
+    if not shapes:
+        raise ValueError("need at least one tensor to stack")
+    base = shapes[0]
+    for s in shapes:
+        if tuple(s) != tuple(base):
+            raise ValueError(
+                f"all tensors must have the same shape to stack, got {tuple(s)} "
+                f"and {tuple(base)}"
+            )
+    axis = _check_axis(axis, len(base) + 1)
+    out = list(base)
+    out.insert(axis, len(shapes))
+    return tuple(out)
+
+
+def stack_source(result_coord, axis, ndim):
+    """Map a result coordinate to its ``(operand_index, source_coord)``."""
+    axis = _check_axis(axis, ndim + 1)
+    i = result_coord[axis]
+    coord = result_coord[:axis] + result_coord[axis + 1:]
+    return i, coord
