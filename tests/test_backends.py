@@ -93,3 +93,12 @@ def test_jax_array_renders_when_installed():
 
     assert visual.shape == (2, 3)
     assert ">5<" in visual.svg
+
+
+def test_tensorflow_tensor_renders_when_installed():
+    tf = pytest.importorskip("tensorflow")
+    tensor = tf.reshape(tf.range(6), (2, 3))
+    visual = rt.shape(tensor)
+
+    assert visual.shape == (2, 3)
+    assert ">5<" in visual.svg
