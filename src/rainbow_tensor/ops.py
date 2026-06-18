@@ -8,7 +8,9 @@ mappings into values to draw, and the tests cross check every result against
 NumPy.
 """
 
+from itertools import product
 from math import prod
+from string import ascii_letters
 
 from .shape import flat_index
 
@@ -95,6 +97,144 @@ def transpose_source_coord(result_coord, axes):
     for r, a in enumerate(axes):
         source[a] = result_coord[r]
     return tuple(source)
+
+
+# Swap axes ----------------------------------------------------------------
+
+
+def swapaxes_axes(ndim, axis1, axis2):
+    """Return the transpose permutation for swapping two axes."""
+    first = _check_axis(axis1, ndim)
+    second = _check_axis(axis2, ndim)
+    axes = list(range(ndim))
+    axes[first], axes[second] = axes[second], axes[first]
+    return tuple(axes)
+
+
+# Einsum -------------------------------------------------------------------
+
+
+def parse_einsum_subscripts(subscripts, operand_count):
+    """Parse einsum text into input labels and output labels.
+
+    The supported syntax covers named axes with ASCII letters and an optional
+    explicit output after ``->``. Ellipsis is rejected so the visual stays
+    honest about every axis it draws.
+    """
+    compact = "".join(str(subscripts).split())
+    if "..." in compact or "." in compact:
+        raise ValueError("einsum ellipsis is not supported yet")
+    if compact.count("->") > 1:
+        raise ValueError("einsum subscripts may contain only one output arrow")
+
+    if "->" in compact:
+        input_text, output_text = compact.split("->")
+        explicit = True
+    else:
+        input_text = compact
+        output_text = ""
+        explicit = False
+
+    inputs = tuple(tuple(part) for part in input_text.split(","))
+    if len(inputs) != operand_count:
+        raise ValueError(
+            f"einsum expected {len(inputs)} operands from subscripts, got {operand_count}"
+        )
+
+    for labels in inputs:
+        _validate_einsum_labels(labels, "input")
+
+    if explicit:
+        output = tuple(output_text)
+        _validate_einsum_labels(output, "output")
+        if len(set(output)) != len(output):
+            raise ValueError("einsum output labels may not repeat")
+        input_labels = {label for labels in inputs for label in labels}
+        for label in output:
+            if label not in input_labels:
+                raise ValueError(f"einsum output label {label!r} does not appear in input")
+    else:
+        counts = {}
+        for labels in inputs:
+            for label in labels:
+                counts[label] = counts.get(label, 0) + 1
+        output = tuple(sorted(label for label, count in counts.items() if count == 1))
+
+    return inputs, output
+
+
+def _validate_einsum_labels(labels, role):
+    """Validate one side of an einsum subscript."""
+    for label in labels:
+        if label not in ascii_letters:
+            raise ValueError(f"einsum {role} labels must be ASCII letters, got {label!r}")
+
+
+def einsum_index_sizes(input_axes, shapes):
+    """Return the size for each subscript label after validating operands."""
+    if len(input_axes) != len(shapes):
+        raise ValueError("einsum inputs and shapes must have the same length")
+
+    sizes = {}
+    for operand, (labels, shape) in enumerate(zip(input_axes, shapes)):
+        if len(labels) != len(shape):
+            raise ValueError(
+                f"einsum operand {operand} has {len(labels)} labels for rank {len(shape)}"
+            )
+        for label, size in zip(labels, shape):
+            if label in sizes and sizes[label] != size:
+                raise ValueError(
+                    f"einsum label {label!r} has inconsistent sizes "
+                    f"{sizes[label]} and {size}"
+                )
+            sizes[label] = size
+    return sizes
+
+
+def einsum_contracted_labels(input_axes, output_axes):
+    """Return labels that are summed away by an einsum."""
+    output = set(output_axes)
+    contracted = []
+    seen = set()
+    for labels in input_axes:
+        for label in labels:
+            if label not in output and label not in seen:
+                contracted.append(label)
+                seen.add(label)
+    return tuple(contracted)
+
+
+def einsum_result_shape(subscripts, shapes):
+    """Derive the einsum output shape from labels and operand shapes."""
+    input_axes, output_axes = parse_einsum_subscripts(subscripts, len(shapes))
+    sizes = einsum_index_sizes(input_axes, shapes)
+    return tuple(sizes[label] for label in output_axes)
+
+
+def einsum_selected_coords(input_axes, output_axes, shapes):
+    """Return source coordinates that feed the first output element.
+
+    These coordinates give the renderer a small concrete contraction to
+    highlight. For matrix multiplication this marks the row in the first
+    operand and the column in the second operand.
+    """
+    sizes = einsum_index_sizes(input_axes, shapes)
+    contracted = einsum_contracted_labels(input_axes, output_axes)
+    fixed = {label: 0 for label in output_axes}
+    selected = [[] for _ in input_axes]
+    ranges = [range(sizes[label]) for label in contracted]
+
+    for values in product(*ranges):
+        assignment = dict(fixed)
+        assignment.update(zip(contracted, values))
+        for operand, labels in enumerate(input_axes):
+            selected[operand].append(tuple(assignment[label] for label in labels))
+
+    if not contracted:
+        for operand, labels in enumerate(input_axes):
+            selected[operand].append(tuple(fixed[label] for label in labels))
+
+    return [sorted(set(coords)) for coords in selected]
 
 
 # Axis reductions ----------------------------------------------------------

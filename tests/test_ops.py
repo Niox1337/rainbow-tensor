@@ -9,10 +9,14 @@ import pytest
 
 import rainbow_tensor as rt
 from rainbow_tensor.ops import (
+    einsum_contracted_labels,
+    einsum_result_shape,
+    parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
     reshape_result_shape,
     reshape_source_coord,
+    swapaxes_axes,
     transpose_axes,
     transpose_result_shape,
     transpose_source_coord,
@@ -73,6 +77,30 @@ def test_transpose_rejects_non_permutation():
         transpose_axes(2, (0, 0))
 
 
+SWAPAXES_CASES = [
+    ((2, 3), 0, 1),
+    ((2, 3, 4), 0, 2),
+    ((2, 3, 4), -1, 0),
+    ((2, 3, 4, 5), 1, 3),
+]
+
+
+@pytest.mark.parametrize("shape, axis1, axis2", SWAPAXES_CASES)
+def test_swapaxes_matches_numpy(shape, axis1, axis2):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.swapaxes(x, axis1, axis2)
+    perm = swapaxes_axes(len(shape), axis1, axis2)
+
+    assert transpose_result_shape(shape, perm) == expected.shape
+    for rc in np.ndindex(expected.shape):
+        assert expected[rc] == x[transpose_source_coord(rc, perm)]
+
+
+def test_swapaxes_rejects_bad_axis():
+    with pytest.raises(ValueError):
+        swapaxes_axes(3, 0, 3)
+
+
 REDUCE_CASES = [
     ((4,), 0),
     ((3, 4), 0),
@@ -97,6 +125,43 @@ def test_reduce_matches_numpy(shape, axis):
 def test_reduce_rejects_bad_axis():
     with pytest.raises(ValueError):
         reduce_result_shape((2, 3), 2)
+
+
+EINSUM_CASES = [
+    ("ij,jk->ik", [(2, 3), (3, 4)]),
+    ("ij,jk", [(2, 3), (3, 4)]),
+    ("ij,jk->ijk", [(2, 3), (3, 4)]),
+    ("abc,cde,ef->abdf", [(2, 3, 4), (4, 5, 6), (6, 7)]),
+    ("ij->", [(2, 3)]),
+    ("ii->i", [(3, 3)]),
+]
+
+
+@pytest.mark.parametrize("subscripts, shapes", EINSUM_CASES)
+def test_einsum_result_shape_matches_numpy(subscripts, shapes):
+    arrays = [np.ones(shape) for shape in shapes]
+    expected = np.einsum(subscripts, *arrays)
+
+    assert einsum_result_shape(subscripts, shapes) == expected.shape
+
+
+def test_parse_einsum_subscripts_returns_inputs_and_output():
+    inputs, output = parse_einsum_subscripts("ij,jk->ik", 2)
+
+    assert inputs == (("i", "j"), ("j", "k"))
+    assert output == ("i", "k")
+    assert einsum_contracted_labels(inputs, output) == ("j",)
+
+
+def test_einsum_rejects_invalid_subscripts():
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("ij,jk->ik->i", 2)
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("i...j->ij", 1)
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("ij,jk->iz", 2)
+    with pytest.raises(ValueError):
+        einsum_result_shape("ij,jk->ik", [(2, 3), (2, 4)])
 
 
 def test_public_functions_render_and_report_shape():
