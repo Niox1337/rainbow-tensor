@@ -8,6 +8,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 import builtins
 from itertools import product
 
+from .backends import value_at_coordinate
 from .indexing import (
     advanced_index,
     explain_index,
@@ -99,11 +100,7 @@ def _value_fn_for(obj):
         return None
 
     def value_fn(coord):
-        value = obj[coord]
-        item = getattr(value, "item", None)
-        if callable(item):
-            return item()
-        return value
+        return value_at_coordinate(obj, coord)
 
     return value_fn
 
