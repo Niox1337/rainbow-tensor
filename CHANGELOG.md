@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.2
+
+### Added
+
+- A global axis colour scheme. `set_default_axis_colors` sets an axis colour ramp once for every later render, `get_default_axis_colors` reads it back, and `None` clears it. A per call `theme` still overrides the global scheme
+
+### Changed
+
+- The default axis colour ramp now spreads its hues so adjacent axes are easy to tell apart. After red and orange it jumps to lime and teal, then walks through blue, violet, and pink, in both the light and the dark theme
+
 ## 0.10.1
 
 ### Fixed

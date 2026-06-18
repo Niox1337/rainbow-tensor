@@ -47,5 +47,7 @@ Themes
 
 .. autofunction:: get_default_theme
 .. autofunction:: set_default_theme
+.. autofunction:: get_default_axis_colors
+.. autofunction:: set_default_axis_colors
 .. autofunction:: register_theme
 .. autofunction:: resolve_theme
