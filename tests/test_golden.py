@@ -42,6 +42,8 @@ CASES = {
     "concatenate_2d_light": lambda: rt.concatenate([(2, 3), (2, 3)], 0),
     "concatenate_2d_dark": lambda: rt.concatenate([(2, 2), (2, 3)], 1, theme="dark"),
     "stack_2d_light": lambda: rt.stack([(2, 3), (2, 3)], 0),
+    "broadcast_2d_light": lambda: rt.broadcast((3, 1), (1, 4)),
+    "broadcast_2d_dark": lambda: rt.broadcast((2, 3, 4), (4,), theme="dark"),
 }
 
 
