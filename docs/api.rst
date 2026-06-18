@@ -28,6 +28,17 @@ Result object
 .. autoclass:: TensorVisual
    :members:
 
+Renderers
+---------
+
+.. autoclass:: SvgRenderer
+   :members:
+
+.. autofunction:: get_default_renderer
+.. autofunction:: set_default_renderer
+.. autofunction:: register_renderer
+.. autofunction:: resolve_renderer
+
 Themes
 ------
 
