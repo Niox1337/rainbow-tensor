@@ -1,0 +1,7 @@
+{
+  "name": "rainbow-tensor",
+  "compatibility_date": "2026-06-18",
+  "assets": {
+    "directory": "docs/_build/html"
+  }
+}
