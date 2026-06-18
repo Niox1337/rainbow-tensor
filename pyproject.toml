@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rainbow-tensor"
-version = "0.10.1"
+version = "0.10.2"
 description = "Visualise tensor shape, indexing, and slicing as SVG in Jupyter notebooks"
 readme = "README.md"
 requires-python = ">=3.10"

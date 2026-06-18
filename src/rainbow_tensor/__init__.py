@@ -49,7 +49,7 @@ from .theme import (
     set_default_theme,
 )
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 __all__ = [
     "shape",
     "index",
