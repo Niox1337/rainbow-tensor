@@ -168,9 +168,18 @@ def test_public_functions_render_and_report_shape():
     x = np.arange(12).reshape(3, 4)
     assert rt.reshape(x, (2, 6)).result_shape == (2, 6)
     assert rt.transpose(x).result_shape == (4, 3)
+    assert rt.swapaxes(np.arange(24).reshape(2, 3, 4), 0, 2).result_shape == (4, 3, 2)
     assert rt.sum(x, 0).result_shape == (4,)
     assert rt.mean(x, 1).result_shape == (3,)
-    for visual in (rt.reshape(x, (2, 6)), rt.transpose(x), rt.sum(x, 0), rt.mean(x, 1)):
+    assert rt.einsum("ij,jk->ik", x, np.ones((4, 2))).result_shape == (3, 2)
+    for visual in (
+        rt.reshape(x, (2, 6)),
+        rt.transpose(x),
+        rt.swapaxes(np.arange(24).reshape(2, 3, 4), 0, 2),
+        rt.sum(x, 0),
+        rt.mean(x, 1),
+        rt.einsum("ij,jk->ik", x, np.ones((4, 2))),
+    ):
         assert visual.svg.startswith("<svg")
 
 

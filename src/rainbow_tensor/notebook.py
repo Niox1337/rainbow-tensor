@@ -6,6 +6,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 """
 
 import builtins
+from itertools import product
 
 from .indexing import (
     advanced_index,
@@ -23,12 +24,18 @@ from .ops import (
     broadcast_stretched_axes,
     concatenate_result_shape,
     concatenate_source,
+    einsum_contracted_labels,
+    einsum_index_sizes,
+    einsum_result_shape,
+    einsum_selected_coords,
+    parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
     reshape_result_shape,
     reshape_source_coord,
     stack_result_shape,
     stack_source,
+    swapaxes_axes,
     transpose_axes,
     transpose_result_shape,
     transpose_source_coord,
@@ -344,6 +351,180 @@ def transpose(array, axes=None, theme=None, precision=2):
     ]
     svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
     return TensorVisual(svg, shape, result=result, explanation=explanation)
+
+
+def swapaxes(array, axis1, axis2, theme=None, precision=2):
+    """Visualise swapping two axes of a tensor.
+
+    ``swapaxes`` is the small two axis form of transpose. The source and result
+    are drawn side by side, and the two moved axes keep their colours so the
+    swap is traceable.
+    """
+    theme = resolve_theme(theme)
+    shape = extract_shape(array)
+    perm = swapaxes_axes(len(shape), axis1, axis2)
+    result = transpose_result_shape(shape, perm)
+    source_value = _source_value(array, shape)
+    axis1_r = axis1 + len(shape) if axis1 < 0 else axis1
+    axis2_r = axis2 + len(shape) if axis2 < 0 else axis2
+
+    def result_value(coord):
+        return source_value(transpose_source_coord(coord, perm))
+
+    result_theme = theme.variant(
+        axis_colors=tuple(theme.axis_color(perm[r]) for r in range(len(perm)))
+    )
+
+    def result_color(axis):
+        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Swapping axes {axis1_r} and {axis2_r}.",
+        f"Axes order: {perm}",
+        f"Result shape: {format_shape(result)}",
+        "The two moved axes keep their source colours in the result.",
+    ]
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                "swapaxes", result, theme, color_for=result_color
+            ),
+        },
+    ]
+    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shape, result=result, explanation=explanation)
+
+
+def _einsum_label_colors(input_axes, output_axes, theme):
+    """Map every einsum label to one stable theme colour."""
+    order = []
+    for labels in (*input_axes, output_axes):
+        for label in labels:
+            if label not in order:
+                order.append(label)
+    return {label: theme.axis_color(i) for i, label in enumerate(order)}
+
+
+def _einsum_theme(labels, theme, label_colors):
+    """Return a theme whose axis ramp follows the subscript labels."""
+    if not labels:
+        return theme
+    return theme.variant(axis_colors=tuple(label_colors[label] for label in labels))
+
+
+def _einsum_caption_parts(name, labels, shape, theme, label_colors):
+    """Build a coloured caption for an einsum panel."""
+    neutral = theme.heading
+    parts = [(f"{name} ", neutral)]
+    if labels:
+        for label in labels:
+            parts.append((label, label_colors[label]))
+    else:
+        parts.append(("scalar", theme.text_muted))
+    parts.append((" (", neutral))
+    for axis, dim in enumerate(shape):
+        color = label_colors[labels[axis]] if labels else theme.text_muted
+        parts.append((str(dim), color))
+        if axis < len(shape) - 1:
+            parts.append((", ", neutral))
+    parts.append((")", neutral))
+    return parts
+
+
+def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
+    """Build a value function for the einsum output panel."""
+    sizes = einsum_index_sizes(input_axes, shapes)
+    contracted = einsum_contracted_labels(input_axes, output_axes)
+    ranges = [range(sizes[label]) for label in contracted]
+
+    def result_value(coord):
+        output_coord = () if not output_axes else coord
+        fixed = dict(zip(output_axes, output_coord))
+        total = 0
+        for values in product(*ranges):
+            assignment = dict(fixed)
+            assignment.update(zip(contracted, values))
+            term = 1
+            for labels, value_fn in zip(input_axes, source_values):
+                source_coord = tuple(assignment[label] for label in labels)
+                term *= value_fn(source_coord)
+            total += term
+        return total
+
+    return result_value
+
+
+def einsum(subscripts, *arrays, theme=None, precision=2):
+    """Visualise an einsum expression.
+
+    Each operand is drawn with its subscript labels. Shared labels reuse the
+    same colour, labels that disappear in the output are highlighted on the
+    source operands, and the output panel shows the derived free index shape.
+    """
+    if not arrays:
+        raise ValueError("einsum needs at least one operand")
+
+    theme = resolve_theme(theme)
+    shapes = [extract_shape(array) for array in arrays]
+    input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays))
+    result = einsum_result_shape(subscripts, shapes)
+    display_result = result or (1,)
+    source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
+    label_colors = _einsum_label_colors(input_axes, output_axes, theme)
+    selected = einsum_selected_coords(input_axes, output_axes, shapes)
+    result_value = _einsum_result_value_fn(input_axes, output_axes, shapes, source_values)
+    contracted = einsum_contracted_labels(input_axes, output_axes)
+
+    panels = []
+    for i, (array, labels, shape, selected_coords) in enumerate(
+        zip(arrays, input_axes, shapes, selected)
+    ):
+        panels.append(
+            {
+                "shape": shape,
+                "selected": selected_coords,
+                "value_fn": _value_fn_for(array),
+                "theme": _einsum_theme(labels, theme, label_colors),
+                "caption_parts": _einsum_caption_parts(
+                    f"operand {i}", labels, shape, theme, label_colors
+                ),
+            }
+        )
+
+    panels.append(
+        {
+            "shape": display_result,
+            "value_fn": result_value,
+            "theme": _einsum_theme(output_axes, theme, label_colors),
+            "caption_parts": _einsum_caption_parts(
+                "output", output_axes, display_result, theme, label_colors
+            ),
+        }
+    )
+    connectors = ["*"] * (len(arrays) - 1) + ["->"]
+    input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
+    output_text = "".join(output_axes) or "scalar"
+    if contracted:
+        contracted_line = f"Contracted labels: {', '.join(contracted)}"
+    else:
+        contracted_line = "No labels are contracted."
+    explanation = [
+        f"Operand subscripts: {input_text}",
+        f"Output subscript: {output_text}",
+        contracted_line,
+        f"Result shape: {format_shape(result)}",
+    ]
+    svg = render_panels(panels, connectors, explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shapes[0], selected=selected, result=result, explanation=explanation)
 
 
 def _reduce(array, axis, op_name, combine, theme, precision):
