@@ -24,10 +24,11 @@ from .theme import LIGHT
 # A sentinel marking a hidden run of positions along an axis.
 ELLIPSIS = object()
 
-# The glyph drawn for the gap, chosen to match the axis orientation.
-COL_ELLIPSIS = "…"  # horizontal ellipsis for a hidden column run
-ROW_ELLIPSIS = "⋮"  # vertical ellipsis for a hidden row run
-BLOCK_ELLIPSIS = "⋯"  # midline ellipsis for a hidden block run
+# The glyph drawn for the gap, chosen to match the axis orientation. Written as
+# ASCII unicode escapes so a non-UTF-8 re-save of this file cannot corrupt them.
+COL_ELLIPSIS = "\u2026"  # horizontal ellipsis for a hidden column run
+ROW_ELLIPSIS = "\u22ee"  # vertical ellipsis for a hidden row run
+BLOCK_ELLIPSIS = "\u22ef"  # midline ellipsis for a hidden block run
 
 
 @dataclass
