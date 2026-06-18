@@ -61,7 +61,8 @@ def test_index_computes_selection_and_result_shape():
     visual = index((2, 2, 2), (0, slice(None), 1))
     assert visual.selected == [(0, 0, 1), (0, 1, 1)]
     assert visual.result_shape == (2,)
-    assert "Result shape: (2,)" in visual.svg
+    assert "Result shape: (2,)" in visual.text
+    assert "Result shape: (2,)" not in visual.svg
 
 
 def test_index_highlights_selected_values():
@@ -106,7 +107,7 @@ def test_swapaxes_renders_result_with_moved_axis_colours():
 
     assert visual.result_shape == np.swapaxes(x, 0, 2).shape
     assert "swapaxes" in visual.svg
-    assert "Swapping axes 0 and 2." in visual.svg
+    assert "Swapping axes 0 and 2." in visual.text
     assert "#dc2626" in visual.svg
     assert "#d97706" in visual.svg
 
@@ -122,7 +123,7 @@ def test_einsum_renders_subscripts_and_result_values():
     assert ">20<" in visual.svg
     assert "operand 0" in visual.svg
     assert "output" in visual.svg
-    assert "Contracted labels" in visual.svg
+    assert "Contracted labels" in visual.text
     assert visual.selected == [[(0, 0), (0, 1), (0, 2)], [(0, 0), (1, 0), (2, 0)]]
 
 
@@ -135,3 +136,26 @@ def test_einsum_general_operands_match_numpy_shape():
 
     assert visual.result_shape == np.einsum("abc,cde,ef->abdf", a, b, c).shape
     assert visual.svg.startswith("<svg")
+
+
+def test_shape_big_tensor_reports_preview_text():
+    visual = shape((1000, 1000, 1000))
+
+    assert "Large preview" in visual.text
+    assert "Large preview" not in visual.svg
+
+
+def test_ipython_display_prints_explanation(monkeypatch, capsys):
+    import sys
+
+    calls = []
+    fake_module = type(sys)("IPython.display")
+    fake_module.SVG = lambda data: ("svg", data)
+    fake_module.display = lambda *args, **kwargs: calls.append((args, kwargs))
+    monkeypatch.setitem(sys.modules, "IPython.display", fake_module)
+
+    visual = index((2, 2, 2), (0, slice(None), 1))
+    visual._ipython_display_()
+
+    assert calls[0][0][0][0] == "svg"
+    assert "Result shape: (2,)" in capsys.readouterr().out

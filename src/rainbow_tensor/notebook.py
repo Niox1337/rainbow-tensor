@@ -7,6 +7,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 
 import builtins
 from itertools import product
+from math import prod
 
 from .backends import value_at_coordinate
 from .indexing import (
@@ -19,6 +20,7 @@ from .indexing import (
     selected_coordinates,
     validate_index,
 )
+from .layout import axis_visible_limits
 from .ops import (
     broadcast_result_shape,
     broadcast_source_coord,
@@ -74,6 +76,7 @@ class TensorVisual:
         self.selected = selected
         self.result_shape = result
         self.explanation = explanation or []
+        self.text = "\n".join(self.explanation)
         self.renderer = renderer
         self.mime_type = mime_type
 
@@ -89,6 +92,17 @@ class TensorVisual:
         # Stable text repr so a re-run notebook's text/plain output never churns
         # on the object's memory address.
         return f"TensorVisual(shape={self.shape}, result_shape={self.result_shape})"
+
+    def _ipython_display_(self):
+        """Display the figure and print explanation text as standard output."""
+        from IPython.display import SVG, display
+
+        if self.mime_type == "image/svg+xml":
+            display(SVG(self.svg))
+        else:
+            display({self.mime_type: self.content}, raw=True)
+        if self.text:
+            print(self.text)
 
     def save(self, path):
         """Write the SVG to ``path`` and return the path.
@@ -112,6 +126,23 @@ def _visual(content, shape, renderer, selected=None, result=None, explanation=No
         renderer=getattr(renderer, "name", "custom"),
         mime_type=getattr(renderer, "mime_type", "image/svg+xml"),
     )
+
+
+def _preview_explanation(shapes, theme):
+    """Return standard output lines for large tensor previews."""
+    lines = []
+    for i, shape in enumerate(shapes):
+        limits = axis_visible_limits(shape, theme.max_cells, theme.max_visible_cells)
+        hidden = [axis for axis, (size, limit) in enumerate(zip(shape, limits)) if size > limit]
+        if not hidden:
+            continue
+        name = "tensor" if len(shapes) == 1 else f"tensor {i}"
+        lines.append(
+            f"Large preview for {name} {format_shape(shape)} draws at most "
+            f"{theme.max_visible_cells} real cells from {prod(shape)} total."
+        )
+        lines.append(f"Hidden axes {hidden} keep the head, selected positions, and tail.")
+    return lines
 
 
 def _value_fn_for(obj):
@@ -193,6 +224,7 @@ def shape(array, theme=None, precision=2, renderer=None):
     normalized = extract_shape(array)
     value_fn = _value_fn_for(array)
     label_parts = _shape_label_parts(normalized, theme)
+    explanation = _preview_explanation([normalized], theme)
     content = renderer.render_tensor(
         shape=normalized,
         value_fn=value_fn,
@@ -200,7 +232,7 @@ def shape(array, theme=None, precision=2, renderer=None):
         theme=theme,
         precision=precision,
     )
-    return _visual(content, normalized, renderer)
+    return _visual(content, normalized, renderer, explanation=explanation)
 
 
 def index(array, index, theme=None, precision=2, renderer=None):
@@ -223,6 +255,7 @@ def index(array, index, theme=None, precision=2, renderer=None):
 
     if is_advanced(index, normalized):
         selected, result, explanation = advanced_index(normalized, index)
+        explanation = explanation + _preview_explanation([normalized], theme)
         label = "mask" if not isinstance(index, tuple) else f"Index ({format_index(index)})"
         content = renderer.render_tensor(
             shape=normalized,
@@ -240,7 +273,7 @@ def index(array, index, theme=None, precision=2, renderer=None):
     validate_index(index, normalized)
     selected = selected_coordinates(normalized, index)
     result = result_shape(normalized, index)
-    explanation = explain_index(normalized, index)
+    explanation = explain_index(normalized, index) + _preview_explanation([normalized], theme)
     label_parts = _index_label_parts(index, theme)
     content = renderer.render_tensor(
         shape=normalized,
@@ -314,7 +347,7 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
         f"Original shape: {format_shape(old)}",
         f"New shape: {format_shape(new)}",
         "Values keep their row major order, so element k stays element k.",
-    ]
+    ] + _preview_explanation([old, new], theme)
     panels = [
         {
             "shape": old,
@@ -363,7 +396,7 @@ def transpose(array, axes=None, theme=None, precision=2, renderer=None):
         f"Axes order: {perm}",
         f"Result shape: {format_shape(result)}",
         "Each axis keeps its colour as it moves to its new position.",
-    ]
+    ] + _preview_explanation([shape, result], theme)
     panels = [
         {
             "shape": shape,
@@ -417,7 +450,7 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
         f"Axes order: {perm}",
         f"Result shape: {format_shape(result)}",
         "The two moved axes keep their source colours in the result.",
-    ]
+    ] + _preview_explanation([shape, result], theme)
     panels = [
         {
             "shape": shape,
@@ -558,7 +591,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
         f"Output subscript: {output_text}",
         contracted_line,
         f"Result shape: {format_shape(result)}",
-    ]
+    ] + _preview_explanation([*shapes, display_result], theme)
     content = renderer.render_panels(
         panels=panels,
         connectors=connectors,
@@ -599,7 +632,7 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         f"Reducing axis {axis} with {op_name}.",
         f"Result shape: {format_shape(result)}",
         f"Each result element combines {shape[axis]} values from axis {axis}.",
-    ]
+    ] + _preview_explanation([shape, disp], theme)
     panels = [
         {
             "shape": shape,
@@ -707,6 +740,7 @@ def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precis
         }
     )
     connectors = ["+"] * (len(arrays) - 1) + ["->"]
+    explanation = explanation + _preview_explanation([*shapes, result], theme)
     content = renderer.render_panels(
         panels=panels,
         connectors=connectors,
@@ -826,7 +860,7 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
         axes_line(1),
         f"Result shape: {format_shape(result)}",
         "A stretched axis repeats one value, so both operands fill the result shape.",
-    ]
+    ] + _preview_explanation([*shapes, result], theme)
     content = renderer.render_panels(
         panels=panels,
         connectors=["->", "&", "->"],
