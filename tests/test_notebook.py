@@ -2,7 +2,7 @@
 
 import pytest
 
-from rainbow_tensor import index, shape
+from rainbow_tensor import einsum, index, shape, swapaxes
 from rainbow_tensor.notebook import TensorVisual
 
 
@@ -97,3 +97,41 @@ def test_index_with_numpy_array():
     assert ">1<" in visual.svg
     assert ">3<" in visual.svg
     assert visual.result_shape == (2,)
+
+
+def test_swapaxes_renders_result_with_moved_axis_colours():
+    np = pytest.importorskip("numpy")
+    x = np.arange(24).reshape(2, 3, 4)
+    visual = swapaxes(x, 0, 2)
+
+    assert visual.result_shape == np.swapaxes(x, 0, 2).shape
+    assert "swapaxes" in visual.svg
+    assert "Swapping axes 0 and 2." in visual.svg
+    assert "#dc2626" in visual.svg
+    assert "#d97706" in visual.svg
+
+
+def test_einsum_renders_subscripts_and_result_values():
+    np = pytest.importorskip("numpy")
+    a = np.arange(6).reshape(2, 3)
+    b = np.arange(12).reshape(3, 4)
+    visual = einsum("ij,jk->ik", a, b)
+    expected = np.einsum("ij,jk->ik", a, b)
+
+    assert visual.result_shape == expected.shape
+    assert ">20<" in visual.svg
+    assert "operand 0" in visual.svg
+    assert "output" in visual.svg
+    assert "Contracted labels" in visual.svg
+    assert visual.selected == [[(0, 0), (0, 1), (0, 2)], [(0, 0), (1, 0), (2, 0)]]
+
+
+def test_einsum_general_operands_match_numpy_shape():
+    np = pytest.importorskip("numpy")
+    a = np.ones((2, 3, 4))
+    b = np.ones((4, 5, 6))
+    c = np.ones((6, 7))
+    visual = einsum("abc,cde,ef->abdf", a, b, c)
+
+    assert visual.result_shape == np.einsum("abc,cde,ef->abdf", a, b, c).shape
+    assert visual.svg.startswith("<svg")

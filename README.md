@@ -50,6 +50,14 @@ Shape changing, combining, and broadcasting views draw the source and the result
 
 ![Broadcast (3, 1) and (1, 4)](examples/images/broadcast_3x1_1x4.svg)
 
+`rt.einsum("ij,jk->ik", np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4))`
+
+![Einsum ij and jk to ik](examples/images/einsum_ij_jk_ik.svg)
+
+`rt.swapaxes(np.arange(24).reshape(2, 3, 4), 0, 2)`
+
+![Swapaxes (2, 3, 4)](examples/images/swapaxes_2x3x4.svg)
+
 More sample images live in `examples/images`, and runnable notebooks live in `examples`.
 
 ## Features
@@ -58,8 +66,10 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
 - Index visualisation with highlighted selections and a plain text explanation, including boolean masks and integer array indexing
 - Shape changing views for reshape, transpose, and axis reductions, drawing the source and the result side by side
+- Swapaxes views that move two axes while keeping the source colours traceable
 - Combining views for concatenate and stack, tinting each operand so the seam or the new axis is clear
 - Broadcasting views that stretch a smaller operand to match a larger one, marking every stretched axis
+- Einsum views that colour shared labels, mark contracted axes, and show the derived output shape
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
@@ -129,11 +139,12 @@ x = np.arange(12).reshape(3, 4)
 rt.reshape(x, (2, 6))      # the same values flow into a new layout
 rt.transpose(x)            # axes reverse, each keeping its colour
 rt.transpose(x, (1, 0))    # an explicit permutation
+rt.swapaxes(x.reshape(2, 3, 2), 0, 2)   # swap exactly two axes
 rt.sum(x, 0)               # collapse axis 0, the result keeps the rest
 rt.mean(x, 1)              # collapse axis 1 into per group means
 ```
 
-`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the swap. `sum` and `mean` mark the source elements that fold into the first result element and draw the surviving shape.
+`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the move. `swapaxes` does the same for two chosen axes. `sum` and `mean` mark the source elements that fold into the first result element and draw the surviving shape.
 
 ## Combining tensors
 
@@ -169,6 +180,23 @@ rt.broadcast((2, 3, 4), (4,))   # a (4,) vector gains two leading axes
 ```
 
 Axes line up from the right, and on each axis the sizes must be equal or one of them must be `1`. Incompatible shapes raise a clear error rather than drawing a wrong figure.
+
+## Einsum
+
+`einsum` turns a subscript expression into labelled operand panels and an output panel. A repeated label that does not appear in the output is highlighted on the operands, which makes the contraction visible.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+a = np.arange(6).reshape(2, 3)
+b = np.arange(12).reshape(3, 4)
+
+rt.einsum("ij,jk->ik", a, b)
+rt.einsum("abc,cde,ef->abdf", (2, 2, 2), (2, 2, 2), (2, 2))
+```
+
+Shared labels keep the same colour wherever they appear. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
 
 ## Installation
 
@@ -232,14 +260,17 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Integer array (fancy) indexing, including mixed with slices, with the gathered axis placed as NumPy does
 - Reshape with row major order and one inferred `-1` axis
 - Transpose and permute with axis colours following the move
+- Swapaxes with negative axes resolved like NumPy
 - Sum and mean reductions over a chosen axis
 - Concatenate along an existing axis, with the seam tinted
 - Stack onto a brand new axis
 - Broadcasting two tensors to a common shape, marking every stretched axis
+- Einsum with explicit or implicit output labels and any number of operands
 
 ## Not supported yet
 
 - Multi-dimensional index arrays and per-axis boolean arrays
+- Einsum ellipsis notation
 - Interactive controls and animation
 
 ## Development

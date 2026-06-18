@@ -14,11 +14,13 @@ Shape changing and combining
 
 .. autofunction:: reshape
 .. autofunction:: transpose
+.. autofunction:: swapaxes
 .. autofunction:: sum
 .. autofunction:: mean
 .. autofunction:: concatenate
 .. autofunction:: stack
 .. autofunction:: broadcast
+.. autofunction:: einsum
 
 Result object
 -------------

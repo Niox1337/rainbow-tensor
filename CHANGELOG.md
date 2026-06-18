@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Einsum views parse subscripts, colour shared labels across operands, highlight labels that contract away, and show the derived output shape
+- Swapaxes views draw the source and result side by side with the moved axes keeping their colours
+
 ## 0.7.0
 
 ### Added

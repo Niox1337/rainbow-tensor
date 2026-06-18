@@ -37,6 +37,7 @@ CASES = {
     "fancy_2d_dark": lambda: rt.index((3, 4), ([0, 2], [1, 3]), theme="dark"),
     "reshape_2d_light": lambda: rt.reshape((2, 3), (3, 2)),
     "transpose_2d_dark": lambda: rt.transpose((2, 3), theme="dark"),
+    "swapaxes_3d_light": lambda: rt.swapaxes((2, 3, 4), 0, 2),
     "sum_2d_light": lambda: rt.sum((3, 4), 0),
     "mean_2d_light": lambda: rt.mean((3, 4), 1),
     "concatenate_2d_light": lambda: rt.concatenate([(2, 3), (2, 3)], 0),
@@ -44,6 +45,7 @@ CASES = {
     "stack_2d_light": lambda: rt.stack([(2, 3), (2, 3)], 0),
     "broadcast_2d_light": lambda: rt.broadcast((3, 1), (1, 4)),
     "broadcast_2d_dark": lambda: rt.broadcast((2, 3, 4), (4,), theme="dark"),
+    "einsum_2d_light": lambda: rt.einsum("ij,jk->ik", (2, 3), (3, 4)),
 }
 
 
