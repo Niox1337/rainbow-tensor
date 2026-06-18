@@ -58,6 +58,10 @@ Shape changing, combining, and broadcasting views draw the source and the result
 
 ![Swapaxes (2, 3, 4)](examples/images/swapaxes_2x3x4.svg)
 
+`rt.shape((100, 100, 100, 100))`
+
+![Big tensor preview](examples/images/big_tensor_preview.svg)
+
 The same calls work with backend arrays that expose a shape and coordinate access.
 
 `rt.shape(np.arange(6).reshape(2, 3))`
@@ -71,6 +75,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Static SVG output that stays sharp at any zoom level in a notebook
 - Shape visualisation for tensors of any rank, nesting frames to arbitrary depth
 - Index visualisation with highlighted selections and a plain text explanation, including boolean masks and integer array indexing
+- Explanation lines print as standard output in notebooks and stay available as `visual.text`
 - Shape changing views for reshape, transpose, and axis reductions, drawing the source and the result side by side
 - Swapaxes views that move two axes while keeping the source colours traceable
 - Combining views for concatenate and stack, tinting each operand so the seam or the new axis is clear
@@ -82,6 +87,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
 - Long axes truncate to a readable head and tail with an ellipsis cell
+- Big tensor previews respect a total visible cell budget, and selected positions are kept visible when there is room
 - Hover any cell to read its coordinate and flat index
 - A `save` helper that writes the SVG to a file
 - Works with shape tuples and with array-like objects that expose a `.shape` attribute, such as NumPy arrays
@@ -114,10 +120,10 @@ rt.set_default_theme("dark")
 rt.index(x, (0, slice(None), 1))
 ```
 
-A theme bundles the colours, fonts, cell size, stroke width, and the truncation limit. Derive a tweaked copy with `variant` and pass it directly.
+A theme bundles the colours, fonts, cell size, stroke width, the per axis truncation limit, and the total visible cell budget. Derive a tweaked copy with `variant` and pass it directly.
 
 ```python
-roomy = rt.LIGHT.variant(cell_w=64, max_cells=8)
+roomy = rt.LIGHT.variant(cell_w=64, max_cells=8, max_visible_cells=160)
 rt.shape(np.arange(8).reshape(2, 4), theme=roomy)
 ```
 
@@ -205,6 +211,28 @@ rt.einsum("abc,cde,ef->abdf", (2, 2, 2), (2, 2, 2), (2, 2))
 ```
 
 Shared labels keep the same colour wherever they appear. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
+
+## Big tensor previews
+
+Large tensors use two limits. `max_cells` limits one axis, while `max_visible_cells` caps the whole preview so a high rank tensor does not create a huge SVG.
+
+```python
+import rainbow_tensor as rt
+
+rt.shape((100, 100, 100, 100))
+rt.index((100,), (50,))
+```
+
+The preview keeps the head and tail of hidden axes. A selected position in a long axis is pinned into the preview when the budget allows it.
+
+## Standard output explanations
+
+The SVG now stays focused on the figure. Explanation lines are printed as normal notebook output under the image, and the same text is available in Python.
+
+```python
+visual = rt.index((2, 2, 2), (0, slice(None), 1))
+visual.text
+```
 
 ## Backend arrays
 
@@ -294,11 +322,12 @@ rt.index(x, (0, slice(None), 1))
 
 For the array `np.arange(8).reshape(2, 2, 2)` the index `(0, slice(None), 1)` selects the values `1` and `3`, the selected coordinates are `(0, 0, 1)` and `(0, 1, 1)`, and the result shape is `(2,)`.
 
-Each function returns a small result object. Its `svg` attribute holds the SVG string, so the package can be inspected and tested outside a notebook.
+Each function returns a small result object. Its `svg` attribute holds the SVG string, and its `text` attribute holds the explanation printed below the figure in notebooks.
 
 ## Supported
 
 - Tensors of any rank, with frames nested to arbitrary depth
+- Big tensor previews with a total visible cell budget
 - Shape tuples and array-like objects with a `.shape` attribute
 - Integer indexing, including negatives such as `-1`
 - Basic slicing with `slice(None)`, `slice(start, stop)`, and `slice(start, stop, step)`, including negative bounds and steps such as `slice(None, None, -1)`
@@ -316,6 +345,7 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Einsum with explicit or implicit output labels and any number of operands
 - Backend arrays with `.shape` and coordinate access, including optional Torch, JAX, and TensorFlow checks
 - Custom renderers through the renderer registry
+- Standard output explanation text through `TensorVisual.text`
 
 ## Not supported yet
 

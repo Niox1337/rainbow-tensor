@@ -55,9 +55,10 @@ _py_sum = builtins.sum
 class TensorVisual:
     """A rendered tensor visualisation.
 
-    The ``svg`` attribute holds the SVG string. In a notebook the object is
-    shown as an image through ``_repr_svg_``. Outside a notebook the same
-    string is available for inspection and testing.
+    The ``svg`` attribute holds the SVG string, and ``text`` holds the plain
+    explanation. In a notebook the image is displayed first and the explanation
+    is printed as standard output underneath it. Outside a notebook both values
+    stay available for inspection and testing.
     """
 
     def __init__(
