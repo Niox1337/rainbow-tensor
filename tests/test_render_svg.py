@@ -78,22 +78,21 @@ def test_label_parts_render_coloured_tspans():
     assert 'fill="#dc2626"' in svg
 
 
-def test_width_grows_to_fit_long_explanation():
+def test_explanation_does_not_grow_svg_width():
     import re
 
     long_line = "Axis 0 is removed because integer index 0 is used and it is long"
     svg = render_svg((2,), label="Index (0,)", explanation=[long_line])
     width = int(re.search(r'width="(\d+)"', svg).group(1))
-    # the explanation is far wider than the tiny 1D tensor, so the canvas must
-    # have grown well beyond the default tensor width to avoid clipping
-    assert width > len(long_line) * 7
+    assert width < len(long_line) * 7
+    assert long_line not in svg
 
 
-def test_render_svg_includes_explanation_lines():
+def test_render_svg_keeps_explanation_lines_out_of_svg():
     svg = render_svg(
         (2, 2, 2),
         selected=[(0, 0, 1), (0, 1, 1)],
         label="Index (0, :, 1)",
         explanation=["Result shape: (2,)"],
     )
-    assert "Result shape: (2,)" in svg
+    assert "Result shape: (2,)" not in svg

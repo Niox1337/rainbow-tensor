@@ -16,6 +16,7 @@ overflowing the canvas.
 """
 
 from dataclasses import dataclass, field
+from math import prod
 
 from .shape import flat_index
 from .theme import LIGHT
@@ -75,7 +76,7 @@ class Layout:
     height: float = 0.0
 
 
-def visible_positions(size, limit):
+def visible_positions(size, limit, pinned=None):
     """Return the positions drawn along an axis of ``size``.
 
     When ``size`` fits within ``limit`` every position is returned. Otherwise
@@ -84,10 +85,80 @@ def visible_positions(size, limit):
     """
     if limit is None or size <= limit:
         return list(range(size))
+    if pinned:
+        return _visible_positions_with_pins(size, limit, pinned)
     keep = limit - 1
     head = (keep + 1) // 2
     tail = keep // 2
     return list(range(head)) + [ELLIPSIS] + list(range(size - tail, size))
+
+
+def axis_visible_limits(shape, per_axis_limit, cell_budget):
+    """Return per axis limits that keep the preview under ``cell_budget``."""
+    if per_axis_limit is None:
+        limits = list(shape)
+    else:
+        limits = [min(size, per_axis_limit) for size in shape]
+
+    if cell_budget is None:
+        return tuple(limits)
+
+    while prod(limits) > cell_budget and any(limit > 1 for limit in limits):
+        axis = max(range(len(limits)), key=lambda i: (limits[i], shape[i]))
+        limits[axis] -= 1
+    return tuple(limits)
+
+
+def _selected_positions_by_axis(selected, ndim):
+    """Collect selected positions that should stay visible in a preview."""
+    positions = {axis: set() for axis in range(ndim)}
+    for coord in selected:
+        for axis, value in enumerate(coord):
+            positions[axis].add(value)
+    return positions
+
+
+def _visible_positions_with_pins(size, limit, pinned):
+    """Return visible positions while keeping a small set of pins."""
+    if limit <= 0:
+        return [ELLIPSIS]
+
+    pins = [p for p in sorted(set(pinned)) if 0 <= p < size]
+    kept = set()
+
+    def add_if_it_fits(pos):
+        candidate = sorted(kept | {pos})
+        if len(_compress_positions(candidate)) <= limit:
+            kept.add(pos)
+            return True
+        return False
+
+    for pos in pins:
+        add_if_it_fits(pos)
+    add_if_it_fits(0)
+    add_if_it_fits(size - 1)
+
+    cursor = 1
+    while len(_compress_positions(sorted(kept))) < limit and cursor < size - cursor:
+        grew = add_if_it_fits(cursor)
+        grew = add_if_it_fits(size - 1 - cursor) or grew
+        if not grew:
+            break
+        cursor += 1
+
+    return _compress_positions(sorted(kept))
+
+
+def _compress_positions(positions):
+    """Insert ellipsis sentinels where kept positions skip hidden values."""
+    compressed = []
+    previous = None
+    for pos in positions:
+        if previous is not None and pos != previous + 1:
+            compressed.append(ELLIPSIS)
+        compressed.append(pos)
+        previous = pos
+    return compressed
 
 
 def build_layout(shape, selected=None, value_fn=None, theme=None):
@@ -105,13 +176,17 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     """
     t = theme or LIGHT
     sel = {tuple(coord) for coord in (selected or [])}
+    pinned = _selected_positions_by_axis(sel, len(shape))
 
     cell_w, cell_h, gap = t.cell_w, t.cell_h, t.cell_gap
     row_pad, row_gap = t.row_pad, t.row_gap
     block_pad, block_gap, pad = t.block_pad, t.block_gap, t.padding
-    limit = t.max_cells
+    limits = axis_visible_limits(shape, t.max_cells, t.max_visible_cells)
 
-    col_pos = visible_positions(shape[-1], limit)
+    def positions_for(axis):
+        return visible_positions(shape[axis], limits[axis], pinned.get(axis))
+
+    col_pos = positions_for(len(shape) - 1)
     n_cols = len(col_pos)
     row_w = n_cols * cell_w + (n_cols - 1) * gap + 2 * row_pad
     row_h = cell_h + 2 * row_pad
@@ -159,7 +234,7 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
 
     def group_size(axis):
         """Size of the region drawn for one fixed value of ``axis - 1``."""
-        n = len(visible_positions(shape[axis], limit))
+        n = len(positions_for(axis))
         if axis == ndim - 2:
             tile_w, tile_h = row_w, row_h
         else:
@@ -171,7 +246,7 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
 
     def render(axis, prefix, ox, oy):
         """Draw ``axis`` and every inner axis for ``prefix``; return (w, h)."""
-        positions = visible_positions(shape[axis], limit)
+        positions = positions_for(axis)
         is_row = axis == ndim - 2  # children are leaf rows of cells
         inner_pad = 0 if is_row else block_pad
         content_w, content_h = (row_w, row_h) if is_row else group_size(axis + 1)

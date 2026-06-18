@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Big tensor previews now respect a total visible cell budget, and selected positions stay visible when the preview budget allows it
+- Explanation text now prints as standard notebook output and is available as `TensorVisual.text`
+
 ## 0.9.0
 
 ### Added

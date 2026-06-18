@@ -310,13 +310,13 @@ def render_svg(
     ``selected`` is an iterable of selected coordinates and ``value_fn`` maps a
     coordinate to its display value. ``label`` is a plain label while
     ``label_parts`` is an optional list of ``(text, colour)`` pairs for a
-    coloured label. ``explanation`` is an optional list of lines drawn below.
+    coloured label. ``explanation`` is accepted for renderer interface
+    compatibility, but plain explanation text is emitted by ``TensorVisual``.
     ``theme`` chooses the palette and geometry, ``precision`` controls float
     formatting, ``legend`` toggles the axis legend, and ``hover`` toggles the
     per-cell title used for tooltips.
     """
     theme = resolve_theme(theme)
-    explanation = explanation or []
     selected_list = list(selected or [])
 
     body, body_w, body_h, theme = _render_body(
@@ -333,11 +333,6 @@ def render_svg(
     legend_items = _legend_items(shape, theme, has_selection) if legend else []
 
     content_width = _text_width(label_len, LABEL_FONT_SIZE, SANS_CHAR_RATIO) + 2 * TEXT_MARGIN
-    for line in explanation:
-        content_width = max(
-            content_width,
-            _text_width(len(line), EXPLANATION_FONT_SIZE, MONO_CHAR_RATIO) + 2 * TEXT_MARGIN,
-        )
     if legend_items:
         content_width = max(content_width, _legend_width(legend_items))
 
@@ -358,14 +353,6 @@ def render_svg(
         y += LEGEND_HEIGHT - LINE_HEIGHT + 8
         parts.append(_render_legend(legend_items, TEXT_MARGIN, y, theme))
         y += 6
-
-    for line in explanation:
-        y += LINE_HEIGHT - 4
-        parts.append(
-            f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{EXPLANATION_FONT_SIZE}" '
-            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
-            f"{escape(line)}</text>"
-        )
 
     height = y + 18
     return svg_document("".join(parts), width, height, theme=theme)
@@ -397,13 +384,13 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
     origin, and optional ``caption_parts`` drawn under the panel as coloured
     ``(text, colour)`` pairs. ``connectors`` is a list of glyph strings drawn
     between consecutive panels, for example ``"->"`` or ``"+"``. ``explanation``
-    is a shared list of lines drawn below every panel. This composes the
-    existing single tensor body, so the source and the result of an operation,
-    or several operands, sit in one figure.
+    is accepted for renderer interface compatibility, but plain explanation
+    text is emitted by ``TensorVisual``. This composes the existing single
+    tensor body, so the source and the result of an operation, or several
+    operands, sit in one figure.
     """
     theme = resolve_theme(theme)
     connectors = connectors or []
-    explanation = explanation or []
 
     bodies = []
     for panel in panels:
@@ -451,19 +438,6 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
                 parts.append(_centered_parts(center, y, caption, CAPTION_FONT_SIZE))
         y += 6
 
-    for line in explanation:
-        y += LINE_HEIGHT - 4
-        parts.append(
-            f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{EXPLANATION_FONT_SIZE}" '
-            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
-            f"{escape(line)}</text>"
-        )
-
     content_width = row_width
-    for line in explanation:
-        content_width = max(
-            content_width,
-            _text_width(len(line), EXPLANATION_FONT_SIZE, MONO_CHAR_RATIO) + 2 * TEXT_MARGIN,
-        )
 
     return svg_document("".join(parts), content_width, y + 18, theme=theme)

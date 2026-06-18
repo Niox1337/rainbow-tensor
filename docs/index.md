@@ -7,8 +7,8 @@ elements.
 
 Every non-leaf axis draws a frame in its own rainbow colour, leaf elements sit
 in rounded cells, and a legend names each axis with its size in the matching
-colour. The same figure renders in a light or a dark theme without any change
-to your code.
+colour. Explanations print as plain notebook output below the figure. The same
+figure renders in a light or a dark theme without any change to your code.
 
 ## Install
 
@@ -37,7 +37,8 @@ rt.broadcast((3, 1), (1, 4))         # stretch a smaller operand to match
 ```
 
 Each function returns a small result object. Its `svg` attribute holds the SVG
-string, so the package stays inspectable and testable outside a notebook.
+string, and its `text` attribute holds the explanation printed under the
+figure, so the package stays inspectable and testable outside a notebook.
 
 ## What it covers
 
@@ -45,6 +46,7 @@ string, so the package stays inspectable and testable outside a notebook.
 ```
 
 - Tensors of any rank, with frames nested to arbitrary depth
+- Big tensor previews with a total visible cell budget
 - Integer indexing, basic slicing, `Ellipsis`, and `None` for a new axis
 - Boolean masks and integer array indexing, matching NumPy result shapes
 
