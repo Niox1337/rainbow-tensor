@@ -189,3 +189,53 @@ def stack_source(result_coord, axis, ndim):
     i = result_coord[axis]
     coord = result_coord[:axis] + result_coord[axis + 1:]
     return i, coord
+
+
+# Broadcasting -------------------------------------------------------------
+
+
+def broadcast_result_shape(shapes):
+    """Return the broadcast shape of ``shapes`` using the NumPy rules.
+
+    Axes are aligned from the right. On each axis the sizes must be equal or
+    one of them must be ``1``, which stretches to match the other.
+    """
+    ndim = max(len(s) for s in shapes)
+    result = []
+    for offset in range(1, ndim + 1):
+        sizes = [s[-offset] for s in shapes if offset <= len(s)]
+        big = [n for n in sizes if n != 1]
+        if len(set(big)) > 1:
+            raise ValueError(
+                f"operands could not be broadcast together: axis sizes {sizes}"
+            )
+        result.append(big[0] if big else 1)
+    return tuple(reversed(result))
+
+
+def broadcast_source_coord(result_coord, operand_shape):
+    """Map a result coordinate back to ``operand_shape``.
+
+    Leading axes the operand does not have are dropped, and a stretched axis of
+    size one always reads position zero.
+    """
+    extra = len(result_coord) - len(operand_shape)
+    coord = []
+    for i, size in enumerate(operand_shape):
+        pos = result_coord[extra + i]
+        coord.append(0 if size == 1 else pos)
+    return tuple(coord)
+
+
+def broadcast_stretched_axes(operand_shape, result_shape):
+    """Return the result axes where ``operand_shape`` is stretched.
+
+    This is every leading axis the operand gains, plus every size one axis that
+    grows to match the result.
+    """
+    extra = len(result_shape) - len(operand_shape)
+    stretched = list(range(extra))
+    for i, size in enumerate(operand_shape):
+        if size == 1 and result_shape[extra + i] != 1:
+            stretched.append(extra + i)
+    return stretched
