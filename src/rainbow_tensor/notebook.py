@@ -8,6 +8,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 import builtins
 from itertools import product
 
+from .backends import value_at_coordinate
 from .indexing import (
     advanced_index,
     explain_index,
@@ -40,7 +41,7 @@ from .ops import (
     transpose_result_shape,
     transpose_source_coord,
 )
-from .render_svg import render_panels, render_svg
+from .renderers import resolve_renderer
 from .shape import coordinates, extract_shape, flat_index, format_shape
 from .theme import resolve_theme
 
@@ -57,15 +58,29 @@ class TensorVisual:
     string is available for inspection and testing.
     """
 
-    def __init__(self, svg, shape, selected=None, result=None, explanation=None):
+    def __init__(
+        self,
+        svg,
+        shape,
+        selected=None,
+        result=None,
+        explanation=None,
+        renderer="svg",
+        mime_type="image/svg+xml",
+    ):
         self.svg = svg
+        self.content = svg
         self.shape = shape
         self.selected = selected
         self.result_shape = result
         self.explanation = explanation or []
+        self.renderer = renderer
+        self.mime_type = mime_type
 
     def _repr_svg_(self):
-        return self.svg
+        if self.mime_type == "image/svg+xml":
+            return self.svg
+        return None
 
     def __str__(self):
         return self.svg
@@ -86,6 +101,19 @@ class TensorVisual:
         return path
 
 
+def _visual(content, shape, renderer, selected=None, result=None, explanation=None):
+    """Build the visual result object for a renderer output."""
+    return TensorVisual(
+        content,
+        shape,
+        selected=selected,
+        result=result,
+        explanation=explanation,
+        renderer=getattr(renderer, "name", "custom"),
+        mime_type=getattr(renderer, "mime_type", "image/svg+xml"),
+    )
+
+
 def _value_fn_for(obj):
     """Build a coordinate to value function for array-like input.
 
@@ -99,11 +127,7 @@ def _value_fn_for(obj):
         return None
 
     def value_fn(coord):
-        value = obj[coord]
-        item = getattr(value, "item", None)
-        if callable(item):
-            return item()
-        return value
+        return value_at_coordinate(obj, coord)
 
     return value_fn
 
@@ -152,7 +176,7 @@ def _index_label_parts(index, theme):
     return parts
 
 
-def shape(array, theme=None, precision=2):
+def shape(array, theme=None, precision=2, renderer=None):
     """Visualise the structure of a tensor shape.
 
     ``array`` may be an array-like object with a ``.shape`` attribute such as
@@ -165,20 +189,21 @@ def shape(array, theme=None, precision=2):
     ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     normalized = extract_shape(array)
     value_fn = _value_fn_for(array)
     label_parts = _shape_label_parts(normalized, theme)
-    svg = render_svg(
-        normalized,
+    content = renderer.render_tensor(
+        shape=normalized,
         value_fn=value_fn,
         label_parts=label_parts,
         theme=theme,
         precision=precision,
     )
-    return TensorVisual(svg, normalized)
+    return _visual(content, normalized, renderer)
 
 
-def index(array, index, theme=None, precision=2):
+def index(array, index, theme=None, precision=2, renderer=None):
     """Visualise how an index selects elements from a tensor.
 
     ``array`` may be an array-like object with a ``.shape`` attribute, in
@@ -192,14 +217,15 @@ def index(array, index, theme=None, precision=2):
     ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     normalized = extract_shape(array)
     value_fn = _value_fn_for(array)
 
     if is_advanced(index, normalized):
         selected, result, explanation = advanced_index(normalized, index)
         label = "mask" if not isinstance(index, tuple) else f"Index ({format_index(index)})"
-        svg = render_svg(
-            normalized,
+        content = renderer.render_tensor(
+            shape=normalized,
             selected=selected,
             value_fn=value_fn,
             label=label,
@@ -207,8 +233,8 @@ def index(array, index, theme=None, precision=2):
             theme=theme,
             precision=precision,
         )
-        return TensorVisual(
-            svg, normalized, selected=selected, result=result, explanation=explanation
+        return _visual(
+            content, normalized, renderer, selected=selected, result=result, explanation=explanation
         )
 
     validate_index(index, normalized)
@@ -216,8 +242,8 @@ def index(array, index, theme=None, precision=2):
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index)
     label_parts = _index_label_parts(index, theme)
-    svg = render_svg(
-        normalized,
+    content = renderer.render_tensor(
+        shape=normalized,
         selected=selected,
         value_fn=value_fn,
         label_parts=label_parts,
@@ -225,8 +251,8 @@ def index(array, index, theme=None, precision=2):
         theme=theme,
         precision=precision,
     )
-    return TensorVisual(
-        svg, normalized, selected=selected, result=result, explanation=explanation
+    return _visual(
+        content, normalized, renderer, selected=selected, result=result, explanation=explanation
     )
 
 
@@ -265,7 +291,7 @@ def _shape_caption_parts(name, shape, theme, color_for=None):
     return parts
 
 
-def reshape(array, new_shape, theme=None, precision=2):
+def reshape(array, new_shape, theme=None, precision=2, renderer=None):
     """Visualise a reshape from the source layout into a new one.
 
     ``array`` is an array-like with a ``.shape`` attribute or a shape tuple.
@@ -276,6 +302,7 @@ def reshape(array, new_shape, theme=None, precision=2):
     the new layout.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     old = extract_shape(array)
     new = reshape_result_shape(old, new_shape)
     source_value = _source_value(array, old)
@@ -300,11 +327,13 @@ def reshape(array, new_shape, theme=None, precision=2):
             "caption_parts": _shape_caption_parts("reshape", new, theme),
         },
     ]
-    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, old, result=new, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, old, renderer, result=new, explanation=explanation)
 
 
-def transpose(array, axes=None, theme=None, precision=2):
+def transpose(array, axes=None, theme=None, precision=2, renderer=None):
     """Visualise a transpose or permute, with axis colours following the move.
 
     ``axes`` is a permutation of the source axes, or ``None`` to reverse them
@@ -312,6 +341,7 @@ def transpose(array, axes=None, theme=None, precision=2):
     axis it came from, so a colour can be traced across the swap.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
     perm = transpose_axes(len(shape), axes)
     result = transpose_result_shape(shape, perm)
@@ -349,11 +379,13 @@ def transpose(array, axes=None, theme=None, precision=2):
             ),
         },
     ]
-    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shape, result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
-def swapaxes(array, axis1, axis2, theme=None, precision=2):
+def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
     """Visualise swapping two axes of a tensor.
 
     ``swapaxes`` is the small two axis form of transpose. The source and result
@@ -361,6 +393,7 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2):
     swap is traceable.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
     perm = swapaxes_axes(len(shape), axis1, axis2)
     result = transpose_result_shape(shape, perm)
@@ -400,8 +433,10 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2):
             ),
         },
     ]
-    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shape, result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 def _einsum_label_colors(input_axes, output_axes, theme):
@@ -463,7 +498,7 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
     return result_value
 
 
-def einsum(subscripts, *arrays, theme=None, precision=2):
+def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     """Visualise an einsum expression.
 
     Each operand is drawn with its subscript labels. Shared labels reuse the
@@ -474,6 +509,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2):
         raise ValueError("einsum needs at least one operand")
 
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     shapes = [extract_shape(array) for array in arrays]
     input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays))
     result = einsum_result_shape(subscripts, shapes)
@@ -523,13 +559,22 @@ def einsum(subscripts, *arrays, theme=None, precision=2):
         contracted_line,
         f"Result shape: {format_shape(result)}",
     ]
-    svg = render_panels(panels, connectors, explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shapes[0], selected=selected, result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels,
+        connectors=connectors,
+        explanation=explanation,
+        theme=theme,
+        precision=precision,
+    )
+    return _visual(
+        content, shapes[0], renderer, selected=selected, result=result, explanation=explanation
+    )
 
 
-def _reduce(array, axis, op_name, combine, theme, precision):
+def _reduce(array, axis, op_name, combine, theme, precision, renderer):
     """Shared body for axis reductions such as sum and mean."""
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
     result = reduce_result_shape(shape, axis)
     source_value = _source_value(array, shape)
@@ -568,28 +613,34 @@ def _reduce(array, axis, op_name, combine, theme, precision):
             "caption_parts": _shape_caption_parts(op_name, disp, theme),
         },
     ]
-    svg = render_panels(panels, ["->"], explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shape, selected=selected, result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(
+        content, shape, renderer, selected=selected, result=result, explanation=explanation
+    )
 
 
-def sum(array, axis, theme=None, precision=2):
+def sum(array, axis, theme=None, precision=2, renderer=None):
     """Visualise a sum reduction over ``axis``.
 
     The source panel marks the elements that collapse into the first result
     element, and the result panel holds the per group sums with the reduced
     axis gone.
     """
-    return _reduce(array, axis, "sum", _py_sum, theme, precision)
+    return _reduce(array, axis, "sum", _py_sum, theme, precision, renderer)
 
 
-def mean(array, axis, theme=None, precision=2):
+def mean(array, axis, theme=None, precision=2, renderer=None):
     """Visualise a mean reduction over ``axis``.
 
     The source panel marks the elements that collapse into the first result
     element, and the result panel holds the per group means with the reduced
     axis gone.
     """
-    return _reduce(array, axis, "mean", lambda vs: _py_sum(vs) / len(vs), theme, precision)
+    return _reduce(
+        array, axis, "mean", lambda vs: _py_sum(vs) / len(vs), theme, precision, renderer
+    )
 
 
 # Soft operand tints, keyed by operand index, so a combined result can colour
@@ -617,7 +668,7 @@ def _operand_tint(theme, i):
     return ramp[i % len(ramp)]
 
 
-def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precision):
+def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precision, renderer):
     """Render several operands and their combined result in one figure.
 
     ``origin_fn`` maps a result coordinate to ``(operand_index, source_coord)``,
@@ -625,6 +676,7 @@ def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precis
     tinted, and the result colours every cell by the operand it came from, so
     the seam between operands stays clear.
     """
+    renderer = resolve_renderer(renderer)
     source_values = [_source_value(a, s) for a, s in zip(arrays, shapes)]
 
     def result_value(coord):
@@ -655,11 +707,17 @@ def _combine(arrays, shapes, result, origin_fn, name, explanation, theme, precis
         }
     )
     connectors = ["+"] * (len(arrays) - 1) + ["->"]
-    svg = render_panels(panels, connectors, explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shapes[0], result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels,
+        connectors=connectors,
+        explanation=explanation,
+        theme=theme,
+        precision=precision,
+    )
+    return _visual(content, shapes[0], renderer, result=result, explanation=explanation)
 
 
-def concatenate(arrays, axis=0, theme=None, precision=2):
+def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None):
     """Visualise concatenating several tensors along an existing axis.
 
     ``arrays`` is a sequence of array-likes or shape tuples. They must match on
@@ -681,10 +739,12 @@ def concatenate(arrays, axis=0, theme=None, precision=2):
         f"Result shape: {format_shape(result)}",
         "Each operand keeps its tint, so the seam along the joined axis is clear.",
     ]
-    return _combine(arrays, shapes, result, origin_fn, "concatenate", explanation, theme, precision)
+    return _combine(
+        arrays, shapes, result, origin_fn, "concatenate", explanation, theme, precision, renderer
+    )
 
 
-def stack(arrays, axis=0, theme=None, precision=2):
+def stack(arrays, axis=0, theme=None, precision=2, renderer=None):
     """Visualise stacking several tensors onto a brand new axis.
 
     ``arrays`` is a sequence of array-likes or shape tuples that all share the
@@ -706,10 +766,12 @@ def stack(arrays, axis=0, theme=None, precision=2):
         f"Result shape: {format_shape(result)}",
         "The new axis indexes the operands, each kept in its own tint.",
     ]
-    return _combine(arrays, shapes, result, origin_fn, "stack", explanation, theme, precision)
+    return _combine(
+        arrays, shapes, result, origin_fn, "stack", explanation, theme, precision, renderer
+    )
 
 
-def broadcast(a, b, theme=None, precision=2):
+def broadcast(a, b, theme=None, precision=2, renderer=None):
     """Visualise broadcasting two tensors to a common shape.
 
     Each operand is drawn in its own shape and again stretched to the broadcast
@@ -717,6 +779,7 @@ def broadcast(a, b, theme=None, precision=2):
     stretched axis is marked in the accent colour in the stretched caption.
     """
     theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
     arrays = [a, b]
     shapes = [extract_shape(x) for x in arrays]
     result = broadcast_result_shape(shapes)
@@ -764,5 +827,11 @@ def broadcast(a, b, theme=None, precision=2):
         f"Result shape: {format_shape(result)}",
         "A stretched axis repeats one value, so both operands fill the result shape.",
     ]
-    svg = render_panels(panels, ["->", "&", "->"], explanation, theme=theme, precision=precision)
-    return TensorVisual(svg, shapes[0], result=result, explanation=explanation)
+    content = renderer.render_panels(
+        panels=panels,
+        connectors=["->", "&", "->"],
+        explanation=explanation,
+        theme=theme,
+        precision=precision,
+    )
+    return _visual(content, shapes[0], renderer, result=result, explanation=explanation)

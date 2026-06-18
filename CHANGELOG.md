@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Backend value adapters for NumPy style arrays plus Torch, JAX, and TensorFlow style scalar values
+- A renderer registry with SVG as the default renderer and a public hook for later output backends
+- A backend arrays notebook that runs even when optional backend libraries are not installed
+
 ## 0.8.0
 
 ### Added

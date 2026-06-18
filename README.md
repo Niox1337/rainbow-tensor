@@ -58,6 +58,12 @@ Shape changing, combining, and broadcasting views draw the source and the result
 
 ![Swapaxes (2, 3, 4)](examples/images/swapaxes_2x3x4.svg)
 
+The same calls work with backend arrays that expose a shape and coordinate access.
+
+`rt.shape(np.arange(6).reshape(2, 3))`
+
+![Backend array shape](examples/images/backend_array_shape.svg)
+
 More sample images live in `examples/images`, and runnable notebooks live in `examples`.
 
 ## Features
@@ -70,6 +76,8 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Combining views for concatenate and stack, tinting each operand so the seam or the new axis is clear
 - Broadcasting views that stretch a smaller operand to match a larger one, marking every stretched axis
 - Einsum views that colour shared labels, mark contracted axes, and show the derived output shape
+- Backend value access for NumPy style arrays plus Torch, JAX, and TensorFlow style scalar values
+- A renderer registry with SVG as the default output backend
 - A light theme and a dark theme, selectable per call or through a module default
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
@@ -198,6 +206,46 @@ rt.einsum("abc,cde,ef->abdf", (2, 2, 2), (2, 2, 2), (2, 2))
 
 Shared labels keep the same colour wherever they appear. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
 
+## Backend arrays
+
+rainbow-tensor keeps using duck typing for arrays. If an object exposes a `.shape` attribute and supports coordinate reads, the visualiser can draw its values without importing that backend in the core package.
+
+```python
+import rainbow_tensor as rt
+import torch
+import jax.numpy as jnp
+
+rt.shape(torch.arange(6).reshape(2, 3))
+rt.shape(jnp.arange(6).reshape(2, 3))
+```
+
+Torch, JAX, and TensorFlow checks are optional in the test suite. They run when those packages are installed and skip cleanly otherwise.
+
+## Renderer registry
+
+SVG is still the default renderer. A custom renderer can be registered for experiments with other output formats. It receives the same tensor shape, panel dictionaries, value functions, theme, and precision that the SVG renderer uses.
+
+```python
+import rainbow_tensor as rt
+
+
+class TextRenderer:
+    name = "text"
+    mime_type = "text/plain"
+
+    def render_tensor(self, **kwargs):
+        return str(kwargs["shape"])
+
+    def render_panels(self, **kwargs):
+        return str(kwargs["panels"][-1]["shape"])
+
+
+rt.register_renderer(TextRenderer())
+rt.shape((2, 3), renderer="text")
+```
+
+Use `set_default_renderer` to choose a renderer for later calls, or pass `renderer=` on one call when you only want a local override.
+
 ## Installation
 
 Install from PyPI.
@@ -266,6 +314,8 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Stack onto a brand new axis
 - Broadcasting two tensors to a common shape, marking every stretched axis
 - Einsum with explicit or implicit output labels and any number of operands
+- Backend arrays with `.shape` and coordinate access, including optional Torch, JAX, and TensorFlow checks
+- Custom renderers through the renderer registry
 
 ## Not supported yet
 

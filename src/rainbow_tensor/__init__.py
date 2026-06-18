@@ -29,6 +29,14 @@ from .notebook import (
     swapaxes,
     transpose,
 )
+from .renderers import (
+    SVG,
+    SvgRenderer,
+    get_default_renderer,
+    register_renderer,
+    resolve_renderer,
+    set_default_renderer,
+)
 from .theme import (
     DARK,
     LIGHT,
@@ -53,6 +61,12 @@ __all__ = [
     "broadcast",
     "einsum",
     "TensorVisual",
+    "SvgRenderer",
+    "SVG",
+    "get_default_renderer",
+    "set_default_renderer",
+    "register_renderer",
+    "resolve_renderer",
     "Theme",
     "LIGHT",
     "DARK",
