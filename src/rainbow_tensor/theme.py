@@ -93,6 +93,7 @@ class Theme:
 
     # Truncation: the most cells drawn along one axis before an ellipsis.
     max_cells: int = 12
+    max_visible_cells: int = 240
 
     def axis_color(self, axis):
         """Return the ramp colour for ``axis``, wrapping if the ramp runs out."""
