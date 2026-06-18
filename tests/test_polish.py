@@ -9,7 +9,14 @@ import re
 import pytest
 
 import rainbow_tensor as rt
-from rainbow_tensor.layout import COL_ELLIPSIS, ELLIPSIS, build_layout, visible_positions
+from rainbow_tensor.layout import (
+    BLOCK_ELLIPSIS,
+    COL_ELLIPSIS,
+    ELLIPSIS,
+    ROW_ELLIPSIS,
+    build_layout,
+    visible_positions,
+)
 
 
 def _width(svg):
@@ -32,6 +39,21 @@ def test_visible_positions_truncates_long_axis():
 def test_long_axis_draws_ellipsis_cell():
     visual = rt.shape((30,))
     assert COL_ELLIPSIS in visual.svg
+
+
+def test_skipped_glyphs_are_the_exact_codepoints():
+    # Pin the exact glyphs so a non-UTF-8 re-save of layout.py that corrupts the
+    # source literals fails here instead of shipping broken text in a preview.
+    assert (COL_ELLIPSIS, ROW_ELLIPSIS, BLOCK_ELLIPSIS) == ("…", "⋮", "⋯")
+
+
+def test_truncated_high_rank_tensor_renders_all_three_glyphs():
+    # A 3D tensor truncated on every axis draws a hidden column run, row run, and
+    # block run, so all three intended glyphs must appear verbatim in the SVG.
+    svg = rt.shape((30, 30, 30)).svg
+    assert "…" in svg  # … horizontal ellipsis
+    assert "⋮" in svg  # ⋮ vertical ellipsis
+    assert "⋯" in svg  # ⋯ midline ellipsis
 
 
 def test_long_axis_stays_bounded_in_width():
