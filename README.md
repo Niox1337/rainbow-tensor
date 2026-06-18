@@ -84,6 +84,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Backend value access for NumPy style arrays plus Torch, JAX, and TensorFlow style scalar values
 - A renderer registry with SVG as the default output backend
 - A light theme and a dark theme, selectable per call or through a module default
+- A global axis colour scheme, set once with `set_default_axis_colors` and overridable by a per call theme
 - An axis legend that names each axis with its size in the matching colour
 - Configurable float precision with right aligned numbers
 - Long axes truncate to a readable head and tail with an ellipsis cell
@@ -99,7 +100,7 @@ Each axis has its own colour drawn from a rainbow ramp keyed by depth, so the st
 
 - Axis 0 is the outer frame, drawn red
 - Axis 1 is the inner row frame, drawn orange
-- Deeper axes continue through amber, green, blue, violet, and pink
+- Deeper axes jump to lime and teal, then continue through blue, violet, and pink, so adjacent axes are easy to tell apart
 - The leaf axis elements sit in plain cells, and a selected element fills green
 - The numbers in the shape label, the tokens in the index label, and the legend swatches are coloured to match
 
@@ -126,6 +127,22 @@ A theme bundles the colours, fonts, cell size, stroke width, the per axis trunca
 roomy = rt.LIGHT.variant(cell_w=64, max_cells=8, max_visible_cells=160)
 rt.shape(np.arange(8).reshape(2, 4), theme=roomy)
 ```
+
+## Global colour scheme
+
+To recolour the axis frames everywhere without building a whole theme, set an axis colour ramp once with `set_default_axis_colors`. Each colour maps to one axis depth, and the ramp wraps for tensors deeper than it. It applies to every later call that does not pass its own `theme`, so a per call `theme` still wins.
+
+```python
+import rainbow_tensor as rt
+
+rt.set_default_axis_colors(["#2563eb", "#db2777", "#16a34a"])
+rt.shape((2, 2, 2))                 # uses the new ramp
+rt.shape((2, 2, 2), theme="dark")   # the per call theme keeps its own ramp
+
+rt.set_default_axis_colors(None)    # clear it and fall back to the theme ramp
+```
+
+`get_default_axis_colors` returns the current ramp, or `None` when none is set.
 
 ## Float precision and saving
 

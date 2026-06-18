@@ -7,8 +7,10 @@ elements.
 
 Every non-leaf axis draws a frame in its own rainbow colour, leaf elements sit
 in rounded cells, and a legend names each axis with its size in the matching
-colour. Explanations print as plain notebook output below the figure. The same
-figure renders in a light or a dark theme without any change to your code.
+colour. Adjacent axes use clearly separated colours, so a deep tensor stays
+readable. Explanations print as plain notebook output below the figure. The same
+figure renders in a light or a dark theme without any change to your code, and
+`set_default_axis_colors` recolours the axis frames everywhere at once.
 
 ## Install
 
