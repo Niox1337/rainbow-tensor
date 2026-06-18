@@ -20,6 +20,36 @@ The same view also renders in a dark theme.
 
 ![Shape (2, 2, 2) dark](examples/images/shape_2x2x2_dark.svg)
 
+Shape changing, combining, and broadcasting views draw the source and the result side by side.
+
+`rt.reshape((2, 3), (3, 2))`
+
+![Reshape (2, 3) to (3, 2)](examples/images/reshape_2x3_to_3x2.svg)
+
+`rt.transpose((2, 3))`
+
+![Transpose (2, 3)](examples/images/transpose_2x3.svg)
+
+`rt.sum((3, 4), 0)`
+
+![Sum over axis 0](examples/images/sum_axis0.svg)
+
+`rt.mean((3, 4), 1)`
+
+![Mean over axis 1](examples/images/mean_axis1.svg)
+
+`rt.concatenate([(2, 3), (2, 3)], 0)`
+
+![Concatenate along axis 0](examples/images/concatenate_axis0.svg)
+
+`rt.stack([(2, 3), (2, 3)], 0)`
+
+![Stack on a new axis 0](examples/images/stack_axis0.svg)
+
+`rt.broadcast((3, 1), (1, 4))`
+
+![Broadcast (3, 1) and (1, 4)](examples/images/broadcast_3x1_1x4.svg)
+
 More sample images live in `examples/images`, and runnable notebooks live in `examples`.
 
 ## Features

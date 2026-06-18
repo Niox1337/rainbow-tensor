@@ -37,7 +37,7 @@ from .theme import (
     set_default_theme,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.7.0"
 __all__ = [
     "shape",
     "index",
