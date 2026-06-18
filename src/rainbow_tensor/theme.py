@@ -24,24 +24,27 @@ SANS_FAMILY = (
 )
 MONO_FAMILY = "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace"
 
-# A full rainbow ramp keyed by axis depth, fitting the project name.
+# A full rainbow ramp keyed by axis depth, fitting the project name. The hues
+# are spread so adjacent axes never share a neighbouring hue: red and orange
+# open the ramp, then it jumps straight to lime and teal before walking through
+# blue, violet, and pink, so two stacked frames are always easy to tell apart.
 LIGHT_AXIS_RAMP = (
     "#dc2626",  # red
     "#ea580c",  # orange
-    "#d97706",  # amber
-    "#16a34a",  # green
+    "#65a30d",  # lime
+    "#0d9488",  # teal
     "#2563eb",  # blue
     "#7c3aed",  # violet
     "#db2777",  # pink
 )
 DARK_AXIS_RAMP = (
-    "#f87171",
-    "#fb923c",
-    "#fbbf24",
-    "#4ade80",
-    "#60a5fa",
-    "#a78bfa",
-    "#f472b6",
+    "#f87171",  # red
+    "#fb923c",  # orange
+    "#a3e635",  # lime
+    "#2dd4bf",  # teal
+    "#60a5fa",  # blue
+    "#a78bfa",  # violet
+    "#f472b6",  # pink
 )
 
 
@@ -141,6 +144,9 @@ DARK = Theme(
 
 _PRESETS = {LIGHT.name: LIGHT, DARK.name: DARK}
 _default_theme = LIGHT
+# A global axis colour ramp applied to the default theme for calls that pass no
+# theme of their own. ``None`` keeps each theme's built-in ramp.
+_default_axis_colors = None
 
 
 def register_theme(theme):
@@ -158,6 +164,8 @@ def resolve_theme(theme):
     the registered presets. A :class:`Theme` is returned unchanged.
     """
     if theme is None:
+        if _default_axis_colors is not None:
+            return _default_theme.variant(axis_colors=_default_axis_colors)
         return _default_theme
     if isinstance(theme, Theme):
         return theme
@@ -184,3 +192,30 @@ def set_default_theme(theme):
     global _default_theme
     _default_theme = resolve_theme(theme)
     return _default_theme
+
+
+def get_default_axis_colors():
+    """Return the global axis colour ramp, or ``None`` when none is set."""
+    return _default_axis_colors
+
+
+def set_default_axis_colors(colors):
+    """Set a global axis colour ramp for later renders.
+
+    ``colors`` is a sequence of CSS colour strings, one per axis depth, reused
+    by every later call that does not pass its own ``theme``. A per call
+    ``theme`` still wins, so the global ramp is a convenient default rather than
+    a hard override. Pass ``None`` to clear it and fall back to each theme's
+    built-in ramp.
+    """
+    global _default_axis_colors
+    if colors is None:
+        _default_axis_colors = None
+        return None
+    ramp = tuple(colors)
+    if not ramp:
+        raise ValueError("axis colours must be a non-empty sequence of colour strings")
+    if not all(isinstance(c, str) for c in ramp):
+        raise TypeError("axis colours must all be colour strings")
+    _default_axis_colors = ramp
+    return _default_axis_colors

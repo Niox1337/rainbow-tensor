@@ -41,9 +41,11 @@ from .theme import (
     DARK,
     LIGHT,
     Theme,
+    get_default_axis_colors,
     get_default_theme,
     register_theme,
     resolve_theme,
+    set_default_axis_colors,
     set_default_theme,
 )
 
@@ -72,6 +74,8 @@ __all__ = [
     "DARK",
     "get_default_theme",
     "set_default_theme",
+    "get_default_axis_colors",
+    "set_default_axis_colors",
     "register_theme",
     "resolve_theme",
     "__version__",

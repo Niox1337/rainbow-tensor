@@ -4,6 +4,7 @@ import pytest
 
 from rainbow_tensor import einsum, index, shape, swapaxes
 from rainbow_tensor.notebook import TensorVisual
+from rainbow_tensor.theme import LIGHT
 
 
 class FakeArray:
@@ -108,8 +109,9 @@ def test_swapaxes_renders_result_with_moved_axis_colours():
     assert visual.result_shape == np.swapaxes(x, 0, 2).shape
     assert "swapaxes" in visual.svg
     assert "Swapping axes 0 and 2." in visual.text
-    assert "#dc2626" in visual.svg
-    assert "#d97706" in visual.svg
+    # axis 0 (red) and axis 2 keep their ramp colours through the swap
+    assert LIGHT.axis_color(0) in visual.svg
+    assert LIGHT.axis_color(2) in visual.svg
 
 
 def test_einsum_renders_subscripts_and_result_values():
