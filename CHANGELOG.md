@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1
+
+### Fixed
+
+- Skipped tensor positions in a large preview now always draw the intended ellipsis glyphs. The horizontal, vertical, and midline ellipsis are defined with ASCII unicode escapes so a non-UTF-8 re-save of the source can no longer corrupt them into broken text
+
 ## 0.10.0
 
 ### Added
