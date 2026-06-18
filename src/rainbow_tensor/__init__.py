@@ -17,6 +17,7 @@ Public API:
 
 from .notebook import (
     TensorVisual,
+    broadcast,
     concatenate,
     index,
     mean,
@@ -46,6 +47,7 @@ __all__ = [
     "mean",
     "concatenate",
     "stack",
+    "broadcast",
     "TensorVisual",
     "Theme",
     "LIGHT",

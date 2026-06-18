@@ -18,6 +18,9 @@ from .indexing import (
     validate_index,
 )
 from .ops import (
+    broadcast_result_shape,
+    broadcast_source_coord,
+    broadcast_stretched_axes,
     concatenate_result_shape,
     concatenate_source,
     reduce_result_shape,
@@ -523,3 +526,62 @@ def stack(arrays, axis=0, theme=None, precision=2):
         "The new axis indexes the operands, each kept in its own tint.",
     ]
     return _combine(arrays, shapes, result, origin_fn, "stack", explanation, theme, precision)
+
+
+def broadcast(a, b, theme=None, precision=2):
+    """Visualise broadcasting two tensors to a common shape.
+
+    Each operand is drawn in its own shape and again stretched to the broadcast
+    shape, so the repeated values along a stretched axis are visible. Every
+    stretched axis is marked in the accent colour in the stretched caption.
+    """
+    theme = resolve_theme(theme)
+    arrays = [a, b]
+    shapes = [extract_shape(x) for x in arrays]
+    result = broadcast_result_shape(shapes)
+
+    panels = []
+    for i, (arr, s) in enumerate(zip(arrays, shapes)):
+        source_value = _source_value(arr, s)
+        stretched = set(broadcast_stretched_axes(s, result))
+
+        def stretched_value(coord, _sv=source_value, _s=s):
+            return _sv(broadcast_source_coord(coord, _s))
+
+        def color_for(axis, _stretched=stretched):
+            if axis in _stretched:
+                return theme.surface_selected
+            return theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+        panels.append(
+            {
+                "shape": s,
+                "value_fn": _value_fn_for(arr),
+                "caption_parts": _shape_caption_parts(f"operand {i}", s, theme),
+            }
+        )
+        panels.append(
+            {
+                "shape": result,
+                "value_fn": stretched_value,
+                "caption_parts": _shape_caption_parts(
+                    "stretched", result, theme, color_for=color_for
+                ),
+            }
+        )
+
+    def axes_line(i):
+        ax = broadcast_stretched_axes(shapes[i], result)
+        if ax:
+            return f"operand {i} {format_shape(shapes[i])} stretches axes {ax}"
+        return f"operand {i} {format_shape(shapes[i])} already matches"
+
+    explanation = [
+        f"Operand shapes: {format_shape(shapes[0])} and {format_shape(shapes[1])}",
+        axes_line(0),
+        axes_line(1),
+        f"Result shape: {format_shape(result)}",
+        "A stretched axis repeats one value, so both operands fill the result shape.",
+    ]
+    svg = render_panels(panels, ["->", "&", "->"], explanation, theme=theme, precision=precision)
+    return TensorVisual(svg, shapes[0], result=result, explanation=explanation)
