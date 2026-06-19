@@ -619,9 +619,18 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         contributing = list(reduce_source_coords(rc, shape, axis))
         values[rc] = combine([source_value(sc) for sc in contributing])
 
-    # Mark the source elements that collapse into the first result element.
+    # Mark the source elements that collapse into the first result element, and
+    # tint every other group so values that fold into the same result share one
+    # background while the first group stays clearly highlighted.
     first = next(iter(coordinates(result)))
     selected = list(reduce_source_coords(first, shape, axis))
+
+    def source_tint(coord):
+        rc = coord[:axis] + coord[axis + 1:]
+        group = flat_index(rc, result) if result else 0
+        if group == 0:
+            return None  # the first group is shown through the selected highlight
+        return _operand_tint(theme, group - 1)
 
     disp = result or (1,)
 
@@ -633,12 +642,15 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         f"Reducing axis {axis} with {op_name}.",
         f"Result shape: {format_shape(result)}",
         f"Each result element combines {shape[axis]} values from axis {axis}.",
+        "Values that fold into the same result share one background, "
+        "and the first group is highlighted.",
     ] + _preview_explanation([shape, disp], theme)
     panels = [
         {
             "shape": shape,
             "value_fn": _value_fn_for(array),
             "selected": selected,
+            "cell_tint": source_tint,
             "caption_parts": _shape_caption_parts("source", shape, theme),
         },
         {
