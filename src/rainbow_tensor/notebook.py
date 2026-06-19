@@ -473,14 +473,58 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
     return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
-def _einsum_label_colors(input_axes, output_axes, theme):
-    """Map every einsum label to one stable theme colour."""
-    order = []
+# Role colour families, chosen so free, shared, and contracted labels read as
+# three distinct groups while every label keeps one colour everywhere it appears.
+_EINSUM_FREE = ("#2563eb", "#0891b2", "#4f46e5", "#0d9488", "#0284c7")
+_EINSUM_SHARED = ("#db2777", "#9333ea", "#c026d3", "#e11d48")
+_EINSUM_CONTRACTED = ("#ea580c", "#ca8a04", "#dc2626", "#b45309")
+
+
+def _einsum_roles(input_axes, output_axes):
+    """Classify each einsum label as free, shared, or contracted.
+
+    A label that is not in the output is contracted. Otherwise a label that
+    appears in more than one operand is shared, and the rest are free. Each
+    label gets exactly one role, so the three roles partition the labels.
+    """
+    output = set(output_axes)
+    operand_count = {}
+    for labels in input_axes:
+        for label in set(labels):
+            operand_count[label] = operand_count.get(label, 0) + 1
+    roles = {}
     for labels in (*input_axes, output_axes):
         for label in labels:
-            if label not in order:
-                order.append(label)
-    return {label: theme.axis_color(i) for i, label in enumerate(order)}
+            if label in roles:
+                continue
+            if label not in output:
+                roles[label] = "contracted"
+            elif operand_count.get(label, 0) >= 2:
+                roles[label] = "shared"
+            else:
+                roles[label] = "free"
+    return roles
+
+
+def _einsum_label_colors(input_axes, output_axes):
+    """Map every einsum label to one colour drawn from its role family.
+
+    The colour is stable across every operand and the output, so a label keeps
+    one colour in every caption and figure, and the three roles stay visually
+    distinct.
+    """
+    roles = _einsum_roles(input_axes, output_axes)
+    ramps = {"free": _EINSUM_FREE, "shared": _EINSUM_SHARED, "contracted": _EINSUM_CONTRACTED}
+    counters = {"free": 0, "shared": 0, "contracted": 0}
+    colors = {}
+    for labels in (*input_axes, output_axes):
+        for label in labels:
+            if label in colors:
+                continue
+            role = roles[label]
+            colors[label] = ramps[role][counters[role] % len(ramps[role])]
+            counters[role] += 1
+    return colors
 
 
 def _einsum_theme(labels, theme, label_colors):
@@ -488,6 +532,21 @@ def _einsum_theme(labels, theme, label_colors):
     if not labels:
         return theme
     return theme.variant(axis_colors=tuple(label_colors[label] for label in labels))
+
+
+def _einsum_leaf_tint(labels, theme, label_colors):
+    """Border a panel's leaf cells with the leaf label colour.
+
+    A non-leaf axis shows its label colour as a frame, but the leaf axis is
+    drawn as plain cells, so without this the leaf label colour would appear in
+    the caption yet never in the figure. Bordering each cell with the leaf label
+    colour keeps the figure and the caption consistent for every label.
+    """
+    if not labels:
+        return None
+    border = label_colors[labels[-1]]
+    fill = theme.surface
+    return lambda coord: (fill, border)
 
 
 def _einsum_caption_parts(name, labels, shape, theme, label_colors):
@@ -535,9 +594,10 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
 def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     """Visualise an einsum expression.
 
-    Each operand is drawn with its subscript labels. Shared labels reuse the
-    same colour, labels that disappear in the output are highlighted on the
-    source operands, and the output panel shows the derived free index shape.
+    Each operand is drawn with its subscript labels. Every label keeps one
+    colour across all operand captions, operand figures, and the output, drawn
+    from a colour family for its role, so free, shared, and contracted labels
+    stay visually distinct. The output panel shows the derived free index shape.
     """
     if not arrays:
         raise ValueError("einsum needs at least one operand")
@@ -549,21 +609,19 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     result = einsum_result_shape(subscripts, shapes)
     display_result = result or (1,)
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
-    label_colors = _einsum_label_colors(input_axes, output_axes, theme)
+    label_colors = _einsum_label_colors(input_axes, output_axes)
     selected = einsum_selected_coords(input_axes, output_axes, shapes)
     result_value = _einsum_result_value_fn(input_axes, output_axes, shapes, source_values)
     contracted = einsum_contracted_labels(input_axes, output_axes)
 
     panels = []
-    for i, (array, labels, shape, selected_coords) in enumerate(
-        zip(arrays, input_axes, shapes, selected)
-    ):
+    for i, (array, labels, shape) in enumerate(zip(arrays, input_axes, shapes)):
         panels.append(
             {
                 "shape": shape,
-                "selected": selected_coords,
                 "value_fn": _value_fn_for(array),
                 "theme": _einsum_theme(labels, theme, label_colors),
+                "cell_tint": _einsum_leaf_tint(labels, theme, label_colors),
                 "caption_parts": _einsum_caption_parts(
                     f"operand {i}", labels, shape, theme, label_colors
                 ),
@@ -575,6 +633,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
             "shape": display_result,
             "value_fn": result_value,
             "theme": _einsum_theme(output_axes, theme, label_colors),
+            "cell_tint": _einsum_leaf_tint(output_axes, theme, label_colors),
             "caption_parts": _einsum_caption_parts(
                 "output", output_axes, display_result, theme, label_colors
             ),
