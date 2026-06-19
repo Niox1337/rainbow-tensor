@@ -4,8 +4,9 @@ This module validates indexing expressions, expands slices into integer
 positions, computes the selected coordinates, and computes the result shape
 after indexing. Basic indexing supports negative integer indices, negative
 slice bounds and steps, ``Ellipsis`` (``...``), and ``None`` (newaxis).
-Advanced indexing supports a full-shape boolean mask and integer index
-arrays of any shape that broadcast together; see :func:`advanced_index`.
+Advanced indexing supports a full-shape boolean mask, integer index arrays
+of any shape that broadcast together, and per-axis boolean arrays that act
+like their nonzero integer arrays; see :func:`advanced_index`.
 """
 
 import itertools
@@ -57,6 +58,21 @@ def _is_array_like(entry):
 def _is_bool(value):
     """True for a Python bool or a NumPy boolean scalar, without importing it."""
     return isinstance(value, bool) or type(value).__name__.startswith("bool")
+
+
+def _first_leaf(entry):
+    """Drill into a nested array-like and return its first scalar element."""
+    cur = entry
+    while _is_array_like(cur):
+        if len(cur) == 0:
+            return None
+        cur = cur[0]
+    return cur
+
+
+def _is_bool_array(entry):
+    """True for an index-array entry whose elements are booleans."""
+    return _is_array_like(entry) and _is_bool(_first_leaf(entry))
 
 
 def validate_index(index, shape):
@@ -197,6 +213,8 @@ def _format_array(entry):
     """Format a possibly nested integer index array as ``[[0, 1], [2, 3]]``."""
     if _is_array_like(entry):
         return "[" + ", ".join(_format_array(entry[i]) for i in range(len(entry))) + "]"
+    if _is_bool(entry):
+        return "True" if entry else "False"
     return str(int(entry))
 
 
@@ -248,7 +266,8 @@ def advanced_index(shape, index):
     arrays gather coordinates and follow NumPy: the gathered axis stays in place
     when the advanced axes are contiguous and moves to the front when a slice
     separates them. Index arrays may have any shape and broadcast against each
-    other, with the broadcast shape forming the gathered block.
+    other, with the broadcast shape forming the gathered block. A boolean array
+    on one or more consecutive axes acts like its nonzero integer arrays.
     """
     if not isinstance(index, tuple):
         return _mask_index(shape, index)
@@ -290,11 +309,12 @@ def _array_index(shape, index):
         raise IndexError("newaxis (None) is not supported with advanced indexing")
 
     def consumes(e):
-        return (
-            isinstance(e, slice)
-            or _is_array_like(e)
-            or (isinstance(e, int) and not isinstance(e, bool))
-        )
+        # A boolean array consumes one axis per dimension, like its nonzero arrays.
+        if _is_bool_array(e):
+            return len(_shape_of(e))
+        if e is Ellipsis or e is None:
+            return 0
+        return 1
 
     consuming = sum(consumes(e) for e in index)
     if consuming > ndim:
@@ -318,17 +338,28 @@ def _array_index(shape, index):
         elif isinstance(e, slice):
             entries.append(("slice", e))
             axis += 1
+        elif _is_bool_array(e):
+            # A boolean array spanning d axes acts like its nonzero integer
+            # arrays: d paired index arrays selecting each True position.
+            bshape_ = _shape_of(e)
+            d = len(bshape_)
+            expected = tuple(shape[axis:axis + d])
+            if bshape_ != expected:
+                raise IndexError(
+                    f"boolean index on axes {axis}..{axis + d - 1} has shape "
+                    f"{format_shape(bshape_)} but the tensor axes are "
+                    f"{format_shape(expected)}"
+                )
+            nz = [c for c in coordinates(bshape_) if _get(e, c)]
+            for col in range(d):
+                resolved = {(k,): nz[k][col] for k in range(len(nz))}
+                entries.append(("arr", ((len(nz),), resolved)))
+            axis += d
         elif _is_array_like(e):
             ishape = _shape_of(e)
             resolved = {}
             for c in coordinates(ishape):
-                v = _get(e, c)
-                if _is_bool(v):
-                    raise IndexError(
-                        "a per-axis boolean array is not supported; pass a full "
-                        "boolean mask as the whole index instead"
-                    )
-                resolved[c] = _resolve_int(int(v), shape[axis], axis)
+                resolved[c] = _resolve_int(int(_get(e, c)), shape[axis], axis)
             entries.append(("arr", (ishape, resolved)))
             axis += 1
         else:
