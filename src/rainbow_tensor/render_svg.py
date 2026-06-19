@@ -203,15 +203,17 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
         border = theme.selected_border
         text_color = theme.text_selected
         weight = "700"
+    elif tint is not None:
+        # A group tint marks context cells, so it takes precedence over the
+        # muted fill used for unselected cells in a selection view.
+        fill, border = tint
+        text_color = theme.text
+        weight = "500"
     elif has_selection:
         fill = theme.surface_muted
         border = theme.cell_border
         text_color = theme.text_muted
         weight = "400"
-    elif tint is not None:
-        fill, border = tint
-        text_color = theme.text
-        weight = "500"
     else:
         fill = theme.surface
         border = theme.cell_border

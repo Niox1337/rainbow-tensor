@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.5
+
+### Changed
+
+- Sum and mean now colour the source values that fold into the same result element with one shared background and highlight the first group, so a reduction reads with the same clarity as the concatenate and stack views. The reduced axis, the result shape, and the numeric result are unchanged
+
 ## 0.10.4
 
 ### Added
