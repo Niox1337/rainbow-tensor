@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.4
+
+### Added
+
+- Advanced indexing now accepts per-axis boolean arrays. A boolean array on one or more consecutive axes acts like its nonzero integer arrays, mixes with slices and integer indices, and matches the NumPy selected coordinates and result shape. The full-shape boolean mask keeps working as before
+
 ## 0.10.3
 
 ### Added

@@ -28,6 +28,12 @@ CASES = [
     ((3, 4), ([[0], [2]], [1, 3])),  # (2,1) and (2,) broadcast to (2, 2)
     ((3, 4, 5), ([[0, 2]], slice(None), [[1, 3]])),  # 2D arrays, slice moves block front
     ((5,), (np.array([[0, 1, 2], [2, 3, 4]]),)),  # 2x3 block on a vector
+    ((4,), (np.array([True, False, True, True]),)),  # 1D boolean on the only axis
+    ((3, 4), (np.array([True, False, True]), slice(None))),  # boolean axis 0 with a slice
+    ((3, 4), (slice(None), np.array([False, True, True, False]))),  # boolean on axis 1
+    ((3, 4), (np.array([True, False, True]), [1, 3])),  # boolean axis 0 paired with an int array
+    ((2, 3), (np.array([[True, False, True], [False, True, False]]),)),  # 2D boolean as a tuple
+    ((3, 4), (np.array([True, False, True]), 2)),  # boolean axis 0 with an integer
 ]
 
 
@@ -51,6 +57,9 @@ def test_index_renders_mask_and_arrays():
     assert rt.index(x, ([0, 1], [2, 0])).result_shape == (2,)
     # A 2D index array keeps its own shape in the result.
     assert rt.index(x, ([[0, 1], [1, 0]], [[2, 0], [1, 2]])).result_shape == (2, 2)
+    # A per-axis boolean array keeps the True rows and the sliced columns.
+    keep_rows = np.array([True, False])
+    assert rt.index(x, (keep_rows, slice(None))).result_shape == (1, 3)
 
 
 def test_detects_advanced():
