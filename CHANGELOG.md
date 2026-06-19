@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3
+
+### Added
+
+- Advanced indexing now accepts multi-dimensional integer index arrays. Index arrays of any shape broadcast together, the gathered block takes the broadcast shape, and the selected coordinates and result shape match NumPy, including when a slice moves the block to the front
+
 ## 0.10.2
 
 ### Added
