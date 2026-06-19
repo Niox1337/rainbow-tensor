@@ -129,19 +129,26 @@ def test_reduce_rejects_bad_axis():
 
 def test_reduction_colours_groups_with_matching_backgrounds():
     import re
+    from collections import Counter
 
     from rainbow_tensor.notebook import _LIGHT_TINTS
 
     tint_fills = {fill for fill, _ in _LIGHT_TINTS}
-    # Reducing axis 0 of (2, 3) leaves result (3,), so three column groups.
+    # Reducing axis 0 of (2, 3) leaves result (3,), so three column groups, each
+    # with two source values plus the one result element they fold into.
     for op in (rt.sum, rt.mean):
         visual = op((2, 3), 0)
         assert visual.result_shape == (3,)
-        fills = set(re.findall(r'fill="(#[0-9a-fA-F]+)"', visual.svg))
+        cell_fills = Counter(re.findall(r'<rect[^>]*fill="(#[0-9a-fA-F]+)"', visual.svg))
         # The first group is shown through the selected highlight, and the other
         # groups each take their own tint background.
-        assert rt.LIGHT.surface_selected in fills
-        assert len(fills & tint_fills) >= 2
+        assert rt.LIGHT.surface_selected in cell_fills
+        assert len(set(cell_fills) & tint_fills) >= 2
+        # Every group colours its two source cells and its one result cell the
+        # same, so a result element shares the background of its source group.
+        for fill, count in cell_fills.items():
+            if fill in tint_fills or fill == rt.LIGHT.surface_selected:
+                assert count == 3
 
 
 EINSUM_CASES = [
