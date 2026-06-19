@@ -88,7 +88,7 @@ More sample images live in `examples/images`, and runnable notebooks live in `ex
 - Swapaxes views that move two axes while keeping the source colours traceable
 - Combining views for concatenate and stack, tinting each operand so the seam or the new axis is clear
 - Broadcasting views that stretch a smaller operand to match a larger one, marking every stretched axis
-- Einsum views that colour shared labels, mark contracted axes, and show the derived output shape
+- Einsum views that colour each label by its role so free, shared, and contracted labels stay distinct and consistent across every panel, and show the derived output shape
 - Backend value access for NumPy style arrays plus Torch, JAX, and TensorFlow style scalar values
 - A renderer registry with SVG as the default output backend
 - A light theme and a dark theme, selectable per call or through a module default
@@ -222,7 +222,7 @@ Axes line up from the right, and on each axis the sizes must be equal or one of 
 
 ## Einsum
 
-`einsum` turns a subscript expression into labelled operand panels and an output panel. A repeated label that does not appear in the output is highlighted on the operands, which makes the contraction visible.
+`einsum` turns a subscript expression into labelled operand panels and an output panel. Every label is coloured by its role, so free, shared, and contracted labels read as three distinct groups, and a label keeps that colour across every operand caption, operand figure, and the output.
 
 ```python
 import numpy as np
@@ -235,7 +235,7 @@ rt.einsum("ij,jk->ik", a, b)
 rt.einsum("abc,cde,ef->abdf", (2, 2, 2), (2, 2, 2), (2, 2))
 ```
 
-Shared labels keep the same colour wherever they appear. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
+A non-leaf axis shows its label colour as a frame and a leaf axis shows it as the cell border, so the figure colours always match the caption colours. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
 
 ## Big tensor previews
 

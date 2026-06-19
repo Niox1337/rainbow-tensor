@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.7
+
+### Fixed
+
+- Einsum label colours now match between the figure and the caption. A leaf axis label used to be coloured only in the caption, and the contraction highlight dimmed unrelated frames, so the colours disagreed. A leaf axis now shows its label colour as the cell border and operand frames keep their colour
+
+### Changed
+
+- Einsum now colours every label by its role. Free, shared, and contracted labels are drawn from three distinct colour families, and each label keeps one colour across every operand caption, operand figure, and the output panel
+
 ## 0.10.6
 
 ### Changed
