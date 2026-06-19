@@ -183,7 +183,7 @@ rt.sum(x, 0)               # collapse axis 0, the result keeps the rest
 rt.mean(x, 1)              # collapse axis 1 into per group means
 ```
 
-`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the move. `swapaxes` does the same for two chosen axes. `sum` and `mean` give the source values that fold into the same result element one shared background, highlight the first group, and draw the surviving shape, so a reduction reads like the concatenate and stack views.
+`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the move. `swapaxes` does the same for two chosen axes. `sum` and `mean` give the source values that fold into the same result element one shared background with that result element, highlight the first group, and draw the surviving shape, so a reduction reads like the concatenate and stack views.
 
 ## Combining tensors
 

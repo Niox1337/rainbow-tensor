@@ -634,6 +634,16 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
 
     disp = result or (1,)
 
+    # The result element of each group takes the same background as its source
+    # group, so a result cell and the values that fold into it read as one unit.
+    def result_tint(coord):
+        group = flat_index(coord, disp)
+        if group == 0:
+            return None
+        return _operand_tint(theme, group - 1)
+
+    selected_result = [next(iter(coordinates(disp)))]
+
     def result_value(coord):
         return values[() if not result else coord]
 
@@ -642,8 +652,8 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         f"Reducing axis {axis} with {op_name}.",
         f"Result shape: {format_shape(result)}",
         f"Each result element combines {shape[axis]} values from axis {axis}.",
-        "Values that fold into the same result share one background, "
-        "and the first group is highlighted.",
+        "Values that fold into the same result share one background with that "
+        "result element, and the first group is highlighted.",
     ] + _preview_explanation([shape, disp], theme)
     panels = [
         {
@@ -656,6 +666,8 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         {
             "shape": disp,
             "value_fn": result_value,
+            "selected": selected_result,
+            "cell_tint": result_tint,
             "caption_parts": _shape_caption_parts(op_name, disp, theme),
         },
     ]
