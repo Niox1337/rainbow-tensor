@@ -226,6 +226,10 @@ def test_public_functions_render_and_report_shape():
     assert rt.sum(x, 0).result_shape == (4,)
     assert rt.mean(x, 1).result_shape == (3,)
     assert rt.einsum("ij,jk->ik", x, np.ones((4, 2))).result_shape == (3, 2)
+    assert rt.squeeze(np.ones((1, 3, 1))).result_shape == (3,)
+    assert rt.squeeze(np.ones((1, 3, 1)), 0).result_shape == (3, 1)
+    assert rt.expand_dims(x, 1).result_shape == (3, 1, 4)
+    assert rt.expand_dims(x, -1).result_shape == (3, 4, 1)
     for visual in (
         rt.reshape(x, (2, 6)),
         rt.transpose(x),
@@ -233,6 +237,8 @@ def test_public_functions_render_and_report_shape():
         rt.sum(x, 0),
         rt.mean(x, 1),
         rt.einsum("ij,jk->ik", x, np.ones((4, 2))),
+        rt.squeeze(np.ones((1, 3, 1))),
+        rt.expand_dims(x, (0, 2)),
     ):
         assert visual.svg.startswith("<svg")
 
