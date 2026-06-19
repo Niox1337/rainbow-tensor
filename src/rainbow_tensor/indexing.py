@@ -4,12 +4,14 @@ This module validates indexing expressions, expands slices into integer
 positions, computes the selected coordinates, and computes the result shape
 after indexing. Basic indexing supports negative integer indices, negative
 slice bounds and steps, ``Ellipsis`` (``...``), and ``None`` (newaxis).
-Advanced indexing supports a full-shape boolean mask and 1D integer index
-arrays; see :func:`advanced_index`.
+Advanced indexing supports a full-shape boolean mask and integer index
+arrays of any shape that broadcast together; see :func:`advanced_index`.
 """
 
 import itertools
+from math import prod
 
+from .ops import broadcast_result_shape, broadcast_source_coord
 from .shape import coordinates, format_shape
 
 
@@ -187,8 +189,15 @@ def format_token(entry):
     if entry is Ellipsis:
         return "..."
     if _is_array_like(entry):
-        return "[" + ", ".join(str(int(v)) for v in entry) + "]"
+        return _format_array(entry)
     return str(entry)
+
+
+def _format_array(entry):
+    """Format a possibly nested integer index array as ``[[0, 1], [2, 3]]``."""
+    if _is_array_like(entry):
+        return "[" + ", ".join(_format_array(entry[i]) for i in range(len(entry))) + "]"
+    return str(int(entry))
 
 
 def format_index(index):
@@ -238,8 +247,8 @@ def advanced_index(shape, index):
     boolean mask of matching shape selects every True position. Integer index
     arrays gather coordinates and follow NumPy: the gathered axis stays in place
     when the advanced axes are contiguous and moves to the front when a slice
-    separates them. Index arrays are 1D and broadcast against each other by
-    length.
+    separates them. Index arrays may have any shape and broadcast against each
+    other, with the broadcast shape forming the gathered block.
     """
     if not isinstance(index, tuple):
         return _mask_index(shape, index)
@@ -310,13 +319,17 @@ def _array_index(shape, index):
             entries.append(("slice", e))
             axis += 1
         elif _is_array_like(e):
-            values = list(e)
-            if any(_is_bool(v) for v in values):
-                raise IndexError(
-                    "a per-axis boolean array is not supported; pass a full "
-                    "boolean mask as the whole index instead"
-                )
-            entries.append(("arr", [_resolve_int(int(v), shape[axis], axis) for v in values]))
+            ishape = _shape_of(e)
+            resolved = {}
+            for c in coordinates(ishape):
+                v = _get(e, c)
+                if _is_bool(v):
+                    raise IndexError(
+                        "a per-axis boolean array is not supported; pass a full "
+                        "boolean mask as the whole index instead"
+                    )
+                resolved[c] = _resolve_int(int(v), shape[axis], axis)
+            entries.append(("arr", (ishape, resolved)))
             axis += 1
         else:
             raise TypeError(f"axis {axis}: unsupported index entry {e!r}")
@@ -334,16 +347,15 @@ def _array_index(shape, index):
     between = entries[arr_axes[0]: arr_axes[-1] + 1]
     contiguous = not any(kind == "slice" for kind, _ in between)
 
-    lengths = {len(entries[a][1]) for a in arr_axes}
-    broadcast = {n for n in lengths if n != 1}
-    if len(broadcast) > 1:
+    # The index arrays broadcast together to one block of axes, just like NumPy.
+    ishapes = [entries[a][1][0] for a in arr_axes]
+    try:
+        bshape = broadcast_result_shape(ishapes)
+    except ValueError:
         raise IndexError(
-            f"index arrays could not be broadcast together: lengths {sorted(lengths)}"
-        )
-    length = max(lengths)
-
-    def gathered(values, k):
-        return values[0] if len(values) == 1 else values[k]
+            f"index arrays could not be broadcast together: shapes "
+            f"{[format_shape(s) for s in ishapes]}"
+        ) from None
 
     slice_axes = [a for a, (kind, _) in enumerate(entries) if kind == "slice"]
     slice_pos = {a: expand_slice(entries[a][1], shape[a]) for a in slice_axes}
@@ -355,21 +367,22 @@ def _array_index(shape, index):
             if kind == "slice":
                 result.append(len(slice_pos[axis_]))
             elif kind == "arr" and not placed:
-                result.append(length)
+                result.extend(bshape)
                 placed = True
         result_shape_ = tuple(result)
     else:
-        result_shape_ = (length,) + tuple(len(slice_pos[a]) for a in slice_axes)
+        result_shape_ = tuple(bshape) + tuple(len(slice_pos[a]) for a in slice_axes)
 
     selected = []
     seen = set()
-    for k in range(length):
+    for bidx in coordinates(bshape):
         fixed = {}
         for a, (kind, value) in enumerate(entries):
             if kind == "int":
                 fixed[a] = value
             elif kind == "arr":
-                fixed[a] = gathered(value, k)
+                ishape, resolved = value
+                fixed[a] = resolved[broadcast_source_coord(bidx, ishape)]
         for combo in itertools.product(*[slice_pos[a] for a in slice_axes]):
             full = dict(fixed)
             full.update(zip(slice_axes, combo))
@@ -378,12 +391,14 @@ def _array_index(shape, index):
                 seen.add(key)
                 selected.append(key)
 
+    count = prod(bshape)
     axes_text = ", ".join(str(a) for a in arr_axes)
     explanation = [
         f"Original shape: {format_shape(shape)}",
         f"Index: {format_index(index)}",
         "Advanced indexing with integer arrays.",
-        f"Axes {axes_text} gather {length} position{'s' if length != 1 else ''} together.",
+        f"Axes {axes_text} gather {count} position{'s' if count != 1 else ''} "
+        f"in shape {format_shape(bshape)}.",
     ]
     if not contiguous:
         explanation.append(
