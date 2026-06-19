@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.6
+
+### Changed
+
+- A sum or mean result element now shares the same background as the source values that fold into it, so a result cell and its source group read as one unit. The first group stays highlighted on both panels, and the result shape and numeric result are unchanged
+
 ## 0.10.5
 
 ### Changed
