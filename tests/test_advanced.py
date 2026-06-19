@@ -23,6 +23,11 @@ CASES = [
     ((4,), ([-1, -2],)),  # negative array values
     ((3, 4, 5), ([0, 2], slice(None), [1, 3])),  # slice between arrays: front moved
     ((2, 3, 4, 5), (slice(None), [0, 1], slice(None), [2, 4])),  # front moved, slices kept
+    ((4,), (np.array([[0, 2], [3, 1]]),)),  # 2D index array, result keeps its shape
+    ((3, 4), ([[0, 2], [1, 2]], [[1, 3], [0, 2]])),  # paired 2D arrays gather a grid
+    ((3, 4), ([[0], [2]], [1, 3])),  # (2,1) and (2,) broadcast to (2, 2)
+    ((3, 4, 5), ([[0, 2]], slice(None), [[1, 3]])),  # 2D arrays, slice moves block front
+    ((5,), (np.array([[0, 1, 2], [2, 3, 4]]),)),  # 2x3 block on a vector
 ]
 
 
@@ -44,6 +49,8 @@ def test_index_renders_mask_and_arrays():
     mask = x % 2 == 0
     assert rt.index(x, mask).result_shape == (3,)
     assert rt.index(x, ([0, 1], [2, 0])).result_shape == (2,)
+    # A 2D index array keeps its own shape in the result.
+    assert rt.index(x, ([[0, 1], [1, 0]], [[2, 0], [1, 2]])).result_shape == (2, 2)
 
 
 def test_detects_advanced():

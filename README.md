@@ -14,6 +14,10 @@ rainbow-tensor is made for people who are learning how a tensor is structured an
 
 ![Index (0, :, 1)](examples/images/index_0_all_1.svg)
 
+`rt.index(np.arange(12).reshape(3, 4), (np.array([[0, 2], [1, 2]]), np.array([[1, 3], [0, 2]])))`
+
+![Multi-dimensional index arrays](examples/images/fancy_2darray.svg)
+
 The same view also renders in a dark theme.
 
 `rt.shape(np.arange(8).reshape(2, 2, 2), theme="dark")`
@@ -351,7 +355,7 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - `Ellipsis` (`...`) to fill the remaining axes, such as `(0, ..., 1)`
 - `None` (newaxis) to insert a size 1 axis, shown in the result shape and label
 - A full-shape boolean mask, highlighting every True position
-- Integer array (fancy) indexing, including mixed with slices, with the gathered axis placed as NumPy does
+- Integer array (fancy) indexing, including multi-dimensional index arrays that broadcast together, mixed with slices, with the gathered block placed as NumPy does
 - Reshape with row major order and one inferred `-1` axis
 - Transpose and permute with axis colours following the move
 - Swapaxes with negative axes resolved like NumPy
@@ -366,7 +370,7 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 
 ## Not supported yet
 
-- Multi-dimensional index arrays and per-axis boolean arrays
+- Per-axis boolean arrays
 - Einsum ellipsis notation
 - Interactive controls and animation
 
