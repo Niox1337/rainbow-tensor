@@ -62,6 +62,10 @@ Shape changing, combining, and broadcasting views draw the source and the result
 
 ![Einsum ij and jk to ik](examples/images/einsum_ij_jk_ik.svg)
 
+`rt.einsum("...ij,...jk->...ik", np.arange(12).reshape(2, 2, 3), np.arange(24).reshape(2, 3, 4))`
+
+![Einsum with ellipsis batch axes](examples/images/einsum_ellipsis.svg)
+
 `rt.swapaxes(np.arange(24).reshape(2, 3, 4), 0, 2)`
 
 ![Swapaxes (2, 3, 4)](examples/images/swapaxes_2x3x4.svg)
@@ -233,9 +237,10 @@ b = np.arange(12).reshape(3, 4)
 
 rt.einsum("ij,jk->ik", a, b)
 rt.einsum("abc,cde,ef->abdf", (2, 2, 2), (2, 2, 2), (2, 2))
+rt.einsum("...ij,...jk->...ik", (2, 2, 3), (2, 3, 4))   # ellipsis for batch axes
 ```
 
-A non-leaf axis shows its label colour as a frame and a leaf axis shows it as the cell border, so the figure colours always match the caption colours. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy.
+A non-leaf axis shows its label colour as a frame and a leaf axis shows it as the cell border, so the figure colours always match the caption colours. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy. Ellipsis notation (`...`) stands for the broadcast axes a subscript leaves unnamed, expanded against the operand shapes and aligned from the right like NumPy, with both implicit and explicit output supported.
 
 ## Big tensor previews
 
@@ -368,14 +373,13 @@ Each function returns a small result object. Its `svg` attribute holds the SVG s
 - Concatenate along an existing axis, with the seam tinted
 - Stack onto a brand new axis
 - Broadcasting two tensors to a common shape, marking every stretched axis
-- Einsum with explicit or implicit output labels and any number of operands
+- Einsum with explicit or implicit output labels, ellipsis notation for broadcast axes, and any number of operands
 - Backend arrays with `.shape` and coordinate access, including optional Torch, JAX, and TensorFlow checks
 - Custom renderers through the renderer registry
 - Standard output explanation text through `TensorVisual.text`
 
 ## Not supported yet
 
-- Einsum ellipsis notation
 - Interactive controls and animation
 
 ## Development

@@ -158,6 +158,14 @@ EINSUM_CASES = [
     ("abc,cde,ef->abdf", [(2, 3, 4), (4, 5, 6), (6, 7)]),
     ("ij->", [(2, 3)]),
     ("ii->i", [(3, 3)]),
+    # Ellipsis notation, cross-checked against NumPy below.
+    ("...ij,...jk->...ik", [(2, 2, 3), (2, 3, 4)]),
+    ("...ij,...jk", [(2, 2, 3), (2, 3, 4)]),
+    ("...ii->...i", [(2, 3, 3)]),
+    ("...i->...", [(2, 4)]),
+    ("...,...->...", [(2, 3), (2, 3)]),
+    ("...ij,jk->...ik", [(4, 2, 3), (3, 5)]),
+    ("a...b,b...c->a...c", [(2, 3, 4), (4, 3, 5)]),
 ]
 
 
@@ -181,11 +189,27 @@ def test_einsum_rejects_invalid_subscripts():
     with pytest.raises(ValueError):
         parse_einsum_subscripts("ij,jk->ik->i", 2)
     with pytest.raises(ValueError):
+        # An ellipsis needs the operand shapes to know how many axes it covers.
         parse_einsum_subscripts("i...j->ij", 1)
     with pytest.raises(ValueError):
         parse_einsum_subscripts("ij,jk->iz", 2)
     with pytest.raises(ValueError):
         einsum_result_shape("ij,jk->ik", [(2, 3), (2, 4)])
+
+
+def test_einsum_rejects_invalid_ellipsis():
+    # Two ellipses in one operand.
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("...i...->...i", 1, [(2, 3, 4)])
+    # A stray dot that is not part of a full ellipsis.
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("..i->i", 1, [(2, 3)])
+    # More named labels than the operand rank leaves for the ellipsis.
+    with pytest.raises(ValueError):
+        parse_einsum_subscripts("...ijk->...", 1, [(2,)])
+    # Ellipsis dimensions that do not match in size cannot share a label.
+    with pytest.raises(ValueError):
+        einsum_result_shape("...i,...i->...i", [(2, 3), (4, 3)])
 
 
 def test_public_functions_render_and_report_shape():

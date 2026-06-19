@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.8
+
+### Added
+
+- Einsum now parses ellipsis (`...`) notation. An ellipsis stands for the broadcast axes a subscript leaves unnamed, is expanded against the operand shapes and aligned from the right like NumPy, and supports both implicit and explicit output. The derived output shape matches NumPy, and an invalid ellipsis raises a clear error
+
 ## 0.10.7
 
 ### Fixed
