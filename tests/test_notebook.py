@@ -129,6 +129,55 @@ def test_einsum_renders_subscripts_and_result_values():
     assert visual.selected == [[(0, 0), (0, 1), (0, 2)], [(0, 0), (1, 0), (2, 0)]]
 
 
+def test_einsum_label_colours_match_between_figure_and_caption():
+    import re
+
+    from rainbow_tensor.notebook import _einsum_label_colors
+    from rainbow_tensor.ops import parse_einsum_subscripts
+
+    # A leaf axis label used to be coloured only in the caption, never in the
+    # figure. Every label colour must now appear as a stroke in the figure too.
+    for sub, shapes in [
+        ("ij,jk->ik", [(2, 3), (3, 4)]),
+        ("bij,bjk->bik", [(2, 2, 3), (2, 3, 4)]),
+        ("abc,cde,ef->abdf", [(2, 3, 4), (4, 5, 6), (6, 7)]),
+    ]:
+        inputs, output = parse_einsum_subscripts(sub, len(shapes))
+        label_colors = _einsum_label_colors(inputs, output)
+        svg = einsum(sub, *shapes).svg
+        strokes = set(re.findall(r'stroke="(#[0-9a-fA-F]+)"', svg))
+        for label, color in label_colors.items():
+            assert color in strokes, f"{sub}: label {label} colour {color} missing from figure"
+
+
+def test_einsum_roles_are_visually_distinct():
+    from rainbow_tensor.notebook import (
+        _EINSUM_CONTRACTED,
+        _EINSUM_FREE,
+        _EINSUM_SHARED,
+        _einsum_label_colors,
+        _einsum_roles,
+    )
+    from rainbow_tensor.ops import parse_einsum_subscripts
+
+    families = {
+        "free": set(_EINSUM_FREE),
+        "shared": set(_EINSUM_SHARED),
+        "contracted": set(_EINSUM_CONTRACTED),
+    }
+    # The three families share no colours, so a label's role is readable.
+    assert not (families["free"] & families["shared"])
+    assert not (families["free"] & families["contracted"])
+    assert not (families["shared"] & families["contracted"])
+
+    inputs, output = parse_einsum_subscripts("bij,bjk->bik", 2)
+    roles = _einsum_roles(inputs, output)
+    colors = _einsum_label_colors(inputs, output)
+    assert roles == {"b": "shared", "i": "free", "j": "contracted", "k": "free"}
+    for label, role in roles.items():
+        assert colors[label] in families[role]
+
+
 def test_einsum_general_operands_match_numpy_shape():
     np = pytest.importorskip("numpy")
     a = np.ones((2, 3, 4))
