@@ -605,7 +605,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shapes = [extract_shape(array) for array in arrays]
-    input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays))
+    input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays), shapes)
     result = einsum_result_shape(subscripts, shapes)
     display_result = result or (1,)
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
