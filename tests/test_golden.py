@@ -49,6 +49,7 @@ CASES = {
     "broadcast_2d_light": lambda: rt.broadcast((3, 1), (1, 4)),
     "broadcast_2d_dark": lambda: rt.broadcast((2, 3, 4), (4,), theme="dark"),
     "einsum_2d_light": lambda: rt.einsum("ij,jk->ik", (2, 3), (3, 4)),
+    "einsum_ellipsis_light": lambda: rt.einsum("...ij,...jk->...ik", (2, 2, 3), (2, 3, 4)),
 }
 
 

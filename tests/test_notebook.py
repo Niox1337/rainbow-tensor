@@ -178,6 +178,17 @@ def test_einsum_roles_are_visually_distinct():
         assert colors[label] in families[role]
 
 
+def test_einsum_ellipsis_renders_and_matches_numpy_shape():
+    np = pytest.importorskip("numpy")
+    a = np.arange(12).reshape(2, 2, 3)
+    b = np.arange(24).reshape(2, 3, 4)
+    visual = einsum("...ij,...jk->...ik", a, b)
+
+    assert visual.result_shape == np.einsum("...ij,...jk->...ik", a, b).shape
+    assert visual.svg.startswith("<svg")
+    assert "operand 0" in visual.svg
+
+
 def test_einsum_general_operands_match_numpy_shape():
     np = pytest.importorskip("numpy")
     a = np.ones((2, 3, 4))
