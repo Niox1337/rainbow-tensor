@@ -111,6 +111,85 @@ def swapaxes_axes(ndim, axis1, axis2):
     return tuple(axes)
 
 
+# Squeeze and expand dims --------------------------------------------------
+
+
+def squeeze_axes(shape, axis=None):
+    """Return the source axes squeeze removes, validated against ``shape``.
+
+    With ``axis`` as ``None`` every size one axis is removed. An explicit axis,
+    or a tuple of axes, must point at a size one axis, matching ``numpy.squeeze``.
+    Negative axes count from the end.
+    """
+    ndim = len(shape)
+    if axis is None:
+        return tuple(i for i, size in enumerate(shape) if size == 1)
+    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    removed = []
+    for a in axes:
+        r = _check_axis(a, ndim)
+        if shape[r] != 1:
+            raise ValueError(
+                f"cannot select axis {a} to squeeze out which has size {shape[r]}, not one"
+            )
+        removed.append(r)
+    if len(set(removed)) != len(removed):
+        raise ValueError("squeeze axes may not repeat")
+    return tuple(sorted(removed))
+
+
+def squeeze_result_shape(shape, axis=None):
+    """Return the shape after removing the squeezed size one axes."""
+    removed = set(squeeze_axes(shape, axis))
+    return tuple(size for i, size in enumerate(shape) if i not in removed)
+
+
+def squeeze_source_coord(result_coord, removed):
+    """Map a result coordinate back to its source coordinate.
+
+    Each removed axis had size one, so its source position is always zero.
+    Inserting a zero at every removed axis, lowest first, rebuilds the source
+    coordinate.
+    """
+    coord = list(result_coord)
+    for axis in sorted(removed):
+        coord.insert(axis, 0)
+    return tuple(coord)
+
+
+def expand_dims_axes(ndim, axis):
+    """Return the inserted axis positions in the expanded shape.
+
+    ``axis`` is a single position or a tuple of positions in the result, which
+    has ``ndim + len(axis)`` axes. Negative positions count from the end of the
+    result, matching ``numpy.expand_dims``.
+    """
+    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    out_ndim = ndim + len(axes)
+    inserted = [_check_axis(a, out_ndim) for a in axes]
+    if len(set(inserted)) != len(inserted):
+        raise ValueError("expand_dims axes may not repeat")
+    return tuple(sorted(inserted))
+
+
+def expand_dims_result_shape(shape, axis):
+    """Return the shape after inserting a size one axis at each ``axis``."""
+    inserted = set(expand_dims_axes(len(shape), axis))
+    out_ndim = len(shape) + len(inserted)
+    source = iter(shape)
+    return tuple(1 if i in inserted else next(source) for i in range(out_ndim))
+
+
+def expand_dims_source_coord(result_coord, inserted):
+    """Map a result coordinate back to its source coordinate.
+
+    The inserted axes carry no source position, so dropping them leaves the
+    surviving coordinates in their original order.
+    """
+    inserted = set(inserted)
+    return tuple(c for i, c in enumerate(result_coord) if i not in inserted)
+
+
 # Einsum -------------------------------------------------------------------
 
 

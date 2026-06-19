@@ -11,11 +11,17 @@ import rainbow_tensor as rt
 from rainbow_tensor.ops import (
     einsum_contracted_labels,
     einsum_result_shape,
+    expand_dims_axes,
+    expand_dims_result_shape,
+    expand_dims_source_coord,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
     reshape_result_shape,
     reshape_source_coord,
+    squeeze_axes,
+    squeeze_result_shape,
+    squeeze_source_coord,
     swapaxes_axes,
     transpose_axes,
     transpose_result_shape,
@@ -236,3 +242,69 @@ def test_reduce_to_scalar_renders():
     visual = rt.sum(x, 0)
     assert visual.result_shape == ()
     assert visual.svg.startswith("<svg")
+
+
+SQUEEZE_CASES = [
+    ((1, 3), None),
+    ((3, 1), None),
+    ((1, 3, 1), None),
+    ((1, 3, 1), 0),
+    ((1, 3, 1), 2),
+    ((1, 3, 1), -1),
+    ((1, 3, 1), (0, 2)),
+    ((1, 3, 1), (0, -1)),
+    ((2, 3), None),
+    ((1, 1, 1), None),
+]
+
+
+@pytest.mark.parametrize("shape, axis", SQUEEZE_CASES)
+def test_squeeze_matches_numpy(shape, axis):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.squeeze(x, axis)
+    result = squeeze_result_shape(shape, axis)
+
+    assert result == expected.shape
+    removed = squeeze_axes(shape, axis)
+    for rc in np.ndindex(result):
+        assert expected[rc] == x[squeeze_source_coord(rc, removed)]
+
+
+def test_squeeze_rejects_non_unit_axis():
+    with pytest.raises(ValueError):
+        squeeze_result_shape((2, 3), 0)
+    with pytest.raises(ValueError):
+        squeeze_result_shape((1, 3), 5)
+
+
+EXPAND_CASES = [
+    ((3,), 0),
+    ((3,), 1),
+    ((3,), -1),
+    ((2, 3), 0),
+    ((2, 3), 1),
+    ((2, 3), 2),
+    ((2, 3), -1),
+    ((2, 3), (0, 1)),
+    ((2, 3), (0, 3)),
+    ((2, 3), (-1, -2)),
+]
+
+
+@pytest.mark.parametrize("shape, axis", EXPAND_CASES)
+def test_expand_dims_matches_numpy(shape, axis):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.expand_dims(x, axis)
+    result = expand_dims_result_shape(shape, axis)
+
+    assert result == expected.shape
+    inserted = expand_dims_axes(len(shape), axis)
+    for rc in np.ndindex(result):
+        assert expected[rc] == x[expand_dims_source_coord(rc, inserted)]
+
+
+def test_expand_dims_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        expand_dims_result_shape((2, 3), 4)
+    with pytest.raises(ValueError):
+        expand_dims_result_shape((2, 3), (0, 0))
