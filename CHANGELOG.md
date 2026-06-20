@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `take` draws a gather along one axis. A 1-D list of indices selects positions along the chosen axis, the result replaces that axis with the gathered positions, and the result shape matches `numpy.take`. Negative axes and negative indices both work. Each gathered source slice and the result slice it feeds share one tint, so repeated indices repeat a tint and reordered indices reorder them, making the gather visible. The existing advanced indexing behaviour is unchanged
+
 ## 0.12.0
 
 ### Added

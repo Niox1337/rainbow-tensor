@@ -190,6 +190,50 @@ def expand_dims_source_coord(result_coord, inserted):
     return tuple(c for i, c in enumerate(result_coord) if i not in inserted)
 
 
+# Take ---------------------------------------------------------------------
+
+
+def take_axis_and_indices(shape, indices, axis):
+    """Resolve the axis and the gather indices for a take.
+
+    The axis is normalised against the rank and each index is normalised against
+    the axis size, so negative axes and negative indices both work like
+    ``numpy.take``. An out of range index raises a clear error.
+    """
+    axis = _check_axis(axis, len(shape))
+    size = shape[axis]
+    resolved = []
+    for raw in indices:
+        i = int(raw)
+        r = i + size if i < 0 else i
+        if not 0 <= r < size:
+            raise ValueError(
+                f"take index {i} is out of range for axis {axis} of size {size}"
+            )
+        resolved.append(r)
+    return axis, tuple(resolved)
+
+
+def take_result_shape(shape, indices, axis):
+    """Return the shape after gathering ``indices`` along ``axis``.
+
+    The chosen axis is replaced by the number of indices, so the rank stays the
+    same and only the gathered axis changes length.
+    """
+    axis, resolved = take_axis_and_indices(shape, indices, axis)
+    return shape[:axis] + (len(resolved),) + shape[axis + 1:]
+
+
+def take_source_coord(result_coord, resolved_indices, axis):
+    """Map a result coordinate back to its source coordinate.
+
+    Along the gathered axis the result position selects one source position from
+    the resolved index list, and every other axis is copied straight through.
+    """
+    source = resolved_indices[result_coord[axis]]
+    return result_coord[:axis] + (source,) + result_coord[axis + 1:]
+
+
 # Matmul -------------------------------------------------------------------
 
 

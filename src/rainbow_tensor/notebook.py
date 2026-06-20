@@ -47,6 +47,9 @@ from .ops import (
     stack_result_shape,
     stack_source,
     swapaxes_axes,
+    take_axis_and_indices,
+    take_result_shape,
+    take_source_coord,
     transpose_axes,
     transpose_result_shape,
     transpose_source_coord,
@@ -694,6 +697,62 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
     return _visual(
         content, a_shape, renderer, selected=a_selected, result=result, explanation=explanation
     )
+
+
+def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
+    """Visualise gathering values along one axis with ``take``.
+
+    ``indices`` is a 1-D list of positions along ``axis``. The chosen axis is
+    replaced by the gathered positions, matching ``numpy.take`` with an axis.
+    Negative axes and negative indices both work. Each gathered source slice and
+    the result slice it feeds share one tint, so repeated indices repeat a tint
+    and reordered indices reorder them, making the gather visible.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    shape = extract_shape(array)
+    axis, resolved = take_axis_and_indices(shape, indices, axis)
+    result = take_result_shape(shape, indices, axis)
+    source_value = _source_value(array, shape)
+    gathered = set(resolved)
+
+    def result_value(coord):
+        return source_value(take_source_coord(coord, resolved, axis))
+
+    def source_tint(coord):
+        pos = coord[axis]
+        if pos in gathered:
+            return _operand_tint(theme, pos)
+        return None
+
+    def result_tint(coord):
+        return _operand_tint(theme, resolved[coord[axis]])
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Taking indices {list(indices)} along axis {axis}.",
+        f"Result shape: {format_shape(result)}",
+        "Each result slice copies a source slice, so repeated indices repeat a "
+        "slice and reordered indices reorder them.",
+    ] + _preview_explanation([shape, result], theme)
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "cell_tint": source_tint,
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "cell_tint": result_tint,
+            "caption_parts": _shape_caption_parts("take", result, theme),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 # Role colour families, chosen so free, shared, and contracted labels read as

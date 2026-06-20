@@ -30,6 +30,7 @@ from .notebook import (
     stack,
     sum,
     swapaxes,
+    take,
     transpose,
 )
 from .renderers import (
@@ -66,6 +67,7 @@ __all__ = [
     "mean",
     "concatenate",
     "stack",
+    "take",
     "broadcast",
     "einsum",
     "TensorVisual",
