@@ -15,6 +15,8 @@ Shape changing and combining
 .. autofunction:: reshape
 .. autofunction:: transpose
 .. autofunction:: swapaxes
+.. autofunction:: squeeze
+.. autofunction:: expand_dims
 .. autofunction:: sum
 .. autofunction:: mean
 .. autofunction:: concatenate

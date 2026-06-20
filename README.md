@@ -183,11 +183,13 @@ rt.reshape(x, (2, 6))      # the same values flow into a new layout
 rt.transpose(x)            # axes reverse, each keeping its colour
 rt.transpose(x, (1, 0))    # an explicit permutation
 rt.swapaxes(x.reshape(2, 3, 2), 0, 2)   # swap exactly two axes
+rt.squeeze(x.reshape(1, 3, 4, 1))       # drop the size one axes
+rt.expand_dims(x, 1)                     # insert a size one axis at position 1
 rt.sum(x, 0)               # collapse axis 0, the result keeps the rest
 rt.mean(x, 1)              # collapse axis 1 into per group means
 ```
 
-`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the move. `swapaxes` does the same for two chosen axes. `sum` and `mean` give the source values that fold into the same result element one shared background with that result element, highlight the first group, and draw the surviving shape, so a reduction reads like the concatenate and stack views.
+`reshape` keeps the row major order, so element k stays element k. A single `-1` lets one axis be inferred. `transpose` colours each result axis by the source axis it came from, so a colour can be traced across the move. `swapaxes` does the same for two chosen axes. `squeeze` removes size one axes, with no axis for every size one axis or an explicit axis or tuple for chosen ones, and marks the removed axes while each surviving axis keeps its colour. `expand_dims` inserts a size one axis at a positive or negative position and marks the inserted axis in the accent colour. `sum` and `mean` give the source values that fold into the same result element one shared background with that result element, highlight the first group, and draw the surviving shape, so a reduction reads like the concatenate and stack views.
 
 ## Combining tensors
 
