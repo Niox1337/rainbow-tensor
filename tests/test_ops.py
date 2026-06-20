@@ -14,6 +14,8 @@ from rainbow_tensor.ops import (
     expand_dims_axes,
     expand_dims_result_shape,
     expand_dims_source_coord,
+    matmul_result_shape,
+    matmul_source_terms,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
@@ -230,6 +232,9 @@ def test_public_functions_render_and_report_shape():
     assert rt.squeeze(np.ones((1, 3, 1)), 0).result_shape == (3, 1)
     assert rt.expand_dims(x, 1).result_shape == (3, 1, 4)
     assert rt.expand_dims(x, -1).result_shape == (3, 4, 1)
+    assert rt.matmul(x, np.ones((4, 2))).result_shape == (3, 2)
+    assert rt.matmul(np.arange(4), np.arange(4)).result_shape == ()
+    assert rt.matmul(np.ones((5, 2, 3)), np.ones((3, 4))).result_shape == (5, 2, 4)
     for visual in (
         rt.reshape(x, (2, 6)),
         rt.transpose(x),
@@ -239,6 +244,8 @@ def test_public_functions_render_and_report_shape():
         rt.einsum("ij,jk->ik", x, np.ones((4, 2))),
         rt.squeeze(np.ones((1, 3, 1))),
         rt.expand_dims(x, (0, 2)),
+        rt.matmul(x, np.ones((4, 2))),
+        rt.matmul(np.arange(4), np.arange(4)),
     ):
         assert visual.svg.startswith("<svg")
 
@@ -314,3 +321,42 @@ def test_expand_dims_rejects_out_of_range():
         expand_dims_result_shape((2, 3), 4)
     with pytest.raises(ValueError):
         expand_dims_result_shape((2, 3), (0, 0))
+
+
+MATMUL_CASES = [
+    ((3,), (3,)),
+    ((2, 3), (3, 4)),
+    ((3,), (3, 4)),
+    ((2, 3), (3,)),
+    ((5, 2, 3), (5, 3, 4)),
+    ((5, 2, 3), (3, 4)),
+    ((2, 3), (5, 3, 4)),
+    ((1, 2, 3), (5, 3, 4)),
+    ((6, 5, 2, 3), (5, 3, 4)),
+    ((5, 2, 3), (3,)),
+    ((3,), (5, 3, 4)),
+]
+
+
+@pytest.mark.parametrize("a, b", MATMUL_CASES)
+def test_matmul_matches_numpy(a, b):
+    x = np.arange(int(np.prod(a))).reshape(a)
+    y = np.arange(int(np.prod(b))).reshape(b)
+    expected = np.matmul(x, y)
+    result = matmul_result_shape(a, b)
+
+    assert result == expected.shape
+    for oc in np.ndindex(result):
+        total = sum(x[ac] * y[bc] for ac, bc in matmul_source_terms(oc, a, b))
+        assert total == expected[oc]
+    # The scalar 1-D by 1-D case reduces to an empty output coordinate.
+    if result == ():
+        total = sum(x[ac] * y[bc] for ac, bc in matmul_source_terms((), a, b))
+        assert total == expected[()]
+
+
+def test_matmul_rejects_inner_mismatch():
+    with pytest.raises(ValueError):
+        matmul_result_shape((2, 3), (4, 5))
+    with pytest.raises(ValueError):
+        matmul_result_shape((), (2,))

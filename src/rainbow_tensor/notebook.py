@@ -34,6 +34,8 @@ from .ops import (
     expand_dims_axes,
     expand_dims_result_shape,
     expand_dims_source_coord,
+    matmul_result_shape,
+    matmul_source_terms,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
@@ -607,6 +609,91 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
         panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
     )
     return _visual(content, shape, renderer, result=result, explanation=explanation)
+
+
+def matmul(a, b, theme=None, precision=2, renderer=None):
+    """Visualise a matrix multiplication ``a @ b``.
+
+    ``a`` and ``b`` are array-likes or shape tuples. Vector, matrix, and batched
+    matrix multiplication are all supported, matching ``numpy.matmul``. The two
+    operands and the output are drawn side by side. The shared inner axis is
+    marked in the accent colour, and the row of the first operand and the column
+    of the second operand that combine into the first output element are
+    highlighted, so the contraction reads directly off the figure.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    a_shape = extract_shape(a)
+    b_shape = extract_shape(b)
+    result = matmul_result_shape(a_shape, b_shape)
+    display_result = result or (1,)
+    a_value = _source_value(a, a_shape)
+    b_value = _source_value(b, b_shape)
+
+    def result_value(coord):
+        out_coord = () if not result else coord
+        terms = matmul_source_terms(out_coord, a_shape, b_shape)
+        return _py_sum(a_value(ac) * b_value(bc) for ac, bc in terms)
+
+    first = (0,) * len(result)
+    terms0 = matmul_source_terms(first, a_shape, b_shape)
+    a_selected = sorted({ac for ac, _ in terms0})
+    b_selected = sorted({bc for _, bc in terms0})
+    result_selected = [(0,) * len(display_result)]
+
+    a_inner = len(a_shape) - 1
+    b_inner = len(b_shape) - 2 if len(b_shape) >= 2 else 0
+
+    def a_color(axis):
+        if axis == a_inner:
+            return theme.surface_selected
+        return theme.axis_color(axis) if axis < len(a_shape) - 1 else theme.text_muted
+
+    def b_color(axis):
+        if axis == b_inner:
+            return theme.surface_selected
+        return theme.axis_color(axis) if axis < len(b_shape) - 1 else theme.text_muted
+
+    inner = a_shape[a_inner]
+    rows = "n/a" if len(a_shape) == 1 else a_shape[-2]
+    cols = "n/a" if len(b_shape) == 1 else b_shape[-1]
+    explanation = [
+        f"Operand shapes: {format_shape(a_shape)} @ {format_shape(b_shape)}",
+        f"Left rows: {rows}, right columns: {cols}, shared inner axis: {inner}.",
+        f"Result shape: {format_shape(result)}",
+        "The shared inner axis is marked, and the highlighted row and column "
+        "combine into the first output element.",
+    ] + _preview_explanation([a_shape, b_shape, display_result], theme)
+    panels = [
+        {
+            "shape": a_shape,
+            "value_fn": _value_fn_for(a),
+            "selected": a_selected,
+            "caption_parts": _shape_caption_parts("A", a_shape, theme, color_for=a_color),
+        },
+        {
+            "shape": b_shape,
+            "value_fn": _value_fn_for(b),
+            "selected": b_selected,
+            "caption_parts": _shape_caption_parts("B", b_shape, theme, color_for=b_color),
+        },
+        {
+            "shape": display_result,
+            "value_fn": result_value,
+            "selected": result_selected,
+            "caption_parts": _shape_caption_parts("matmul", display_result, theme),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels,
+        connectors=["@", "->"],
+        explanation=explanation,
+        theme=theme,
+        precision=precision,
+    )
+    return _visual(
+        content, a_shape, renderer, selected=a_selected, result=result, explanation=explanation
+    )
 
 
 # Role colour families, chosen so free, shared, and contracted labels read as

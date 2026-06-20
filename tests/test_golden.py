@@ -52,6 +52,8 @@ CASES = {
     "einsum_ellipsis_light": lambda: rt.einsum("...ij,...jk->...ik", (2, 2, 3), (2, 3, 4)),
     "squeeze_3d_light": lambda: rt.squeeze((1, 3, 1)),
     "expand_dims_2d_dark": lambda: rt.expand_dims((2, 3), 1, theme="dark"),
+    "matmul_2d_light": lambda: rt.matmul((2, 3), (3, 4)),
+    "matmul_batched_dark": lambda: rt.matmul((2, 2, 3), (2, 3, 4), theme="dark"),
 }
 
 
