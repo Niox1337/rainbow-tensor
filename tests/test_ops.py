@@ -25,6 +25,9 @@ from rainbow_tensor.ops import (
     squeeze_result_shape,
     squeeze_source_coord,
     swapaxes_axes,
+    take_axis_and_indices,
+    take_result_shape,
+    take_source_coord,
     transpose_axes,
     transpose_result_shape,
     transpose_source_coord,
@@ -235,6 +238,8 @@ def test_public_functions_render_and_report_shape():
     assert rt.matmul(x, np.ones((4, 2))).result_shape == (3, 2)
     assert rt.matmul(np.arange(4), np.arange(4)).result_shape == ()
     assert rt.matmul(np.ones((5, 2, 3)), np.ones((3, 4))).result_shape == (5, 2, 4)
+    assert rt.take(x, [0, 2, 2], axis=1).result_shape == (3, 3)
+    assert rt.take(x, [2, 0], axis=0).result_shape == (2, 4)
     for visual in (
         rt.reshape(x, (2, 6)),
         rt.transpose(x),
@@ -246,6 +251,7 @@ def test_public_functions_render_and_report_shape():
         rt.expand_dims(x, (0, 2)),
         rt.matmul(x, np.ones((4, 2))),
         rt.matmul(np.arange(4), np.arange(4)),
+        rt.take(x, [0, 2, 2], axis=1),
     ):
         assert visual.svg.startswith("<svg")
 
@@ -360,3 +366,33 @@ def test_matmul_rejects_inner_mismatch():
         matmul_result_shape((2, 3), (4, 5))
     with pytest.raises(ValueError):
         matmul_result_shape((), (2,))
+
+
+TAKE_CASES = [
+    ((4,), [0, 2, 2, 1], 0),
+    ((4,), [3, -1, 0], 0),
+    ((3, 4), [2, 0, 1], 1),
+    ((3, 4), [0, 0, 2], 0),
+    ((3, 4), [1, -1], -1),
+    ((2, 3, 4), [3, 1, 1, 0], 2),
+    ((2, 3, 4), [1, 0], -2),
+]
+
+
+@pytest.mark.parametrize("shape, indices, axis", TAKE_CASES)
+def test_take_matches_numpy(shape, indices, axis):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.take(x, indices, axis=axis)
+    result = take_result_shape(shape, indices, axis)
+
+    assert result == expected.shape
+    norm_axis, resolved = take_axis_and_indices(shape, indices, axis)
+    for rc in np.ndindex(result):
+        assert expected[rc] == x[take_source_coord(rc, resolved, norm_axis)]
+
+
+def test_take_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        take_result_shape((3,), [5], 0)
+    with pytest.raises(ValueError):
+        take_result_shape((3, 4), [0], 5)

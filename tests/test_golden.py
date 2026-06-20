@@ -54,6 +54,8 @@ CASES = {
     "expand_dims_2d_dark": lambda: rt.expand_dims((2, 3), 1, theme="dark"),
     "matmul_2d_light": lambda: rt.matmul((2, 3), (3, 4)),
     "matmul_batched_dark": lambda: rt.matmul((2, 2, 3), (2, 3, 4), theme="dark"),
+    "take_2d_light": lambda: rt.take((3, 4), [0, 2, 2, 1], axis=1),
+    "take_axis0_dark": lambda: rt.take((4, 3), [2, 0, 2], axis=0, theme="dark"),
 }
 
 
