@@ -262,6 +262,22 @@ rt.matmul(np.ones((5, 2, 3)), np.ones((5, 3, 4)))   # batched -> (5, 2, 4)
 
 Vector, matrix, and batched matrix multiplication are all supported, the batch axes broadcast like `numpy.matmul`, and an inner axis mismatch raises a clear error rather than drawing a wrong figure.
 
+## Gather with take
+
+`take` gathers values along one axis from a list of indices. The chosen axis is replaced by the gathered positions, matching `numpy.take`. Each gathered source slice and the result slice it feeds share one tint, so a repeated index repeats a tint and a reordered index reorders them, making the gather easy to read.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+x = np.arange(12).reshape(3, 4)
+
+rt.take(x, [0, 2, 2, 1], axis=1)   # gather columns, with a repeat -> (3, 4)
+rt.take(x, [2, 0], axis=0)         # reorder rows -> (2, 4)
+```
+
+Negative axes and negative indices both work, and an out of range index raises a clear error. `take` is a separate gather view and leaves the existing advanced indexing through `index` unchanged.
+
 ## Big tensor previews
 
 Large tensors use two limits. `max_cells` limits one axis, while `max_visible_cells` caps the whole preview so a high rank tensor does not create a huge SVG.
