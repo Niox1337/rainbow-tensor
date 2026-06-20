@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `moveaxis` draws moving one or more axes to new positions, the named axis movement operation between `transpose` and `swapaxes`. `source` and `destination` are an axis or a sequence of axes of equal length, the moved axes go to their destinations while the rest keep their order, and the result shape matches `numpy.moveaxis`. Each result axis keeps the colour of the source axis it came from, so the move stays traceable, and `transpose` and `swapaxes` are unchanged
+
 ## 0.14.0
 
 ### Added

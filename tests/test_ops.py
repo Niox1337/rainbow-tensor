@@ -16,6 +16,7 @@ from rainbow_tensor.ops import (
     expand_dims_source_coord,
     matmul_result_shape,
     matmul_source_terms,
+    moveaxis_axes,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
@@ -245,6 +246,8 @@ def test_public_functions_render_and_report_shape():
     assert rt.take(x, [2, 0], axis=0).result_shape == (2, 4)
     assert rt.repeat(x, 2, axis=0).result_shape == (6, 4)
     assert rt.repeat(x, [1, 2, 1, 0], axis=1).result_shape == (3, 4)
+    assert rt.moveaxis(np.zeros((2, 3, 4)), 0, 2).result_shape == (3, 4, 2)
+    assert rt.moveaxis(np.zeros((2, 3, 4, 5)), [0, 1], [2, 3]).result_shape == (4, 5, 2, 3)
     for visual in (
         rt.reshape(x, (2, 6)),
         rt.transpose(x),
@@ -259,6 +262,8 @@ def test_public_functions_render_and_report_shape():
         rt.take(x, [0, 2, 2], axis=1),
         rt.repeat(x, 2, axis=0),
         rt.repeat(x, [1, 2, 1], axis=0),
+        rt.moveaxis(np.zeros((2, 3, 4)), 0, 2),
+        rt.moveaxis(np.zeros((2, 3, 4, 5)), [0, 1], [2, 3]),
     ):
         assert visual.svg.startswith("<svg")
 
@@ -435,3 +440,34 @@ def test_repeat_rejects_bad_input():
         repeat_result_shape((3,), [1, 2], 0)
     with pytest.raises(ValueError):
         repeat_result_shape((3,), -1, 0)
+
+
+MOVEAXIS_CASES = [
+    ((2, 3, 4), 0, 2),
+    ((2, 3, 4), 2, 0),
+    ((2, 3, 4), 0, -1),
+    ((2, 3, 4), -1, 0),
+    ((2, 3, 4, 5), [0, 1], [2, 3]),
+    ((2, 3, 4, 5), [0, 1, 2], [2, 3, 1]),
+    ((2, 3, 4, 5), [0, -1], [-1, 0]),
+    ((2, 3), 0, 1),
+]
+
+
+@pytest.mark.parametrize("shape, source, destination", MOVEAXIS_CASES)
+def test_moveaxis_matches_numpy(shape, source, destination):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.moveaxis(x, source, destination)
+    order = moveaxis_axes(len(shape), source, destination)
+    result = transpose_result_shape(shape, order)
+
+    assert result == expected.shape
+    for rc in np.ndindex(result):
+        assert expected[rc] == x[transpose_source_coord(rc, order)]
+
+
+def test_moveaxis_rejects_bad_input():
+    with pytest.raises(ValueError):
+        moveaxis_axes(3, [0, 1], [2])
+    with pytest.raises(ValueError):
+        moveaxis_axes(3, 5, 0)

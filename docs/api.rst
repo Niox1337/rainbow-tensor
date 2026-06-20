@@ -15,6 +15,7 @@ Shape changing and combining
 .. autofunction:: reshape
 .. autofunction:: transpose
 .. autofunction:: swapaxes
+.. autofunction:: moveaxis
 .. autofunction:: squeeze
 .. autofunction:: expand_dims
 .. autofunction:: matmul
