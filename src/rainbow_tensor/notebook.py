@@ -39,6 +39,9 @@ from .ops import (
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
+    repeat_result_shape,
+    repeat_source_coord,
+    repeat_source_positions,
     reshape_result_shape,
     reshape_source_coord,
     squeeze_axes,
@@ -697,6 +700,60 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
     return _visual(
         content, a_shape, renderer, selected=a_selected, result=result, explanation=explanation
     )
+
+
+def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
+    """Visualise repeating elements along one axis with ``repeat``.
+
+    ``repeats`` is a single count applied to every element, or one count per
+    element along ``axis``, matching ``numpy.repeat``. Each source element and
+    the adjacent run of copies it produces share one tint, so the result reads as
+    materialised copies. This is the contrast with ``broadcast``, which stretches
+    a size one axis virtually without copying any values.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    shape = extract_shape(array)
+    axis = axis + len(shape) if axis < 0 else axis
+    source_positions = repeat_source_positions(shape[axis], repeats)
+    result = repeat_result_shape(shape, repeats, axis)
+    source_value = _source_value(array, shape)
+
+    def result_value(coord):
+        return source_value(repeat_source_coord(coord, source_positions, axis))
+
+    def source_tint(coord):
+        return _operand_tint(theme, coord[axis])
+
+    def result_tint(coord):
+        return _operand_tint(theme, source_positions[coord[axis]])
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Repeating {repeats} along axis {axis}.",
+        f"Result shape: {format_shape(result)}",
+        "Each source element is copied into its own run of result cells, so "
+        "repeat materialises real copies, unlike broadcast which stretches a "
+        "size one axis virtually.",
+    ] + _preview_explanation([shape, result], theme)
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "cell_tint": source_tint,
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "cell_tint": result_tint,
+            "caption_parts": _shape_caption_parts("repeat", result, theme),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 def take(array, indices, axis=0, theme=None, precision=2, renderer=None):

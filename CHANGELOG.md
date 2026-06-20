@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `repeat` draws repeating elements along one axis. A single count repeats every element, or one count per element repeats each by its own amount, matching `numpy.repeat`. Each source element and the adjacent run of copies it produces share one tint, so the result reads as materialised copies. This is the contrast with `broadcast`, which stretches a size one axis virtually without copying any values
+
 ## 0.13.0
 
 ### Added

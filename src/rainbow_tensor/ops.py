@@ -190,6 +190,50 @@ def expand_dims_source_coord(result_coord, inserted):
     return tuple(c for i, c in enumerate(result_coord) if i not in inserted)
 
 
+# Repeat -------------------------------------------------------------------
+
+
+def repeat_source_positions(axis_size, repeats):
+    """Return the source index each result position along the axis copies.
+
+    ``repeats`` is a single count applied to every element, or one count per
+    element along the axis, matching ``numpy.repeat``. Element ``i`` contributes
+    ``repeats[i]`` adjacent result positions, so the returned list reads as the
+    materialised copies in order.
+    """
+    if isinstance(repeats, int):
+        counts = [repeats] * axis_size
+    else:
+        counts = [int(r) for r in repeats]
+        if len(counts) != axis_size:
+            raise ValueError(
+                f"repeats has length {len(counts)} but axis has size {axis_size}"
+            )
+    positions = []
+    for i, count in enumerate(counts):
+        if count < 0:
+            raise ValueError(f"repeats may not be negative, got {count}")
+        positions.extend([i] * count)
+    return positions
+
+
+def repeat_result_shape(shape, repeats, axis):
+    """Return the shape after repeating elements along ``axis``."""
+    axis = _check_axis(axis, len(shape))
+    positions = repeat_source_positions(shape[axis], repeats)
+    return shape[:axis] + (len(positions),) + shape[axis + 1:]
+
+
+def repeat_source_coord(result_coord, source_positions, axis):
+    """Map a result coordinate back to the source element it copies.
+
+    Along the repeated axis the result position picks its source index from the
+    materialised copy list, and every other axis is copied straight through.
+    """
+    source = source_positions[result_coord[axis]]
+    return result_coord[:axis] + (source,) + result_coord[axis + 1:]
+
+
 # Take ---------------------------------------------------------------------
 
 
