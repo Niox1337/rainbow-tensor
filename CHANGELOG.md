@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `squeeze` draws a tensor with its size one axes removed. With no axis it removes every size one axis, and an explicit axis or tuple removes only those, each of which must have size one, matching `numpy.squeeze`. The source panel marks the removed size one axes in the accent colour, every surviving axis keeps its source colour in the result, and the result shape matches NumPy
+- `expand_dims` draws a tensor with a size one axis inserted. The axis is a position or tuple of positions in the result, with negative positions counting from the end, matching `numpy.expand_dims`. Each existing axis keeps its colour, the inserted size one axes are marked in the accent colour, and the result shape matches NumPy
+
 ## 0.10.8
 
 ### Added

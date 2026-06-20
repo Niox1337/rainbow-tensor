@@ -31,11 +31,17 @@ from .ops import (
     einsum_index_sizes,
     einsum_result_shape,
     einsum_selected_coords,
+    expand_dims_axes,
+    expand_dims_result_shape,
+    expand_dims_source_coord,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
     reshape_result_shape,
     reshape_source_coord,
+    squeeze_axes,
+    squeeze_result_shape,
+    squeeze_source_coord,
     stack_result_shape,
     stack_source,
     swapaxes_axes,
@@ -464,6 +470,136 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
             "theme": result_theme,
             "caption_parts": _shape_caption_parts(
                 "swapaxes", result, theme, color_for=result_color
+            ),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
+
+
+def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
+    """Visualise squeezing size one axes out of a tensor.
+
+    ``axis`` is ``None`` to remove every size one axis, or an axis or tuple of
+    axes to remove only those, which must each have size one, matching
+    ``numpy.squeeze``. The source panel marks the removed size one axes in the
+    accent colour, and each surviving axis keeps its source colour in the result.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    shape = extract_shape(array)
+    removed = squeeze_axes(shape, axis)
+    removed_set = set(removed)
+    result = squeeze_result_shape(shape, axis)
+    source_value = _source_value(array, shape)
+    surviving = [i for i in range(len(shape)) if i not in removed_set]
+    display_result = result or (1,)
+
+    def result_value(coord):
+        sc = (0,) * len(shape) if not result else squeeze_source_coord(coord, removed)
+        return source_value(sc)
+
+    if result:
+        result_theme = theme.variant(
+            axis_colors=tuple(theme.axis_color(surviving[r]) for r in range(len(result)))
+        )
+    else:
+        result_theme = theme
+
+    def result_color(axis):
+        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+    def source_color(axis):
+        if axis in removed_set:
+            return theme.surface_selected
+        return theme.axis_color(axis) if axis < len(shape) - 1 else theme.text_muted
+
+    removed_line = (
+        f"Removing size one axes {list(removed)}." if removed else "No size one axes to remove."
+    )
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        removed_line,
+        f"Result shape: {format_shape(result)}",
+        "Each surviving axis keeps its colour, and the removed size one axes are marked.",
+    ] + _preview_explanation([shape, display_result], theme)
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", shape, theme, color_for=source_color),
+        },
+        {
+            "shape": display_result,
+            "value_fn": result_value,
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                "squeeze", display_result, theme, color_for=result_color
+            ),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
+
+
+def expand_dims(array, axis, theme=None, precision=2, renderer=None):
+    """Visualise inserting size one axes into a tensor.
+
+    ``axis`` is a position or tuple of positions in the result where a new size
+    one axis is inserted, with negative positions counting from the end, matching
+    ``numpy.expand_dims``. Each existing axis keeps its source colour, and the
+    inserted size one axes are marked in the accent colour.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    shape = extract_shape(array)
+    inserted = expand_dims_axes(len(shape), axis)
+    inserted_set = set(inserted)
+    result = expand_dims_result_shape(shape, axis)
+    source_value = _source_value(array, shape)
+
+    def result_value(coord):
+        return source_value(expand_dims_source_coord(coord, inserted))
+
+    source_axis = {}
+    src = iter(range(len(shape)))
+    for i in range(len(result)):
+        if i not in inserted_set:
+            source_axis[i] = next(src)
+    result_theme = theme.variant(
+        axis_colors=tuple(
+            theme.surface_selected if i in inserted_set else theme.axis_color(source_axis[i])
+            for i in range(len(result))
+        )
+    )
+
+    def result_color(axis):
+        if axis in inserted_set:
+            return theme.surface_selected
+        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Inserting size one axes at {list(inserted)}.",
+        f"Result shape: {format_shape(result)}",
+        "Each existing axis keeps its colour, and the inserted size one axes are marked.",
+    ] + _preview_explanation([shape, result], theme)
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                "expand_dims", result, theme, color_for=result_color
             ),
         },
     ]
