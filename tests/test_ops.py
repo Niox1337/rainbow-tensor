@@ -19,6 +19,9 @@ from rainbow_tensor.ops import (
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
+    repeat_result_shape,
+    repeat_source_coord,
+    repeat_source_positions,
     reshape_result_shape,
     reshape_source_coord,
     squeeze_axes,
@@ -240,6 +243,8 @@ def test_public_functions_render_and_report_shape():
     assert rt.matmul(np.ones((5, 2, 3)), np.ones((3, 4))).result_shape == (5, 2, 4)
     assert rt.take(x, [0, 2, 2], axis=1).result_shape == (3, 3)
     assert rt.take(x, [2, 0], axis=0).result_shape == (2, 4)
+    assert rt.repeat(x, 2, axis=0).result_shape == (6, 4)
+    assert rt.repeat(x, [1, 2, 1, 0], axis=1).result_shape == (3, 4)
     for visual in (
         rt.reshape(x, (2, 6)),
         rt.transpose(x),
@@ -252,6 +257,8 @@ def test_public_functions_render_and_report_shape():
         rt.matmul(x, np.ones((4, 2))),
         rt.matmul(np.arange(4), np.arange(4)),
         rt.take(x, [0, 2, 2], axis=1),
+        rt.repeat(x, 2, axis=0),
+        rt.repeat(x, [1, 2, 1], axis=0),
     ):
         assert visual.svg.startswith("<svg")
 
@@ -396,3 +403,35 @@ def test_take_rejects_out_of_range():
         take_result_shape((3,), [5], 0)
     with pytest.raises(ValueError):
         take_result_shape((3, 4), [0], 5)
+
+
+REPEAT_CASES = [
+    ((4,), 2, 0),
+    ((4,), [1, 2, 0, 3], 0),
+    ((3, 4), 2, 0),
+    ((3, 4), 3, 1),
+    ((3, 4), [2, 0, 1], 0),
+    ((3, 4), [1, 2, 1, 0], 1),
+    ((2, 3, 4), 2, -1),
+    ((2, 3, 4), [1, 2], 0),
+]
+
+
+@pytest.mark.parametrize("shape, repeats, axis", REPEAT_CASES)
+def test_repeat_matches_numpy(shape, repeats, axis):
+    x = np.arange(int(np.prod(shape))).reshape(shape)
+    expected = np.repeat(x, repeats, axis=axis)
+    result = repeat_result_shape(shape, repeats, axis)
+
+    assert result == expected.shape
+    norm_axis = axis + len(shape) if axis < 0 else axis
+    positions = repeat_source_positions(shape[norm_axis], repeats)
+    for rc in np.ndindex(result):
+        assert expected[rc] == x[repeat_source_coord(rc, positions, norm_axis)]
+
+
+def test_repeat_rejects_bad_input():
+    with pytest.raises(ValueError):
+        repeat_result_shape((3,), [1, 2], 0)
+    with pytest.raises(ValueError):
+        repeat_result_shape((3,), -1, 0)
