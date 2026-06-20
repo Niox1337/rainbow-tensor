@@ -23,6 +23,7 @@ Shape changing and combining
 .. autofunction:: concatenate
 .. autofunction:: stack
 .. autofunction:: take
+.. autofunction:: repeat
 .. autofunction:: broadcast
 .. autofunction:: einsum
 

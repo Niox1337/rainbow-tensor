@@ -226,6 +226,22 @@ rt.broadcast((2, 3, 4), (4,))   # a (4,) vector gains two leading axes
 
 Axes line up from the right, and on each axis the sizes must be equal or one of them must be `1`. Incompatible shapes raise a clear error rather than drawing a wrong figure.
 
+## Repeat
+
+`repeat` copies elements along an axis. A single count repeats every element, or one count per element repeats each by its own amount, matching `numpy.repeat`. Each source element and the adjacent run of copies it produces share one tint, so the result reads as real materialised copies. This is the contrast with `broadcast`, which only stretches a size one axis virtually and copies nothing.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+x = np.arange(12).reshape(3, 4)
+
+rt.repeat(x, 2, axis=0)             # every row copied twice -> (6, 4)
+rt.repeat(x, [1, 2, 0, 1], axis=1)  # per column counts -> (3, 4)
+```
+
+Where `broadcast` shows a size one axis stretching to fill a shape without storing copies, `repeat` shows each value written out into its own cells, so the two views read as virtual stretching versus materialised copies.
+
 ## Einsum
 
 `einsum` turns a subscript expression into labelled operand panels and an output panel. Every label is coloured by its role, so free, shared, and contracted labels read as three distinct groups, and a label keeps that colour across every operand caption, operand figure, and the output.
