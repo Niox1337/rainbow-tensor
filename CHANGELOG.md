@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `matmul` draws a matrix multiplication `a @ b` as two operands and the output side by side. Vector, matrix, and batched matrix multiplication are all supported, with the result shape matching `numpy.matmul`. The shared inner axis is marked in the accent colour, and the row of the first operand and the column of the second operand that combine into the first output element are highlighted, so the contraction reads directly off the figure. The batch axes reuse the broadcast shape logic
+
 ## 0.11.0
 
 ### Added

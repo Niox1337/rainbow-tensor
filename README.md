@@ -244,6 +244,24 @@ rt.einsum("...ij,...jk->...ik", (2, 2, 3), (2, 3, 4))   # ellipsis for batch axe
 
 A non-leaf axis shows its label colour as a frame and a leaf axis shows it as the cell border, so the figure colours always match the caption colours. The output shape is derived from the free labels in the output subscript and checked with the same size rules as NumPy. Ellipsis notation (`...`) stands for the broadcast axes a subscript leaves unnamed, expanded against the operand shapes and aligned from the right like NumPy, with both implicit and explicit output supported.
 
+## Matrix multiplication
+
+`matmul` draws `a @ b` as the two operands and the output. The shared inner axis is marked in the accent colour, and the row of the first operand and the column of the second operand that combine into the first output element are highlighted, so the contraction reads directly off the figure. It is a dedicated, easier to read view of the common matrix multiply that `einsum("ik,kj->ij", a, b)` also expresses.
+
+```python
+import numpy as np
+import rainbow_tensor as rt
+
+a = np.arange(6).reshape(2, 3)
+b = np.arange(12).reshape(3, 4)
+
+rt.matmul(a, b)                         # (2, 3) @ (3, 4) -> (2, 4)
+rt.matmul(np.arange(3), b)              # a vector times a matrix -> (4,)
+rt.matmul(np.ones((5, 2, 3)), np.ones((5, 3, 4)))   # batched -> (5, 2, 4)
+```
+
+Vector, matrix, and batched matrix multiplication are all supported, the batch axes broadcast like `numpy.matmul`, and an inner axis mismatch raises a clear error rather than drawing a wrong figure.
+
 ## Big tensor previews
 
 Large tensors use two limits. `max_cells` limits one axis, while `max_visible_cells` caps the whole preview so a high rank tensor does not create a huge SVG.
