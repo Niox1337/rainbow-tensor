@@ -58,6 +58,8 @@ CASES = {
     "take_axis0_dark": lambda: rt.take((4, 3), [2, 0, 2], axis=0, theme="dark"),
     "repeat_2d_light": lambda: rt.repeat((3, 4), 2, axis=0),
     "repeat_perelem_dark": lambda: rt.repeat((3, 4), [1, 2, 0, 1], axis=1, theme="dark"),
+    "moveaxis_3d_light": lambda: rt.moveaxis((2, 3, 4), 0, 2),
+    "moveaxis_multi_dark": lambda: rt.moveaxis((2, 3, 4, 5), [0, 1], [2, 3], theme="dark"),
 }
 
 

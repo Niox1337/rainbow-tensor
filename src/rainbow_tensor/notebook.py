@@ -36,6 +36,7 @@ from .ops import (
     expand_dims_source_coord,
     matmul_result_shape,
     matmul_source_terms,
+    moveaxis_axes,
     parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
@@ -478,6 +479,61 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
             "theme": result_theme,
             "caption_parts": _shape_caption_parts(
                 "swapaxes", result, theme, color_for=result_color
+            ),
+        },
+    ]
+    content = renderer.render_panels(
+        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    )
+    return _visual(content, shape, renderer, result=result, explanation=explanation)
+
+
+def moveaxis(array, source, destination, theme=None, precision=2, renderer=None):
+    """Visualise moving one or more axes to new positions.
+
+    ``source`` and ``destination`` are an axis or a sequence of axes of equal
+    length, matching ``numpy.moveaxis``. ``moveaxis`` sits between ``transpose``
+    and ``swapaxes``: the moved axes go to their destinations and the rest keep
+    their order. The source and result are drawn side by side, and each result
+    axis keeps the colour of the source axis it came from, so the move is
+    traceable.
+    """
+    theme = resolve_theme(theme)
+    renderer = resolve_renderer(renderer)
+    shape = extract_shape(array)
+    order = moveaxis_axes(len(shape), source, destination)
+    result = transpose_result_shape(shape, order)
+    source_value = _source_value(array, shape)
+
+    def result_value(coord):
+        return source_value(transpose_source_coord(coord, order))
+
+    result_theme = theme.variant(
+        axis_colors=tuple(theme.axis_color(order[r]) for r in range(len(order)))
+    )
+
+    def result_color(axis):
+        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+    explanation = [
+        f"Original shape: {format_shape(shape)}",
+        f"Moving axes {source} to {destination}.",
+        f"Axes order: {order}",
+        f"Result shape: {format_shape(result)}",
+        "Each moved axis keeps its source colour in the result.",
+    ] + _preview_explanation([shape, result], theme)
+    panels = [
+        {
+            "shape": shape,
+            "value_fn": _value_fn_for(array),
+            "caption_parts": _shape_caption_parts("source", shape, theme),
+        },
+        {
+            "shape": result,
+            "value_fn": result_value,
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                "moveaxis", result, theme, color_for=result_color
             ),
         },
     ]

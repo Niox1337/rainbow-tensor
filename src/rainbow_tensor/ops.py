@@ -111,6 +111,39 @@ def swapaxes_axes(ndim, axis1, axis2):
     return tuple(axes)
 
 
+# Move axis ----------------------------------------------------------------
+
+
+def _normalize_axis_seq(axis, ndim):
+    """Resolve an axis or sequence of axes to a tuple of distinct positions."""
+    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    resolved = tuple(_check_axis(a, ndim) for a in axes)
+    if len(set(resolved)) != len(resolved):
+        raise ValueError(f"repeated axis in {axes}")
+    return resolved
+
+
+def moveaxis_axes(ndim, source, destination):
+    """Return the transpose permutation that moves axes to new positions.
+
+    ``source`` and ``destination`` are an axis or a sequence of axes of equal
+    length. Each moved axis lands at its destination and the remaining axes keep
+    their relative order, matching ``numpy.moveaxis``. The permutation is
+    expressed in the same form as :func:`transpose_axes`, so result axis ``r`` is
+    drawn from source axis ``order[r]``.
+    """
+    src = _normalize_axis_seq(source, ndim)
+    dst = _normalize_axis_seq(destination, ndim)
+    if len(src) != len(dst):
+        raise ValueError(
+            f"moveaxis source {src} and destination {dst} must have the same length"
+        )
+    order = [n for n in range(ndim) if n not in src]
+    for d, s in sorted(zip(dst, src)):
+        order.insert(d, s)
+    return tuple(order)
+
+
 # Squeeze and expand dims --------------------------------------------------
 
 
