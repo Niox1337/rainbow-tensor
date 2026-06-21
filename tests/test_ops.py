@@ -275,6 +275,19 @@ def test_reduce_to_scalar_renders():
     assert visual.svg.startswith("<svg")
 
 
+def test_reduce_result_keeps_surviving_axis_colours():
+    # Reducing a non-last axis must not recolour the surviving axes by their new
+    # position. Reducing axis 0 of (2, 3, 4) leaves (3, 4); the surviving "3"
+    # axis keeps the source axis 1 colour rather than taking the axis 0 colour.
+    from rainbow_tensor.theme import resolve_theme
+
+    theme = resolve_theme(None)
+    svg = rt.mean(np.arange(24).reshape(2, 3, 4), 0).svg
+    assert theme.axis_color(1) in svg  # surviving axis keeps its source colour
+    # and the result panel never paints that frame in the reduced axis 0 colour
+    assert f'mean (</tspan><tspan fill="{theme.axis_color(0)}">3' not in svg
+
+
 SQUEEZE_CASES = [
     ((1, 3), None),
     ((3, 1), None),
