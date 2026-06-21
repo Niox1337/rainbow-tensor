@@ -1088,6 +1088,20 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
 
     disp = result or (1,)
 
+    # The surviving axes keep their original source colours instead of being
+    # recoloured by their new position, so reducing a non-last axis does not
+    # swap an axis frame to a different colour.
+    surviving = [i for i in range(len(shape)) if i != axis]
+    if result:
+        result_theme = theme.variant(
+            axis_colors=tuple(theme.axis_color(surviving[r]) for r in range(len(result)))
+        )
+    else:
+        result_theme = theme
+
+    def result_color(ax):
+        return result_theme.axis_color(ax) if ax < len(result) - 1 else theme.text_muted
+
     # The result element of each group takes the same background as its source
     # group, so a result cell and the values that fold into it read as one unit.
     def result_tint(coord):
@@ -1122,7 +1136,10 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
             "value_fn": result_value,
             "selected": selected_result,
             "cell_tint": result_tint,
-            "caption_parts": _shape_caption_parts(op_name, disp, theme),
+            "theme": result_theme,
+            "caption_parts": _shape_caption_parts(
+                op_name, disp, theme, color_for=result_color
+            ),
         },
     ]
     content = renderer.render_panels(
