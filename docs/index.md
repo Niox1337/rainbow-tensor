@@ -44,26 +44,39 @@ figure, so the package stays inspectable and testable outside a notebook.
 
 ## What it covers
 
-```{rubric} Shape and indexing
-```
+The user guide walks through each feature group in order, mirroring the runnable
+notebooks in the `examples` folder.
 
-- Tensors of any rank, with frames nested to arbitrary depth
-- Big tensor previews with a total visible cell budget
-- Integer indexing, basic slicing, `Ellipsis`, and `None` for a new axis
-- Boolean masks and integer array indexing, matching NumPy result shapes
-
-```{rubric} Shape changing and combining
-```
-
-- Reshape with row major order and one inferred `-1` axis
-- Transpose and permute with axis colours following the move
-- Sum and mean reductions over a chosen axis
-- Concatenate along an existing axis and stack onto a brand new axis
-- Broadcasting two tensors to a common shape, marking every stretched axis
+- [Shapes](guide/shapes) draws a tensor and explains the colour scheme, float
+  precision, saving, and big tensor previews
+- [Indexing](guide/indexing) covers integers, slices, ellipsis, new axes,
+  boolean masks, and fancy integer arrays
+- [Reshaping and moving axes](guide/reshaping) covers reshape, transpose,
+  swapaxes, moveaxis, squeeze, and expand_dims
+- [Reductions and math](guide/reductions-and-math) covers sum, mean, matmul,
+  and einsum
+- [Combining tensors](guide/combining) covers concatenate, stack, broadcast,
+  repeat, and take
+- [Themes and configuration](guide/themes-and-configuration) covers themes,
+  global axis colours, backend arrays, and renderers
 
 ```{toctree}
 :maxdepth: 2
-:caption: Contents
+:caption: User guide
+:hidden:
+
+guide/shapes
+guide/indexing
+guide/reshaping
+guide/reductions-and-math
+guide/combining
+guide/themes-and-configuration
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
+:hidden:
 
 api
 ```
