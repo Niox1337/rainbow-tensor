@@ -580,6 +580,16 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
             return theme.surface_selected
         return theme.axis_color(axis) if axis < len(shape) - 1 else theme.text_muted
 
+    # The source frames mark the removed axes in the accent colour too, so a
+    # removed axis frame and its caption number read as one, matching how
+    # expand_dims marks its inserted axes.
+    source_theme = theme.variant(
+        axis_colors=tuple(
+            theme.surface_selected if a in removed_set else theme.axis_color(a)
+            for a in range(len(shape))
+        )
+    )
+
     removed_line = (
         f"Removing size one axes {list(removed)}." if removed else "No size one axes to remove."
     )
@@ -593,6 +603,7 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
         {
             "shape": shape,
             "value_fn": _value_fn_for(array),
+            "theme": source_theme,
             "caption_parts": _shape_caption_parts("source", shape, theme, color_for=source_color),
         },
         {
