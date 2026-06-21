@@ -4,6 +4,8 @@ Every result shape and coordinate mapping is cross-checked against NumPy, so
 the figures the package draws describe the same operation NumPy performs.
 """
 
+import re
+
 import numpy as np
 import pytest
 
@@ -273,6 +275,19 @@ def test_reduce_to_scalar_renders():
     visual = rt.sum(x, 0)
     assert visual.result_shape == ()
     assert visual.svg.startswith("<svg")
+
+
+def test_squeeze_source_frames_mark_removed_axes():
+    # The removed axis frames must use the accent colour, matching the green
+    # caption numbers, instead of falling back to the default axis ramp.
+    from rainbow_tensor.theme import resolve_theme
+
+    theme = resolve_theme(None)
+    svg = rt.squeeze(np.ones((1, 3, 1))).svg
+    source = svg.split("-&gt;")[0]  # frames before the connector belong to the source
+    strokes = re.findall(r'stroke="(#[0-9a-f]+)" stroke-width="2.5"', source)
+    assert theme.surface_selected in strokes  # removed axis 0 frame is the accent
+    assert theme.axis_color(0) not in strokes  # and not the default axis 0 colour
 
 
 def test_reduce_result_keeps_surviving_axis_colours():
