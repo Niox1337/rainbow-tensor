@@ -44,6 +44,23 @@ rt.set_default_axis_colors(None)    # clear it and fall back to the theme ramp
 
 `get_default_axis_colors` returns the current ramp, or `None` when none is set.
 
+## Explanation language
+
+Every caption line under a visual comes from a keyed template in
+`rainbow_tensor.explanations`. The active language is global. Set it once with
+`set_language`, and `get_language` returns the current one.
+
+```python
+rt.set_language("de")   # affects every later visual
+rt.get_language()       # -> "de"
+rt.set_language("en")   # back to the default
+```
+
+Only English (`"en"`) ships today. A translation adds one table to
+`MESSAGES` keyed by its language code, reusing the English keys. English is the
+fallback at two levels, so an unknown language or a key a translation has not
+filled yet still renders the English line rather than failing.
+
 ## Backend arrays
 
 rainbow-tensor reads arrays through duck typing. If an object exposes a `.shape`

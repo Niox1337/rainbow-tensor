@@ -16,6 +16,8 @@ later milestone.
 
 from dataclasses import dataclass, field, replace
 
+from . import config
+
 # Multi-word font names are wrapped in single quotes so the value stays valid
 # inside a double-quoted SVG attribute. Double quotes here would break the XML.
 SANS_FAMILY = (
@@ -143,10 +145,8 @@ DARK = Theme(
 )
 
 _PRESETS = {LIGHT.name: LIGHT, DARK.name: DARK}
-_default_theme = LIGHT
-# A global axis colour ramp applied to the default theme for calls that pass no
-# theme of their own. ``None`` keeps each theme's built-in ramp.
-_default_axis_colors = None
+# The mutable default theme and axis ramp live in ``config``; ``None`` there
+# means use ``LIGHT`` and each theme's own ramp.
 
 
 def register_theme(theme):
@@ -164,9 +164,10 @@ def resolve_theme(theme):
     the registered presets. A :class:`Theme` is returned unchanged.
     """
     if theme is None:
-        if _default_axis_colors is not None:
-            return _default_theme.variant(axis_colors=_default_axis_colors)
-        return _default_theme
+        base = config.default_theme if config.default_theme is not None else LIGHT
+        if config.default_axis_colors is not None:
+            return base.variant(axis_colors=config.default_axis_colors)
+        return base
     if isinstance(theme, Theme):
         return theme
     if isinstance(theme, str):
@@ -184,19 +185,18 @@ def resolve_theme(theme):
 
 def get_default_theme():
     """Return the current module default theme."""
-    return _default_theme
+    return config.default_theme if config.default_theme is not None else LIGHT
 
 
 def set_default_theme(theme):
     """Set the module default theme used when a call passes no theme."""
-    global _default_theme
-    _default_theme = resolve_theme(theme)
-    return _default_theme
+    config.default_theme = resolve_theme(theme)
+    return config.default_theme
 
 
 def get_default_axis_colors():
     """Return the global axis colour ramp, or ``None`` when none is set."""
-    return _default_axis_colors
+    return config.default_axis_colors
 
 
 def set_default_axis_colors(colors):
@@ -208,14 +208,13 @@ def set_default_axis_colors(colors):
     a hard override. Pass ``None`` to clear it and fall back to each theme's
     built-in ramp.
     """
-    global _default_axis_colors
     if colors is None:
-        _default_axis_colors = None
+        config.default_axis_colors = None
         return None
     ramp = tuple(colors)
     if not ramp:
         raise ValueError("axis colours must be a non-empty sequence of colour strings")
     if not all(isinstance(c, str) for c in ramp):
         raise TypeError("axis colours must all be colour strings")
-    _default_axis_colors = ramp
-    return _default_axis_colors
+    config.default_axis_colors = ramp
+    return config.default_axis_colors

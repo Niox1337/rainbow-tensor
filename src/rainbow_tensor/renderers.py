@@ -5,6 +5,7 @@ renderer interface here, which gives later HTML or canvas renderers a stable
 entry point without moving shape maths into a display backend.
 """
 
+from . import config
 from .render_svg import render_panels, render_svg
 
 
@@ -25,7 +26,7 @@ class SvgRenderer:
 
 SVG = SvgRenderer()
 _RENDERERS = {SVG.name: SVG}
-_default_renderer = SVG
+# The mutable default renderer lives in ``config``; ``None`` there means SVG.
 
 
 def register_renderer(renderer):
@@ -41,7 +42,7 @@ def register_renderer(renderer):
 def resolve_renderer(renderer=None):
     """Resolve a renderer object, a renderer name, or ``None``."""
     if renderer is None:
-        return _default_renderer
+        return config.default_renderer if config.default_renderer is not None else SVG
     if isinstance(renderer, str):
         try:
             return _RENDERERS[renderer]
@@ -56,14 +57,13 @@ def resolve_renderer(renderer=None):
 
 def get_default_renderer():
     """Return the current default renderer."""
-    return _default_renderer
+    return config.default_renderer if config.default_renderer is not None else SVG
 
 
 def set_default_renderer(renderer):
     """Set the default renderer used when no call passes one."""
-    global _default_renderer
-    _default_renderer = resolve_renderer(renderer)
-    return _default_renderer
+    config.default_renderer = resolve_renderer(renderer)
+    return config.default_renderer
 
 
 def _check_renderer(renderer):

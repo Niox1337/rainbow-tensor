@@ -12,6 +12,7 @@ like their nonzero integer arrays; see :func:`advanced_index`.
 import itertools
 from math import prod
 
+from .explanations import t
 from .ops import broadcast_result_shape, broadcast_source_coord
 from .shape import coordinates, format_shape
 
@@ -227,25 +228,21 @@ def explain_index(shape, index):
     """Build the lines explaining how an index transforms a shape."""
     tokens = validate_index(index, shape)
     lines = [
-        f"Original shape: {format_shape(shape)}",
-        f"Index: {format_index(index)}",
-        f"Result shape: {format_shape(result_shape(shape, index))}",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("common.index", index=format_index(index)),
+        t("common.result_shape", shape=format_shape(result_shape(shape, index))),
     ]
     axis = 0  # source axis
     out = 0  # result axis position
     for tok in tokens:
         if tok is None:
-            lines.append(f"A new size 1 axis is inserted by None at result position {out}.")
+            lines.append(t("index.new_axis", pos=out))
             out += 1
             continue
         if isinstance(tok, int):
-            lines.append(
-                f"Axis {axis} is removed because integer index {tok} is used."
-            )
+            lines.append(t("index.axis_removed", axis=axis, index=tok))
         else:
-            lines.append(
-                f"Axis {axis} is kept because slice {format_slice(tok)} is used."
-            )
+            lines.append(t("index.axis_kept", axis=axis, slice=format_slice(tok)))
             out += 1
         axis += 1
     return lines
@@ -293,10 +290,10 @@ def _mask_index(shape, mask):
     result = (len(selected),)
     plural = "s" if len(selected) != 1 else ""
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        "Advanced indexing with a boolean mask.",
-        f"The mask keeps {len(selected)} element{plural} where it is True.",
-        f"Result shape: {format_shape(result)}",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("index.mask"),
+        t("index.mask_keeps", count=len(selected), plural=plural),
+        t("common.result_shape", shape=format_shape(result)),
     ]
     return selected, result, explanation
 
@@ -425,15 +422,18 @@ def _array_index(shape, index):
     count = prod(bshape)
     axes_text = ", ".join(str(a) for a in arr_axes)
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Index: {format_index(index)}",
-        "Advanced indexing with integer arrays.",
-        f"Axes {axes_text} gather {count} position{'s' if count != 1 else ''} "
-        f"in shape {format_shape(bshape)}.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("common.index", index=format_index(index)),
+        t("index.arrays"),
+        t(
+            "index.gather",
+            axes=axes_text,
+            count=count,
+            plural="s" if count != 1 else "",
+            shape=format_shape(bshape),
+        ),
     ]
     if not contiguous:
-        explanation.append(
-            "A slice separates the gathered axes, so the gathered axis moves to the front."
-        )
-    explanation.append(f"Result shape: {format_shape(result_shape_)}")
+        explanation.append(t("index.slice_separates"))
+    explanation.append(t("common.result_shape", shape=format_shape(result_shape_)))
     return selected, result_shape_, explanation
