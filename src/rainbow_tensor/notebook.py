@@ -10,6 +10,7 @@ from itertools import product
 from math import prod
 
 from .backends import value_at_coordinate
+from .explanations import t
 from .indexing import (
     advanced_index,
     explain_index,
@@ -152,12 +153,26 @@ def _preview_explanation(shapes, theme):
         hidden = [axis for axis, (size, limit) in enumerate(zip(shape, limits)) if size > limit]
         if not hidden:
             continue
-        name = "tensor" if len(shapes) == 1 else f"tensor {i}"
-        lines.append(
-            f"Large preview for {name} {format_shape(shape)} draws at most "
-            f"{theme.max_visible_cells} real cells from {prod(shape)} total."
-        )
-        lines.append(f"Hidden axes {hidden} keep the head, selected positions, and tail.")
+        if len(shapes) == 1:
+            lines.append(
+                t(
+                    "preview.large_single",
+                    shape=format_shape(shape),
+                    max=theme.max_visible_cells,
+                    total=prod(shape),
+                )
+            )
+        else:
+            lines.append(
+                t(
+                    "preview.large_multi",
+                    i=i,
+                    shape=format_shape(shape),
+                    max=theme.max_visible_cells,
+                    total=prod(shape),
+                )
+            )
+        lines.append(t("preview.hidden", hidden=hidden))
     return lines
 
 
@@ -360,9 +375,9 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
         return source_value(reshape_source_coord(coord, old, new))
 
     explanation = [
-        f"Original shape: {format_shape(old)}",
-        f"New shape: {format_shape(new)}",
-        "Values keep their row major order, so element k stays element k.",
+        t("common.original_shape", shape=format_shape(old)),
+        t("common.new_shape", shape=format_shape(new)),
+        t("reshape.row_major"),
     ] + _preview_explanation([old, new], theme)
     panels = [
         {
@@ -408,10 +423,10 @@ def transpose(array, axes=None, theme=None, precision=2, renderer=None):
         return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Axes order: {perm}",
-        f"Result shape: {format_shape(result)}",
-        "Each axis keeps its colour as it moves to its new position.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("common.axes_order", order=perm),
+        t("common.result_shape", shape=format_shape(result)),
+        t("transpose.keep_colour"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -461,11 +476,11 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
         return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Swapping axes {axis1_r} and {axis2_r}.",
-        f"Axes order: {perm}",
-        f"Result shape: {format_shape(result)}",
-        "The two moved axes keep their source colours in the result.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("swapaxes.swap", a=axis1_r, b=axis2_r),
+        t("common.axes_order", order=perm),
+        t("common.result_shape", shape=format_shape(result)),
+        t("swapaxes.keep_colour"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -516,11 +531,11 @@ def moveaxis(array, source, destination, theme=None, precision=2, renderer=None)
         return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Moving axes {source} to {destination}.",
-        f"Axes order: {order}",
-        f"Result shape: {format_shape(result)}",
-        "Each moved axis keeps its source colour in the result.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("moveaxis.move", source=source, destination=destination),
+        t("common.axes_order", order=order),
+        t("common.result_shape", shape=format_shape(result)),
+        t("moveaxis.keep_colour"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -591,13 +606,13 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
     )
 
     removed_line = (
-        f"Removing size one axes {list(removed)}." if removed else "No size one axes to remove."
+        t("squeeze.removing", axes=list(removed)) if removed else t("squeeze.none")
     )
     explanation = [
-        f"Original shape: {format_shape(shape)}",
+        t("common.original_shape", shape=format_shape(shape)),
         removed_line,
-        f"Result shape: {format_shape(result)}",
-        "Each surviving axis keeps its colour, and the removed size one axes are marked.",
+        t("common.result_shape", shape=format_shape(result)),
+        t("squeeze.keep_colour"),
     ] + _preview_explanation([shape, display_result], theme)
     panels = [
         {
@@ -658,10 +673,10 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
         return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Inserting size one axes at {list(inserted)}.",
-        f"Result shape: {format_shape(result)}",
-        "Each existing axis keeps its colour, and the inserted size one axes are marked.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("expand_dims.inserting", axes=list(inserted)),
+        t("common.result_shape", shape=format_shape(result)),
+        t("expand_dims.keep_colour"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -731,11 +746,10 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
     rows = "n/a" if len(a_shape) == 1 else a_shape[-2]
     cols = "n/a" if len(b_shape) == 1 else b_shape[-1]
     explanation = [
-        f"Operand shapes: {format_shape(a_shape)} @ {format_shape(b_shape)}",
-        f"Left rows: {rows}, right columns: {cols}, shared inner axis: {inner}.",
-        f"Result shape: {format_shape(result)}",
-        "The shared inner axis is marked, and the highlighted row and column "
-        "combine into the first output element.",
+        t("matmul.operands", a=format_shape(a_shape), b=format_shape(b_shape)),
+        t("matmul.dims", rows=rows, cols=cols, inner=inner),
+        t("common.result_shape", shape=format_shape(result)),
+        t("matmul.combine"),
     ] + _preview_explanation([a_shape, b_shape, display_result], theme)
     panels = [
         {
@@ -796,12 +810,10 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
         return _operand_tint(theme, source_positions[coord[axis]])
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Repeating {repeats} along axis {axis}.",
-        f"Result shape: {format_shape(result)}",
-        "Each source element is copied into its own run of result cells, so "
-        "repeat materialises real copies, unlike broadcast which stretches a "
-        "size one axis virtually.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("repeat.repeating", repeats=repeats, axis=axis),
+        t("common.result_shape", shape=format_shape(result)),
+        t("repeat.copies"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -853,11 +865,10 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
         return _operand_tint(theme, resolved[coord[axis]])
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Taking indices {list(indices)} along axis {axis}.",
-        f"Result shape: {format_shape(result)}",
-        "Each result slice copies a source slice, so repeated indices repeat a "
-        "slice and reordered indices reorder them.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("take.taking", indices=list(indices), axis=axis),
+        t("common.result_shape", shape=format_shape(result)),
+        t("take.copies"),
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -1049,14 +1060,14 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
     output_text = "".join(output_axes) or "scalar"
     if contracted:
-        contracted_line = f"Contracted labels: {', '.join(contracted)}"
+        contracted_line = t("einsum.contracted", labels=", ".join(contracted))
     else:
-        contracted_line = "No labels are contracted."
+        contracted_line = t("einsum.none_contracted")
     explanation = [
-        f"Operand subscripts: {input_text}",
-        f"Output subscript: {output_text}",
+        t("einsum.operand_subscripts", subscripts=input_text),
+        t("einsum.output_subscript", subscript=output_text),
         contracted_line,
-        f"Result shape: {format_shape(result)}",
+        t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([*shapes, display_result], theme)
     content = renderer.render_panels(
         panels=panels,
@@ -1127,12 +1138,11 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
         return values[() if not result else coord]
 
     explanation = [
-        f"Original shape: {format_shape(shape)}",
-        f"Reducing axis {axis} with {op_name}.",
-        f"Result shape: {format_shape(result)}",
-        f"Each result element combines {shape[axis]} values from axis {axis}.",
-        "Values that fold into the same result share one background with that "
-        "result element, and the first group is highlighted.",
+        t("common.original_shape", shape=format_shape(shape)),
+        t("reduce.reducing", axis=axis, op=op_name),
+        t("common.result_shape", shape=format_shape(result)),
+        t("reduce.combines", count=shape[axis], axis=axis),
+        t("reduce.share_background"),
     ] + _preview_explanation([shape, disp], theme)
     panels = [
         {
@@ -1275,10 +1285,10 @@ def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None):
 
     sizes = ", ".join(format_shape(s) for s in shapes)
     explanation = [
-        f"Operand shapes: {sizes}",
-        f"Joining along axis {axis_r}.",
-        f"Result shape: {format_shape(result)}",
-        "Each operand keeps its tint, so the seam along the joined axis is clear.",
+        t("concatenate.operands", shapes=sizes),
+        t("concatenate.joining", axis=axis_r),
+        t("common.result_shape", shape=format_shape(result)),
+        t("concatenate.seam"),
     ]
     return _combine(
         arrays, shapes, result, origin_fn, "concatenate", explanation, theme, precision, renderer
@@ -1302,10 +1312,10 @@ def stack(arrays, axis=0, theme=None, precision=2, renderer=None):
         return stack_source(coord, axis_r, ndim)
 
     explanation = [
-        f"Operand shape: {format_shape(shapes[0])}",
-        f"Stacking {len(arrays)} tensors on a new axis {axis_r}.",
-        f"Result shape: {format_shape(result)}",
-        "The new axis indexes the operands, each kept in its own tint.",
+        t("stack.operand", shape=format_shape(shapes[0])),
+        t("stack.stacking", count=len(arrays), axis=axis_r),
+        t("common.result_shape", shape=format_shape(result)),
+        t("stack.new_axis"),
     ]
     return _combine(
         arrays, shapes, result, origin_fn, "stack", explanation, theme, precision, renderer
@@ -1358,15 +1368,15 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
     def axes_line(i):
         ax = broadcast_stretched_axes(shapes[i], result)
         if ax:
-            return f"operand {i} {format_shape(shapes[i])} stretches axes {ax}"
-        return f"operand {i} {format_shape(shapes[i])} already matches"
+            return t("broadcast.stretches", i=i, shape=format_shape(shapes[i]), axes=ax)
+        return t("broadcast.matches", i=i, shape=format_shape(shapes[i]))
 
     explanation = [
-        f"Operand shapes: {format_shape(shapes[0])} and {format_shape(shapes[1])}",
+        t("broadcast.operands", a=format_shape(shapes[0]), b=format_shape(shapes[1])),
         axes_line(0),
         axes_line(1),
-        f"Result shape: {format_shape(result)}",
-        "A stretched axis repeats one value, so both operands fill the result shape.",
+        t("common.result_shape", shape=format_shape(result)),
+        t("broadcast.fill"),
     ] + _preview_explanation([*shapes, result], theme)
     content = renderer.render_panels(
         panels=panels,
