@@ -89,7 +89,9 @@ MESSAGES = {
         # concatenate
         "concatenate.operands": "Operand shapes: {shapes}",
         "concatenate.joining": "Joining along axis {axis}.",
-        "concatenate.seam": "Each operand keeps its tint, so the seam along the joined axis is clear.",
+        "concatenate.seam": (
+            "Each operand keeps its tint, so the seam along the joined axis is clear."
+        ),
         # stack
         "stack.operand": "Operand shape: {shape}",
         "stack.stacking": "Stacking {count} tensors on a new axis {axis}.",
