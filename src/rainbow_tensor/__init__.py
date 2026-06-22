@@ -15,12 +15,11 @@ Public API:
     rt.set_default_theme("dark")
 """
 
+from .einsum import einsum
 from .explanations import get_language, set_language
 from .notebook import (
-    TensorVisual,
     broadcast,
     concatenate,
-    einsum,
     expand_dims,
     index,
     matmul,
@@ -55,8 +54,9 @@ from .theme import (
     set_default_axis_colors,
     set_default_theme,
 )
+from .visual import TensorVisual
 
-__version__ = "0.15.0"
+__version__ = "1.0.0"
 __all__ = [
     "shape",
     "index",

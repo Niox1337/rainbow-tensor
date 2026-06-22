@@ -6,10 +6,7 @@ inspectable in plain Python, so the package is testable outside a notebook.
 """
 
 import builtins
-from itertools import product
-from math import prod
 
-from .backends import value_at_coordinate
 from .explanations import t
 from .indexing import (
     advanced_index,
@@ -21,24 +18,18 @@ from .indexing import (
     selected_coordinates,
     validate_index,
 )
-from .layout import axis_visible_limits
 from .ops import (
     broadcast_result_shape,
     broadcast_source_coord,
     broadcast_stretched_axes,
     concatenate_result_shape,
     concatenate_source,
-    einsum_contracted_labels,
-    einsum_index_sizes,
-    einsum_result_shape,
-    einsum_selected_coords,
     expand_dims_axes,
     expand_dims_result_shape,
     expand_dims_source_coord,
     matmul_result_shape,
     matmul_source_terms,
     moveaxis_axes,
-    parse_einsum_subscripts,
     reduce_result_shape,
     reduce_source_coords,
     repeat_result_shape,
@@ -62,136 +53,11 @@ from .ops import (
 from .renderers import resolve_renderer
 from .shape import coordinates, extract_shape, flat_index, format_shape
 from .theme import resolve_theme
+from .visual import _preview_explanation, _source_value, _value_fn_for, _visual
 
 # The public ``sum`` below shadows the builtin in this module, so keep a handle
 # to the real one for the reduction maths.
 _py_sum = builtins.sum
-
-
-class TensorVisual:
-    """A rendered tensor visualisation.
-
-    The ``svg`` attribute holds the SVG string, and ``text`` holds the plain
-    explanation. In a notebook the image is displayed first and the explanation
-    is printed as standard output underneath it. Outside a notebook both values
-    stay available for inspection and testing.
-    """
-
-    def __init__(
-        self,
-        svg,
-        shape,
-        selected=None,
-        result=None,
-        explanation=None,
-        renderer="svg",
-        mime_type="image/svg+xml",
-    ):
-        self.svg = svg
-        self.content = svg
-        self.shape = shape
-        self.selected = selected
-        self.result_shape = result
-        self.explanation = explanation or []
-        self.text = "\n".join(self.explanation)
-        self.renderer = renderer
-        self.mime_type = mime_type
-
-    def _repr_svg_(self):
-        if self.mime_type == "image/svg+xml":
-            return self.svg
-        return None
-
-    def __str__(self):
-        return self.svg
-
-    def __repr__(self):
-        # Stable text repr so a re-run notebook's text/plain output never churns
-        # on the object's memory address.
-        return f"TensorVisual(shape={self.shape}, result_shape={self.result_shape})"
-
-    def _ipython_display_(self):
-        """Display the figure and print explanation text as standard output."""
-        from IPython.display import SVG, display
-
-        if self.mime_type == "image/svg+xml":
-            display(SVG(self.svg))
-        else:
-            display({self.mime_type: self.content}, raw=True)
-        if self.text:
-            print(self.text)
-
-    def save(self, path):
-        """Write the SVG to ``path`` and return the path.
-
-        The text is written as UTF-8 so the ellipsis and legend glyphs survive
-        the round trip. ``path`` may be a string or a path-like object.
-        """
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(self.svg)
-        return path
-
-
-def _visual(content, shape, renderer, selected=None, result=None, explanation=None):
-    """Build the visual result object for a renderer output."""
-    return TensorVisual(
-        content,
-        shape,
-        selected=selected,
-        result=result,
-        explanation=explanation,
-        renderer=getattr(renderer, "name", "custom"),
-        mime_type=getattr(renderer, "mime_type", "image/svg+xml"),
-    )
-
-
-def _preview_explanation(shapes, theme):
-    """Return standard output lines for large tensor previews."""
-    lines = []
-    for i, shape in enumerate(shapes):
-        limits = axis_visible_limits(shape, theme.max_cells, theme.max_visible_cells)
-        hidden = [axis for axis, (size, limit) in enumerate(zip(shape, limits)) if size > limit]
-        if not hidden:
-            continue
-        if len(shapes) == 1:
-            lines.append(
-                t(
-                    "preview.large_single",
-                    shape=format_shape(shape),
-                    max=theme.max_visible_cells,
-                    total=prod(shape),
-                )
-            )
-        else:
-            lines.append(
-                t(
-                    "preview.large_multi",
-                    i=i,
-                    shape=format_shape(shape),
-                    max=theme.max_visible_cells,
-                    total=prod(shape),
-                )
-            )
-        lines.append(t("preview.hidden", hidden=hidden))
-    return lines
-
-
-def _value_fn_for(obj):
-    """Build a coordinate to value function for array-like input.
-
-    A tuple carries no values, so generated values are used. Any object with
-    a ``.shape`` attribute is read by coordinate, which covers NumPy arrays
-    and any compatible array-like without importing a tensor library.
-    """
-    if isinstance(obj, tuple):
-        return None
-    if not hasattr(obj, "shape"):
-        return None
-
-    def value_fn(coord):
-        return value_at_coordinate(obj, coord)
-
-    return value_fn
 
 
 def _shape_label_parts(shape, theme):
@@ -320,18 +186,6 @@ def index(array, index, theme=None, precision=2, renderer=None):
     )
 
 
-def _source_value(array, shape):
-    """Return a coordinate to value function for ``array``.
-
-    An array-like is read by coordinate. A bare shape tuple carries no values,
-    so the row major flat index stands in, matching :func:`shape`.
-    """
-    value_fn = _value_fn_for(array)
-    if value_fn is None:
-        return lambda coord: flat_index(coord, shape)
-    return value_fn
-
-
 def _shape_caption_parts(name, shape, theme, color_for=None):
     """Build a coloured caption naming a panel and its shape.
 
@@ -397,24 +251,23 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
     return _visual(content, old, renderer, result=new, explanation=explanation)
 
 
-def transpose(array, axes=None, theme=None, precision=2, renderer=None):
-    """Visualise a transpose or permute, with axis colours following the move.
+def _permute_view(array, perm, name, prefix_lines, keep_colour, theme, precision, renderer):
+    """Shared body for transpose, swapaxes, and moveaxis.
 
-    ``axes`` is a permutation of the source axes, or ``None`` to reverse them
-    like ``numpy.transpose``. The result panel colours each axis by the source
-    axis it came from, so a colour can be traced across the swap.
+    ``perm`` is the resolved axis order. The result panel colours each axis by
+    the source axis ``perm[r]`` it came from, so a colour traces across the
+    move. ``prefix_lines`` are the op specific explanation lines inserted after
+    the original shape, and ``keep_colour`` is the closing colour note.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    perm = transpose_axes(len(shape), axes)
     result = transpose_result_shape(shape, perm)
     source_value = _source_value(array, shape)
 
     def result_value(coord):
         return source_value(transpose_source_coord(coord, perm))
 
-    # Result axis r came from source axis perm[r], so it borrows that colour.
     result_theme = theme.variant(
         axis_colors=tuple(theme.axis_color(perm[r]) for r in range(len(perm)))
     )
@@ -424,9 +277,10 @@ def transpose(array, axes=None, theme=None, precision=2, renderer=None):
 
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
+        *prefix_lines,
         t("common.axes_order", order=perm),
         t("common.result_shape", shape=format_shape(result)),
-        t("transpose.keep_colour"),
+        keep_colour,
     ] + _preview_explanation([shape, result], theme)
     panels = [
         {
@@ -438,15 +292,26 @@ def transpose(array, axes=None, theme=None, precision=2, renderer=None):
             "shape": result,
             "value_fn": result_value,
             "theme": result_theme,
-            "caption_parts": _shape_caption_parts(
-                "transpose", result, theme, color_for=result_color
-            ),
+            "caption_parts": _shape_caption_parts(name, result, theme, color_for=result_color),
         },
     ]
     content = renderer.render_panels(
         panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
     )
     return _visual(content, shape, renderer, result=result, explanation=explanation)
+
+
+def transpose(array, axes=None, theme=None, precision=2, renderer=None):
+    """Visualise a transpose or permute, with axis colours following the move.
+
+    ``axes`` is a permutation of the source axes, or ``None`` to reverse them
+    like ``numpy.transpose``. The result panel colours each axis by the source
+    axis it came from, so a colour can be traced across the swap.
+    """
+    perm = transpose_axes(len(extract_shape(array)), axes)
+    return _permute_view(
+        array, perm, "transpose", [], t("transpose.keep_colour"), theme, precision, renderer
+    )
 
 
 def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
@@ -456,51 +321,20 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
     are drawn side by side, and the two moved axes keep their colours so the
     swap is traceable.
     """
-    theme = resolve_theme(theme)
-    renderer = resolve_renderer(renderer)
-    shape = extract_shape(array)
-    perm = swapaxes_axes(len(shape), axis1, axis2)
-    result = transpose_result_shape(shape, perm)
-    source_value = _source_value(array, shape)
-    axis1_r = axis1 + len(shape) if axis1 < 0 else axis1
-    axis2_r = axis2 + len(shape) if axis2 < 0 else axis2
-
-    def result_value(coord):
-        return source_value(transpose_source_coord(coord, perm))
-
-    result_theme = theme.variant(
-        axis_colors=tuple(theme.axis_color(perm[r]) for r in range(len(perm)))
-    )
-
-    def result_color(axis):
-        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
-
-    explanation = [
-        t("common.original_shape", shape=format_shape(shape)),
-        t("swapaxes.swap", a=axis1_r, b=axis2_r),
-        t("common.axes_order", order=perm),
-        t("common.result_shape", shape=format_shape(result)),
+    ndim = len(extract_shape(array))
+    perm = swapaxes_axes(ndim, axis1, axis2)
+    axis1_r = axis1 + ndim if axis1 < 0 else axis1
+    axis2_r = axis2 + ndim if axis2 < 0 else axis2
+    return _permute_view(
+        array,
+        perm,
+        "swapaxes",
+        [t("swapaxes.swap", a=axis1_r, b=axis2_r)],
         t("swapaxes.keep_colour"),
-    ] + _preview_explanation([shape, result], theme)
-    panels = [
-        {
-            "shape": shape,
-            "value_fn": _value_fn_for(array),
-            "caption_parts": _shape_caption_parts("source", shape, theme),
-        },
-        {
-            "shape": result,
-            "value_fn": result_value,
-            "theme": result_theme,
-            "caption_parts": _shape_caption_parts(
-                "swapaxes", result, theme, color_for=result_color
-            ),
-        },
-    ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+        theme,
+        precision,
+        renderer,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 def moveaxis(array, source, destination, theme=None, precision=2, renderer=None):
@@ -513,49 +347,17 @@ def moveaxis(array, source, destination, theme=None, precision=2, renderer=None)
     axis keeps the colour of the source axis it came from, so the move is
     traceable.
     """
-    theme = resolve_theme(theme)
-    renderer = resolve_renderer(renderer)
-    shape = extract_shape(array)
-    order = moveaxis_axes(len(shape), source, destination)
-    result = transpose_result_shape(shape, order)
-    source_value = _source_value(array, shape)
-
-    def result_value(coord):
-        return source_value(transpose_source_coord(coord, order))
-
-    result_theme = theme.variant(
-        axis_colors=tuple(theme.axis_color(order[r]) for r in range(len(order)))
-    )
-
-    def result_color(axis):
-        return result_theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
-
-    explanation = [
-        t("common.original_shape", shape=format_shape(shape)),
-        t("moveaxis.move", source=source, destination=destination),
-        t("common.axes_order", order=order),
-        t("common.result_shape", shape=format_shape(result)),
+    order = moveaxis_axes(len(extract_shape(array)), source, destination)
+    return _permute_view(
+        array,
+        order,
+        "moveaxis",
+        [t("moveaxis.move", source=source, destination=destination)],
         t("moveaxis.keep_colour"),
-    ] + _preview_explanation([shape, result], theme)
-    panels = [
-        {
-            "shape": shape,
-            "value_fn": _value_fn_for(array),
-            "caption_parts": _shape_caption_parts("source", shape, theme),
-        },
-        {
-            "shape": result,
-            "value_fn": result_value,
-            "theme": result_theme,
-            "caption_parts": _shape_caption_parts(
-                "moveaxis", result, theme, color_for=result_color
-            ),
-        },
-    ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+        theme,
+        precision,
+        renderer,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
@@ -888,197 +690,6 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
         panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
     )
     return _visual(content, shape, renderer, result=result, explanation=explanation)
-
-
-# Role colour families, chosen so free, shared, and contracted labels read as
-# three distinct groups while every label keeps one colour everywhere it appears.
-_EINSUM_FREE = ("#2563eb", "#0891b2", "#4f46e5", "#0d9488", "#0284c7")
-_EINSUM_SHARED = ("#db2777", "#9333ea", "#c026d3", "#e11d48")
-_EINSUM_CONTRACTED = ("#ea580c", "#ca8a04", "#dc2626", "#b45309")
-
-
-def _einsum_roles(input_axes, output_axes):
-    """Classify each einsum label as free, shared, or contracted.
-
-    A label that is not in the output is contracted. Otherwise a label that
-    appears in more than one operand is shared, and the rest are free. Each
-    label gets exactly one role, so the three roles partition the labels.
-    """
-    output = set(output_axes)
-    operand_count = {}
-    for labels in input_axes:
-        for label in set(labels):
-            operand_count[label] = operand_count.get(label, 0) + 1
-    roles = {}
-    for labels in (*input_axes, output_axes):
-        for label in labels:
-            if label in roles:
-                continue
-            if label not in output:
-                roles[label] = "contracted"
-            elif operand_count.get(label, 0) >= 2:
-                roles[label] = "shared"
-            else:
-                roles[label] = "free"
-    return roles
-
-
-def _einsum_label_colors(input_axes, output_axes):
-    """Map every einsum label to one colour drawn from its role family.
-
-    The colour is stable across every operand and the output, so a label keeps
-    one colour in every caption and figure, and the three roles stay visually
-    distinct.
-    """
-    roles = _einsum_roles(input_axes, output_axes)
-    ramps = {"free": _EINSUM_FREE, "shared": _EINSUM_SHARED, "contracted": _EINSUM_CONTRACTED}
-    counters = {"free": 0, "shared": 0, "contracted": 0}
-    colors = {}
-    for labels in (*input_axes, output_axes):
-        for label in labels:
-            if label in colors:
-                continue
-            role = roles[label]
-            colors[label] = ramps[role][counters[role] % len(ramps[role])]
-            counters[role] += 1
-    return colors
-
-
-def _einsum_theme(labels, theme, label_colors):
-    """Return a theme whose axis ramp follows the subscript labels."""
-    if not labels:
-        return theme
-    return theme.variant(axis_colors=tuple(label_colors[label] for label in labels))
-
-
-def _einsum_leaf_tint(labels, theme, label_colors):
-    """Border a panel's leaf cells with the leaf label colour.
-
-    A non-leaf axis shows its label colour as a frame, but the leaf axis is
-    drawn as plain cells, so without this the leaf label colour would appear in
-    the caption yet never in the figure. Bordering each cell with the leaf label
-    colour keeps the figure and the caption consistent for every label.
-    """
-    if not labels:
-        return None
-    border = label_colors[labels[-1]]
-    fill = theme.surface
-    return lambda coord: (fill, border)
-
-
-def _einsum_caption_parts(name, labels, shape, theme, label_colors):
-    """Build a coloured caption for an einsum panel."""
-    neutral = theme.heading
-    parts = [(f"{name} ", neutral)]
-    if labels:
-        for label in labels:
-            parts.append((label, label_colors[label]))
-    else:
-        parts.append(("scalar", theme.text_muted))
-    parts.append((" (", neutral))
-    for axis, dim in enumerate(shape):
-        color = label_colors[labels[axis]] if labels else theme.text_muted
-        parts.append((str(dim), color))
-        if axis < len(shape) - 1:
-            parts.append((", ", neutral))
-    parts.append((")", neutral))
-    return parts
-
-
-def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
-    """Build a value function for the einsum output panel."""
-    sizes = einsum_index_sizes(input_axes, shapes)
-    contracted = einsum_contracted_labels(input_axes, output_axes)
-    ranges = [range(sizes[label]) for label in contracted]
-
-    def result_value(coord):
-        output_coord = () if not output_axes else coord
-        fixed = dict(zip(output_axes, output_coord))
-        total = 0
-        for values in product(*ranges):
-            assignment = dict(fixed)
-            assignment.update(zip(contracted, values))
-            term = 1
-            for labels, value_fn in zip(input_axes, source_values):
-                source_coord = tuple(assignment[label] for label in labels)
-                term *= value_fn(source_coord)
-            total += term
-        return total
-
-    return result_value
-
-
-def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
-    """Visualise an einsum expression.
-
-    Each operand is drawn with its subscript labels. Every label keeps one
-    colour across all operand captions, operand figures, and the output, drawn
-    from a colour family for its role, so free, shared, and contracted labels
-    stay visually distinct. The output panel shows the derived free index shape.
-    """
-    if not arrays:
-        raise ValueError("einsum needs at least one operand")
-
-    theme = resolve_theme(theme)
-    renderer = resolve_renderer(renderer)
-    shapes = [extract_shape(array) for array in arrays]
-    input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays), shapes)
-    result = einsum_result_shape(subscripts, shapes)
-    display_result = result or (1,)
-    source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
-    label_colors = _einsum_label_colors(input_axes, output_axes)
-    selected = einsum_selected_coords(input_axes, output_axes, shapes)
-    result_value = _einsum_result_value_fn(input_axes, output_axes, shapes, source_values)
-    contracted = einsum_contracted_labels(input_axes, output_axes)
-
-    panels = []
-    for i, (array, labels, shape) in enumerate(zip(arrays, input_axes, shapes)):
-        panels.append(
-            {
-                "shape": shape,
-                "value_fn": _value_fn_for(array),
-                "theme": _einsum_theme(labels, theme, label_colors),
-                "cell_tint": _einsum_leaf_tint(labels, theme, label_colors),
-                "caption_parts": _einsum_caption_parts(
-                    f"operand {i}", labels, shape, theme, label_colors
-                ),
-            }
-        )
-
-    panels.append(
-        {
-            "shape": display_result,
-            "value_fn": result_value,
-            "theme": _einsum_theme(output_axes, theme, label_colors),
-            "cell_tint": _einsum_leaf_tint(output_axes, theme, label_colors),
-            "caption_parts": _einsum_caption_parts(
-                "output", output_axes, display_result, theme, label_colors
-            ),
-        }
-    )
-    connectors = ["*"] * (len(arrays) - 1) + ["->"]
-    input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
-    output_text = "".join(output_axes) or "scalar"
-    if contracted:
-        contracted_line = t("einsum.contracted", labels=", ".join(contracted))
-    else:
-        contracted_line = t("einsum.none_contracted")
-    explanation = [
-        t("einsum.operand_subscripts", subscripts=input_text),
-        t("einsum.output_subscript", subscript=output_text),
-        contracted_line,
-        t("common.result_shape", shape=format_shape(result)),
-    ] + _preview_explanation([*shapes, display_result], theme)
-    content = renderer.render_panels(
-        panels=panels,
-        connectors=connectors,
-        explanation=explanation,
-        theme=theme,
-        precision=precision,
-    )
-    return _visual(
-        content, shapes[0], renderer, selected=selected, result=result, explanation=explanation
-    )
 
 
 def _reduce(array, axis, op_name, combine, theme, precision, renderer):

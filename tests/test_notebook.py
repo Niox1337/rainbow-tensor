@@ -2,8 +2,7 @@
 
 import pytest
 
-from rainbow_tensor import einsum, index, shape, swapaxes
-from rainbow_tensor.notebook import TensorVisual
+from rainbow_tensor import TensorVisual, einsum, index, shape, swapaxes
 from rainbow_tensor.theme import LIGHT
 
 
@@ -132,7 +131,7 @@ def test_einsum_renders_subscripts_and_result_values():
 def test_einsum_label_colours_match_between_figure_and_caption():
     import re
 
-    from rainbow_tensor.notebook import _einsum_label_colors
+    from rainbow_tensor.einsum import _einsum_label_colors
     from rainbow_tensor.ops import parse_einsum_subscripts
 
     # A leaf axis label used to be coloured only in the caption, never in the
@@ -151,7 +150,7 @@ def test_einsum_label_colours_match_between_figure_and_caption():
 
 
 def test_einsum_roles_are_visually_distinct():
-    from rainbow_tensor.notebook import (
+    from rainbow_tensor.einsum import (
         _EINSUM_CONTRACTED,
         _EINSUM_FREE,
         _EINSUM_SHARED,
