@@ -1,26 +1,26 @@
-"""einsum visualisation.
+"""einsum view.
 
 The einsum view colours every subscript label by its role (free, shared, or
 contracted) and keeps that colour consistent across operands and the output.
 It is self contained apart from the shared rendering substrate in
-:mod:`rainbow_tensor.visual`, so it sits in its own module rather than swelling
-the op module.
+:mod:`rainbow_tensor.visual`, and its own caption builder, so it does not lean
+on the shared caption helper the other families use.
 """
 
 from itertools import product
 
-from .explanations import t
-from .ops import (
+from ..explanations import t
+from ..ops import (
     einsum_contracted_labels,
     einsum_index_sizes,
     einsum_result_shape,
     einsum_selected_coords,
     parse_einsum_subscripts,
 )
-from .renderers import resolve_renderer
-from .shape import extract_shape, format_shape
-from .theme import resolve_theme
-from .visual import _preview_explanation, _source_value, _value_fn_for, _visual
+from ..renderers import resolve_renderer
+from ..shape import extract_shape, format_shape
+from ..theme import resolve_theme
+from ..visual import _preview_explanation, _source_value, _value_fn_for, _visual
 
 # Role colour families, chosen so free, shared, and contracted labels read as
 # three distinct groups while every label keeps one colour everywhere it appears.

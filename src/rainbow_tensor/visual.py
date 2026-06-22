@@ -2,9 +2,9 @@
 
 ``TensorVisual`` is what every public op returns: an SVG string plus a plain
 text explanation that stay inspectable outside a notebook. The small helpers
-here (value lookup, source values, large preview lines) are shared by the op
-module and the einsum module, so they live below the result object rather than
-beside any one caller.
+here (value lookup, source values, large preview lines, captions, operand
+tints) are shared by the views family modules, so they live below the result
+object rather than beside any one caller.
 """
 
 from math import prod
@@ -151,3 +151,51 @@ def _source_value(array, shape):
     if value_fn is None:
         return lambda coord: flat_index(coord, shape)
     return value_fn
+
+
+def _shape_caption_parts(name, shape, theme, color_for=None):
+    """Build a coloured caption naming a panel and its shape.
+
+    ``color_for`` maps an axis to its colour, defaulting to the axis ramp with
+    a muted leaf axis. Passing a custom map lets a transpose colour each axis
+    by where it came from.
+    """
+    ndim = len(shape)
+
+    def default_color(axis):
+        return theme.axis_color(axis) if axis < ndim - 1 else theme.text_muted
+
+    color_for = color_for or default_color
+    neutral = theme.heading
+    parts = [(f"{name} (", neutral)]
+    for axis, dim in enumerate(shape):
+        parts.append((str(dim), color_for(axis)))
+        if axis < ndim - 1:
+            parts.append((", ", neutral))
+    parts.append((")", neutral))
+    return parts
+
+
+# Soft operand tints, keyed by operand index, so a combined result can colour
+# each cell by where it came from. The first entry is the fill, the second the
+# matching border.
+_LIGHT_TINTS = [
+    ("#dbeafe", "#93c5fd"),  # blue
+    ("#fef3c7", "#fcd34d"),  # amber
+    ("#dcfce7", "#86efac"),  # green
+    ("#fce7f3", "#f9a8d4"),  # pink
+    ("#ede9fe", "#c4b5fd"),  # violet
+]
+_DARK_TINTS = [
+    ("#1e3a5f", "#3b82f6"),
+    ("#3f2d10", "#d97706"),
+    ("#14352a", "#22c55e"),
+    ("#3b1d2e", "#db2777"),
+    ("#2a2150", "#7c3aed"),
+]
+
+
+def _operand_tint(theme, i):
+    """Return the ``(fill, border)`` tint for operand ``i`` under ``theme``."""
+    ramp = _DARK_TINTS if theme.name == "dark" else _LIGHT_TINTS
+    return ramp[i % len(ramp)]

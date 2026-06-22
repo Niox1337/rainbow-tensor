@@ -62,6 +62,14 @@ def flat_index(coord, shape):
     return index
 
 
+def _check_axis(axis, ndim):
+    """Resolve a possibly negative axis and bounds check it."""
+    resolved = axis + ndim if axis < 0 else axis
+    if not 0 <= resolved < ndim:
+        raise ValueError(f"axis {axis} is out of range for a rank {ndim} tensor")
+    return resolved
+
+
 def generate_values(shape):
     """Map every coordinate of ``shape`` to a sequential value from 0.
 
