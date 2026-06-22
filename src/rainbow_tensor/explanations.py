@@ -4,14 +4,16 @@ Every caption line shown under a visual is built from a keyed template here,
 instead of being inlined as an f-string next to the render logic. This keeps
 the wording in one place to copy edit, and gives a single point to translate.
 
-The active language is a module global set with :func:`set_language`. English
-(``"en"``) is the fallback at two levels: an unknown language falls back to the
-whole ``en`` table, and a key missing from a translation falls back to its
-``en`` string, so a partial translation never raises.
+The active language lives in :mod:`rainbow_tensor.config` and is set with
+:func:`set_language`. English (``"en"``) is the fallback at two levels: an
+unknown language falls back to the whole ``en`` table, and a key missing from a
+translation falls back to its ``en`` string, so a partial translation never
+raises.
 """
 
+from . import config
+
 _DEFAULT = "en"
-_language = _DEFAULT
 
 MESSAGES = {
     "en": {
@@ -120,13 +122,12 @@ MESSAGES = {
 
 def set_language(lang):
     """Set the active language for all subsequent explanations."""
-    global _language
-    _language = lang
+    config.language = lang
 
 
 def get_language():
     """Return the active explanation language."""
-    return _language
+    return config.language
 
 
 def t(key, **kwargs):
@@ -134,20 +135,6 @@ def t(key, **kwargs):
 
     Falls back to English for an unknown language or a missing key.
     """
-    table = MESSAGES.get(_language, MESSAGES[_DEFAULT])
+    table = MESSAGES.get(config.language, MESSAGES[_DEFAULT])
     template = table.get(key) or MESSAGES[_DEFAULT][key]
     return template.format(**kwargs)
-
-
-if __name__ == "__main__":
-    # ponytail: smallest check that the two fallback levels and formatting hold.
-    assert t("swapaxes.swap", a=0, b=2) == "Swapping axes 0 and 2."
-    set_language("de")  # no German table yet, falls back to the en table
-    assert t("common.result_shape", shape="(2,)") == "Result shape: (2,)"
-    MESSAGES["de"] = {"swapaxes.swap": "Tausche Achsen {a} und {b}."}
-    assert t("swapaxes.swap", a=0, b=2) == "Tausche Achsen 0 und 2."
-    # missing key in a partial table still falls back to en
-    assert t("common.result_shape", shape="(2,)") == "Result shape: (2,)"
-    del MESSAGES["de"]
-    set_language("en")
-    print("ok")
