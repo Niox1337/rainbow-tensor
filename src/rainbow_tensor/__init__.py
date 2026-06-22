@@ -15,6 +15,7 @@ Public API:
     rt.set_default_theme("dark")
 """
 
+from .explanations import get_language, set_language
 from .notebook import (
     TensorVisual,
     broadcast,
@@ -90,5 +91,7 @@ __all__ = [
     "set_default_axis_colors",
     "register_theme",
     "resolve_theme",
+    "set_language",
+    "get_language",
     "__version__",
 ]
