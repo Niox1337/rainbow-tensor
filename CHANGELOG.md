@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+### Changed
+
+- Internal restructure, with no change to the public API. The shape maths and the display layer are each split by operation family into the `rainbow_tensor.ops` and `rainbow_tensor.views` packages (reshaping, reductions, combining, einsum, and shapes for the views), so `einsum` is no longer the only separated operation. Shared helpers moved into `shape.py` and `visual.py`, and the tests follow the same family layout. Every public import keeps working unchanged
+
 ## 0.15.0
 
 ### Added

@@ -15,26 +15,7 @@ Public API:
     rt.set_default_theme("dark")
 """
 
-from .einsum import einsum
 from .explanations import get_language, set_language
-from .notebook import (
-    broadcast,
-    concatenate,
-    expand_dims,
-    index,
-    matmul,
-    mean,
-    moveaxis,
-    repeat,
-    reshape,
-    shape,
-    squeeze,
-    stack,
-    sum,
-    swapaxes,
-    take,
-    transpose,
-)
 from .renderers import (
     SVG,
     SvgRenderer,
@@ -54,9 +35,28 @@ from .theme import (
     set_default_axis_colors,
     set_default_theme,
 )
+from .views import (
+    broadcast,
+    concatenate,
+    einsum,
+    expand_dims,
+    index,
+    matmul,
+    mean,
+    moveaxis,
+    repeat,
+    reshape,
+    shape,
+    squeeze,
+    stack,
+    sum,
+    swapaxes,
+    take,
+    transpose,
+)
 from .visual import TensorVisual
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __all__ = [
     "shape",
     "index",
