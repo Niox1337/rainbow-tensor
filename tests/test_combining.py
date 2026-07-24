@@ -6,6 +6,7 @@ performs.
 """
 
 import itertools
+from xml.etree import ElementTree as ET
 
 import numpy as np
 import pytest
@@ -223,6 +224,33 @@ def test_public_broadcast_renders_and_reports_shape():
     visual = rt.broadcast((3, 1), (1, 4))
     assert visual.result_shape == (3, 4)
     assert visual.svg.startswith("<svg")
+
+
+def test_broadcast_stretched_axis_frame_matches_caption():
+    root = ET.fromstring(rt.broadcast((1, 3, 4), (2, 3, 4)).svg)
+    svg_ns = "{http://www.w3.org/2000/svg}"
+    stretched_panel = root.findall(f"{svg_ns}g")[1]
+    frame_strokes = [
+        rect.attrib["stroke"]
+        for rect in stretched_panel.findall(f"{svg_ns}rect")
+        if rect.attrib.get("fill") == "none"
+    ]
+    stretched_caption = next(
+        text
+        for text in root.findall(f"{svg_ns}text")
+        if any(
+            (part.text or "").startswith("stretched")
+            for part in text.findall(f"{svg_ns}tspan")
+        )
+    )
+    caption_parts = [
+        (part.text, part.attrib["fill"])
+        for part in stretched_caption.findall(f"{svg_ns}tspan")
+    ]
+
+    accent = rt.LIGHT.surface_selected
+    assert ("2", accent) in caption_parts
+    assert accent in frame_strokes
 
 
 def test_public_broadcast_with_arrays():

@@ -252,7 +252,8 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
 
     Each operand is drawn in its own shape and again stretched to the broadcast
     shape, so the repeated values along a stretched axis are visible. Every
-    stretched axis is marked in the accent colour in the stretched caption.
+    stretched axis is marked in the accent colour in the stretched caption and
+    on its frame when it is non-leaf.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -273,6 +274,10 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
                 return theme.surface_selected
             return theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
 
+        stretched_theme = theme.variant(
+            axis_colors=tuple(color_for(axis) for axis in range(len(result)))
+        )
+
         panels.append(
             {
                 "shape": s,
@@ -284,6 +289,7 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
             {
                 "shape": result,
                 "value_fn": stretched_value,
+                "theme": stretched_theme,
                 "caption_parts": _shape_caption_parts(
                     "stretched", result, theme, color_for=color_for
                 ),
