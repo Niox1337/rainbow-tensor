@@ -4,6 +4,8 @@ Every result shape and coordinate mapping is cross-checked against NumPy, so
 the figures the package draws describe the same operation NumPy performs.
 """
 
+from xml.etree import ElementTree as ET
+
 import numpy as np
 import pytest
 
@@ -115,6 +117,33 @@ def test_matmul_matches_numpy(a, b):
     if result == ():
         total = sum(x[ac] * y[bc] for ac, bc in matmul_source_terms((), a, b))
         assert total == expected[()]
+
+
+def test_matmul_contracted_b_frame_matches_caption():
+    root = ET.fromstring(rt.matmul((2, 3), (3, 4)).svg)
+    svg_ns = "{http://www.w3.org/2000/svg}"
+    b_panel = root.findall(f"{svg_ns}g")[1]
+    frame_strokes = {
+        rect.attrib["stroke"]
+        for rect in b_panel.findall(f"{svg_ns}rect")
+        if rect.attrib.get("fill") == "none"
+    }
+    b_caption = next(
+        text
+        for text in root.findall(f"{svg_ns}text")
+        if any(
+            (part.text or "").startswith("B (")
+            for part in text.findall(f"{svg_ns}tspan")
+        )
+    )
+    caption_parts = {
+        (part.text, part.attrib["fill"])
+        for part in b_caption.findall(f"{svg_ns}tspan")
+    }
+
+    accent = rt.LIGHT.surface_selected
+    assert ("3", accent) in caption_parts
+    assert frame_strokes == {accent}
 
 
 def test_matmul_rejects_inner_mismatch():

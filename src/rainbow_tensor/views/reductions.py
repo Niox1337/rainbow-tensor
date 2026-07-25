@@ -74,6 +74,10 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
             return theme.surface_selected
         return theme.axis_color(axis) if axis < len(b_shape) - 1 else theme.text_muted
 
+    b_theme = theme.variant(
+        axis_colors=tuple(b_color(axis) for axis in range(len(b_shape)))
+    )
+
     inner = a_shape[a_inner]
     rows = "n/a" if len(a_shape) == 1 else a_shape[-2]
     cols = "n/a" if len(b_shape) == 1 else b_shape[-1]
@@ -94,6 +98,7 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
             "shape": b_shape,
             "value_fn": _value_fn_for(b),
             "selected": b_selected,
+            "theme": b_theme,
             "caption_parts": _shape_caption_parts("B", b_shape, theme, color_for=b_color),
         },
         {
