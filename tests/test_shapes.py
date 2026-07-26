@@ -2,7 +2,7 @@
 
 import pytest
 
-from rainbow_tensor import TensorVisual, index, shape
+from rainbow_tensor import LIGHT, TensorVisual, index, shape
 
 
 class FakeArray:
@@ -66,7 +66,7 @@ def test_index_computes_selection_and_result_shape():
 
 def test_index_highlights_selected_values():
     visual = index((2, 2, 2), (0, slice(None), 1))
-    assert "#16a34a" in visual.svg
+    assert LIGHT.surface_selected in visual.svg
     assert visual.svg.startswith("<svg")
 
 
@@ -75,7 +75,7 @@ def test_index_label_colours_tokens_by_axis():
     # red axis 0 token, orange axis 1 token, green leaf token, all as tspans
     assert '<tspan fill="#dc2626">0</tspan>' in visual.svg
     assert '<tspan fill="#ea580c">:</tspan>' in visual.svg
-    assert '<tspan fill="#16a34a">1</tspan>' in visual.svg
+    assert f'<tspan fill="{LIGHT.surface_selected}">1</tspan>' in visual.svg
 
 
 def test_index_uses_array_values():

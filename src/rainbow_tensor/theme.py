@@ -115,7 +115,7 @@ LIGHT = Theme(
     background="#f8fafc",
     surface="#ffffff",
     surface_muted="#f1f5f9",
-    surface_selected="#16a34a",
+    surface_selected="#15803d",
     text="#0f172a",
     text_muted="#64748b",
     text_selected="#ffffff",
@@ -123,7 +123,7 @@ LIGHT = Theme(
     axis_colors=LIGHT_AXIS_RAMP,
     neutral="#cbd5e1",
     cell_border="#e2e8f0",
-    selected_border="#15803d",
+    selected_border="#166534",
     card_border="#e8edf3",
 )
 

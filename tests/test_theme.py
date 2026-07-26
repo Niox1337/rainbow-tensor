@@ -28,6 +28,28 @@ def _distance(a, b):
     ) ** 0.5
 
 
+def _relative_luminance(hex_color):
+    channels = [
+        int(hex_color.lstrip("#")[i : i + 2], 16) / 255
+        for i in (0, 2, 4)
+    ]
+    linear = [
+        channel / 12.92
+        if channel <= 0.04045
+        else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast_ratio(first, second):
+    lighter, darker = sorted(
+        (_relative_luminance(first), _relative_luminance(second)),
+        reverse=True,
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 def test_presets_have_distinct_backgrounds():
     assert LIGHT.background != DARK.background
     assert LIGHT.name == "light"
@@ -96,6 +118,13 @@ def test_dark_theme_keeps_text_readable():
 
     assert luminance(DARK.text) - luminance(DARK.surface) > 120
     assert luminance(LIGHT.surface) - luminance(LIGHT.text) > 120
+
+
+def test_selected_values_and_labels_meet_text_contrast():
+    assert _contrast_ratio(LIGHT.text_selected, LIGHT.surface_selected) >= 4.5
+    assert _contrast_ratio(LIGHT.surface_selected, LIGHT.background) >= 4.5
+    assert _contrast_ratio(DARK.text_selected, DARK.surface_selected) >= 4.5
+    assert _contrast_ratio(LIGHT.selected_border, LIGHT.background) >= 3
 
 
 def test_default_adjacent_axis_colours_are_distinct():
