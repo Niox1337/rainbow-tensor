@@ -31,13 +31,13 @@ MONO_FAMILY = "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', mono
 # open the ramp, then it jumps straight to lime and teal before walking through
 # blue, violet, and pink, so two stacked frames are always easy to tell apart.
 LIGHT_AXIS_RAMP = (
-    "#dc2626",  # red
-    "#ea580c",  # orange
-    "#65a30d",  # lime
-    "#0d9488",  # teal
-    "#2563eb",  # blue
-    "#7c3aed",  # violet
-    "#db2777",  # pink
+    "#b91c1c",  # red
+    "#b45309",  # orange
+    "#4d7c0f",  # lime
+    "#0f766e",  # teal
+    "#1d4ed8",  # blue
+    "#6d28d9",  # violet
+    "#be185d",  # pink
 )
 DARK_AXIS_RAMP = (
     "#f87171",  # red

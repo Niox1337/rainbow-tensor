@@ -135,6 +135,11 @@ def test_default_adjacent_axis_colours_are_distinct():
             assert _distance(a, b) > 45, f"{a} and {b} are too close"
 
 
+def test_light_axis_colours_meet_text_contrast():
+    for color in LIGHT.axis_colors:
+        assert _contrast_ratio(color, LIGHT.background) >= 4.5
+
+
 def test_dark_axis_colours_stay_readable_on_surface():
     # Every axis colour must stand out clearly against the dark surface.
     surface = _luminance(DARK.surface)

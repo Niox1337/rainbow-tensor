@@ -90,7 +90,7 @@ def test_legend_names_each_axis():
 def test_legend_uses_axis_colours():
     svg = rt.shape((2, 3)).svg
     # the axis 0 swatch carries the red ramp colour
-    assert 'rx="3" fill="#dc2626"' in svg
+    assert f'rx="3" fill="{rt.LIGHT.axis_color(0)}"' in svg
 
 
 def test_leaf_legend_swatch_matches_label_colour():
