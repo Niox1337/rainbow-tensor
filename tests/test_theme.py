@@ -140,6 +140,11 @@ def test_light_axis_colours_meet_text_contrast():
         assert _contrast_ratio(color, LIGHT.background) >= 4.5
 
 
+def test_dark_neutral_frames_meet_graphics_contrast():
+    for surface in (DARK.background, DARK.surface):
+        assert _contrast_ratio(DARK.neutral, surface) >= 3
+
+
 def test_dark_axis_colours_stay_readable_on_surface():
     # Every axis colour must stand out clearly against the dark surface.
     surface = _luminance(DARK.surface)
