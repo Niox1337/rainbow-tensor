@@ -4,7 +4,7 @@ Every result shape and coordinate mapping is cross-checked against NumPy, so
 the figures the package draws describe the same operation NumPy performs.
 """
 
-import re
+from xml.etree import ElementTree as ET
 
 import numpy as np
 import pytest
@@ -221,9 +221,14 @@ def test_squeeze_source_frames_mark_removed_axes():
     from rainbow_tensor.theme import resolve_theme
 
     theme = resolve_theme(None)
-    svg = rt.squeeze(np.ones((1, 3, 1))).svg
-    source = svg.split("-&gt;")[0]  # frames before the connector belong to the source
-    strokes = re.findall(r'stroke="(#[0-9a-f]+)" stroke-width="2.5"', source)
+    root = ET.fromstring(rt.squeeze(np.ones((1, 3, 1))).svg)
+    svg_ns = "{http://www.w3.org/2000/svg}"
+    source_panel = root.findall(f"{svg_ns}g")[0]
+    strokes = {
+        rect.attrib["stroke"]
+        for rect in source_panel.findall(f"{svg_ns}rect")
+        if rect.attrib.get("fill") == "none"
+    }
     assert theme.surface_selected in strokes  # removed axis 0 frame is the accent
     assert theme.axis_color(0) not in strokes  # and not the default axis 0 colour
 
