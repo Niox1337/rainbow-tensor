@@ -1,0 +1,42 @@
+name: Backend contracts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-backend:
+    name: CPU / ${{ matrix.backend }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [torch, jax, tensorflow]
+    env:
+      RAINBOW_TEST_BACKEND: ${{ matrix.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyTorch CPU
+        if: matrix.backend == 'torch'
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install JAX CPU
+        if: matrix.backend == 'jax'
+        run: python -m pip install jax
+      - name: Install TensorFlow CPU
+        if: matrix.backend == 'tensorflow'
+        run: python -m pip install tensorflow-cpu
+      - name: Install project and test tools
+        run: python -m pip install -e ".[dev]"
+      - name: Check installed dependencies
+        run: python -m pip check
+      - name: Test required backend
+        run: python -m pytest tests/test_backend_contract.py -q -ra
