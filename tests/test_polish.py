@@ -17,6 +17,7 @@ from rainbow_tensor.layout import (
     build_layout,
     visible_positions,
 )
+from rainbow_tensor.render_svg import render_panels, render_svg
 
 
 def _width(svg):
@@ -107,7 +108,43 @@ def test_leaf_legend_swatch_matches_label_colour():
 def test_hover_titles_carry_coordinate_and_flat_index():
     svg = rt.shape((2, 2)).svg
     assert "<title>" in svg
+    assert 'aria-label="[0, 0]  value 0' in svg
     assert "flat" in svg
+    assert 'style="cursor:help"' in svg
+    assert "tabindex" not in svg
+
+
+def test_hover_accessible_name_escapes_cell_value():
+    svg = render_svg((1,), value_fn=lambda _: 'A "B" & <C>')
+
+    assert (
+        'aria-label="[0]  value A &quot;B&quot; &amp; &lt;C&gt;' in svg
+    )
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda: render_svg((2,), hover=False),
+        lambda: render_panels(
+            [
+                {
+                    "shape": (2,),
+                    "caption_parts": [("source", "#000000")],
+                }
+            ],
+            hover=False,
+        ),
+    ],
+)
+def test_hover_false_omits_cell_detail_affordances(make):
+    svg = make()
+
+    assert "<title>" not in svg
+    assert "cursor:help" not in svg
+    assert "flat 0" not in svg
+    assert "tabindex" not in svg
+    assert svg.count("aria-label=") == 1
 
 
 def test_float_values_use_precision():

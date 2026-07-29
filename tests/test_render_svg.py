@@ -9,6 +9,7 @@ from rainbow_tensor.render_svg import (
     AXIS_FRAME_COLORS,
     SELECT_VALUE_COLOR,
     escape,
+    render_panels,
     render_svg,
     svg_document,
 )
@@ -38,10 +39,54 @@ def test_escape_replaces_markup_characters():
 
 
 def test_svg_document_is_well_formed():
-    doc = svg_document("<rect/>", 100, 50)
+    doc = svg_document(
+        "<rect/>", 100, 50, aria_label='Tensor "A" & <preview>'
+    )
+    root = ET.fromstring(doc)
     assert doc.startswith("<svg")
     assert doc.endswith("</svg>")
-    assert 'width="100"' in doc
+    assert root.attrib["role"] == "img"
+    assert root.attrib["aria-label"] == 'Tensor "A" & <preview>'
+    assert root.attrib["width"] == "100"
+    assert root.attrib["height"] == "50"
+    assert root.attrib["viewBox"] == "0 0 100 50"
+    assert root.attrib["style"] == "max-width:100%;height:auto"
+    assert 'aria-label="Tensor &quot;A&quot; &amp; &lt;preview&gt;"' in doc
+
+
+def test_render_svg_accessible_name_uses_visible_label_parts():
+    svg = render_svg(
+        (2,),
+        label_parts=[
+            ("Shape (", "#000000"),
+            ('2 & "wide"', "#dc2626"),
+            (")", "#000000"),
+        ],
+    )
+
+    root = ET.fromstring(svg)
+    assert root.attrib["aria-label"] == 'Shape (2 & "wide")'
+    assert 'aria-label="Shape (2 &amp; &quot;wide&quot;)"' in svg
+
+
+def test_render_panels_accessible_name_uses_visible_captions():
+    svg = render_panels(
+        [
+            {
+                "shape": (2,),
+                "caption_parts": [('source "A"', "#000000")],
+            },
+            {
+                "shape": (2,),
+                "caption_parts": [("result & B", "#000000")],
+            },
+        ],
+        connectors=["->"],
+    )
+    root = ET.fromstring(svg)
+    assert root.attrib["aria-label"] == 'source "A" -> result & B'
+    assert 'aria-label="source &quot;A&quot; -&gt; result &amp; B"' in svg
+
 
 
 def test_render_svg_starts_with_svg_tag():

@@ -53,21 +53,24 @@ def escape(text):
     )
 
 
-def svg_document(content, width, height, theme=None):
+def svg_document(content, width, height, theme=None, aria_label="Tensor visualisation"):
     """Wrap rendered elements in a complete SVG document.
 
     A background rectangle in the theme colour fills the whole canvas so the
     dark preset reads as dark even on a transparent host page.
     """
     t = theme or LIGHT
+    accessible_name = aria_label or "Tensor visualisation"
     background = (
         f'<rect x="0" y="0" width="{width:.0f}" height="{height:.0f}" '
         f'rx="14" fill="{escape(t.background)}" stroke="{escape(t.card_border)}"/>'
     )
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'role="img" aria-label="{escape(accessible_name)}" '
         f'width="{width:.0f}" height="{height:.0f}" '
         f'viewBox="0 0 {width:.0f} {height:.0f}" '
+        f'style="max-width:100%;height:auto" '
         f'font-family="{t.sans_family}">'
         f"{background}{content}"
         f"</svg>"
@@ -245,7 +248,11 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
     if hover and cell.coord is not None:
         coord = ", ".join(str(c) for c in cell.coord)
         title = f"[{coord}]  value {display}  ·  flat {cell.flat}"
-        return f"<g><title>{escape(title)}</title>{rect}{text}</g>"
+        detail = escape(title)
+        return (
+            f'<g aria-label="{detail}" style="cursor:help">'
+            f"<title>{detail}</title>{rect}{text}</g>"
+        )
     return f"{rect}{text}"
 
 
@@ -328,9 +335,10 @@ def render_svg(
     parts = [body]
 
     if label_parts:
-        label_len = sum(len(text) for text, _ in label_parts)
+        label_text = "".join(str(text) for text, _ in label_parts)
     else:
-        label_len = len(label)
+        label_text = str(label)
+    label_len = len(label_text)
 
     legend_items = _legend_items(shape, theme, has_selection) if legend else []
 
@@ -357,7 +365,10 @@ def render_svg(
         y += 6
 
     height = y + 18
-    return svg_document("".join(parts), width, height, theme=theme)
+    aria_label = label_text or f"Tensor shape {tuple(shape)}"
+    return svg_document(
+        "".join(parts), width, height, theme=theme, aria_label=aria_label
+    )
 
 
 PANEL_GAP = 64  # horizontal room between panels, holding the connector glyph
@@ -395,6 +406,7 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
     connectors = connectors or []
 
     bodies = []
+    panel_labels = []
     for panel in panels:
         ptheme = panel.get("theme") or theme
         body, w, h, ptheme = _render_body(
@@ -407,6 +419,11 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
             panel.get("cell_tint"),
         )
         bodies.append((body, w, h, panel))
+        caption = panel.get("caption_parts")
+        if caption:
+            panel_labels.append("".join(str(text) for text, _ in caption))
+        else:
+            panel_labels.append(f"Tensor shape {tuple(panel['shape'])}")
 
     row_height = max(h for _, _, h, _ in bodies)
     has_caption = any(p.get("caption_parts") for _, _, _, p in bodies)
@@ -442,4 +459,18 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
 
     content_width = row_width
 
-    return svg_document("".join(parts), content_width, y + 18, theme=theme)
+    accessible_parts = []
+    for i, panel_label in enumerate(panel_labels):
+        accessible_parts.append(panel_label)
+        if i < len(panel_labels) - 1:
+            connector = connectors[i] if i < len(connectors) else "->"
+            accessible_parts.append(str(connector))
+    aria_label = " ".join(accessible_parts) or "Tensor panels"
+
+    return svg_document(
+        "".join(parts),
+        content_width,
+        y + 18,
+        theme=theme,
+        aria_label=aria_label,
+    )
