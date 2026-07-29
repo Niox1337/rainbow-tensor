@@ -6,6 +6,7 @@ that fold into each result group.
 """
 
 import builtins
+from functools import cache
 
 from ..explanations import t
 from ..ops import (
@@ -15,7 +16,7 @@ from ..ops import (
     reduce_source_coords,
 )
 from ..renderers import resolve_renderer
-from ..shape import coordinates, extract_shape, flat_index, format_shape
+from ..shape import extract_shape, flat_index, format_shape
 from ..theme import resolve_theme
 from ..visual import (
     _operand_tint,
@@ -120,8 +121,14 @@ def matmul(a, b, theme=None, precision=2, renderer=None):
     )
 
 
-def _reduce(array, axis, op_name, combine, theme, precision, renderer):
-    """Shared body for axis reductions such as sum and mean."""
+def _reduce(array, axis, op_name, theme, precision, renderer):
+    """Render a reduction without evaluating hidden output groups.
+
+    Each requested output coordinate is evaluated once per visual. A second
+    layout pass may request it again when a wide value grows the cells, so the
+    local cache avoids repeating backend reads. The cache never reuses values
+    across calls on a mutable array.
+    """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
@@ -129,15 +136,10 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
     source_value = _source_value(array, shape)
     axis = axis + len(shape) if axis < 0 else axis
 
-    values = {}
-    for rc in coordinates(result):
-        contributing = list(reduce_source_coords(rc, shape, axis))
-        values[rc] = combine([source_value(sc) for sc in contributing])
-
     # Mark the source elements that collapse into the first result element, and
     # tint every other group so values that fold into the same result share one
     # background while the first group stays clearly highlighted.
-    first = next(iter(coordinates(result)))
+    first = (0,) * len(result)
     selected = list(reduce_source_coords(first, shape, axis))
 
     def source_tint(coord):
@@ -171,10 +173,14 @@ def _reduce(array, axis, op_name, combine, theme, precision, renderer):
             return None
         return _operand_tint(theme, group - 1)
 
-    selected_result = [next(iter(coordinates(disp)))]
+    selected_result = [(0,) * len(disp)]
 
+    @cache
     def result_value(coord):
-        return values[() if not result else coord]
+        """Evaluate one visible group using a streaming sum of source values."""
+        rc = () if not result else coord
+        total = _py_sum(source_value(sc) for sc in reduce_source_coords(rc, shape, axis))
+        return total / shape[axis] if op_name == "mean" else total
 
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
@@ -217,7 +223,7 @@ def sum(array, axis, theme=None, precision=2, renderer=None):
     element, and the result panel holds the per group sums with the reduced
     axis gone.
     """
-    return _reduce(array, axis, "sum", _py_sum, theme, precision, renderer)
+    return _reduce(array, axis, "sum", theme, precision, renderer)
 
 
 def mean(array, axis, theme=None, precision=2, renderer=None):
@@ -227,6 +233,4 @@ def mean(array, axis, theme=None, precision=2, renderer=None):
     element, and the result panel holds the per group means with the reduced
     axis gone.
     """
-    return _reduce(
-        array, axis, "mean", lambda vs: _py_sum(vs) / len(vs), theme, precision, renderer
-    )
+    return _reduce(array, axis, "mean", theme, precision, renderer)
