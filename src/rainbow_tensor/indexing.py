@@ -260,11 +260,14 @@ def advanced_index(shape, index):
 
     Returns ``(selected_coords, result_shape, explanation_lines)``. A standalone
     boolean mask of matching shape selects every True position. Integer index
-    arrays gather coordinates and follow NumPy: the gathered axis stays in place
-    when the advanced axes are contiguous and moves to the front when a slice
-    separates them. Index arrays may have any shape and broadcast against each
-    other, with the broadcast shape forming the gathered block. A boolean array
-    on one or more consecutive axes acts like its nonzero integer arrays.
+    arrays gather coordinates and follow NumPy: integer scalars and arrays form
+    one indexing block. Its broadcast axes stay in place when the block is
+    contiguous and move to the front when a slice or ellipsis separates it.
+    Even an ellipsis that consumes no axes separates the block. Index arrays may
+    have any shape and broadcast against each other. Their values must support
+    the integer index protocol, so floating-point values are never truncated.
+    A boolean array on consecutive axes acts like its nonzero integer arrays.
+    Newaxis and boolean scalar entries remain unsupported in this mode.
     """
     if not isinstance(index, tuple):
         return _mask_index(shape, index)
@@ -299,15 +302,23 @@ def _mask_index(shape, mask):
 
 
 def _array_index(shape, index):
+    from operator import index as integer_index
+
     ndim = len(shape)
     if sum(e is Ellipsis for e in index) > 1:
         raise IndexError("an index can have at most one ellipsis '...'")
     if any(e is None for e in index):
         raise IndexError("newaxis (None) is not supported with advanced indexing")
 
+    def boolean_array(entry):
+        # A mixed list such as [True, 2] is an integer index, not a mask.
+        return _is_bool_array(entry) and all(
+            _is_bool(_get(entry, coord)) for coord in coordinates(_shape_of(entry))
+        )
+
     def consumes(e):
         # A boolean array consumes one axis per dimension, like its nonzero arrays.
-        if _is_bool_array(e):
+        if boolean_array(e):
             return len(_shape_of(e))
         if e is Ellipsis or e is None:
             return 0
@@ -324,18 +335,22 @@ def _array_index(shape, index):
     entries = []
     axis = 0
     for e in index:
+        if _is_array_like(e):
+            dtype_kind = getattr(getattr(e, "dtype", None), "kind", None)
+            if dtype_kind is not None and dtype_kind not in "biu":
+                raise IndexError("index arrays must have an integer or boolean dtype")
         if e is Ellipsis:
             entries.extend(("slice", slice(None)) for _ in range(fill))
             axis += fill
-        elif isinstance(e, bool):
+        elif _is_bool(e):
             raise TypeError(f"axis {axis}: boolean scalar indices are not supported")
-        elif isinstance(e, int):
-            entries.append(("int", _resolve_int(e, shape[axis], axis)))
+        elif not _is_array_like(e) and hasattr(e, "__index__"):
+            entries.append(("int", _resolve_int(integer_index(e), shape[axis], axis)))
             axis += 1
         elif isinstance(e, slice):
             entries.append(("slice", e))
             axis += 1
-        elif _is_bool_array(e):
+        elif boolean_array(e):
             # A boolean array spanning d axes acts like its nonzero integer
             # arrays: d paired index arrays selecting each True position.
             bshape_ = _shape_of(e)
@@ -356,7 +371,11 @@ def _array_index(shape, index):
             ishape = _shape_of(e)
             resolved = {}
             for c in coordinates(ishape):
-                resolved[c] = _resolve_int(int(_get(e, c)), shape[axis], axis)
+                try:
+                    value = integer_index(_get(e, c))
+                except TypeError:
+                    raise IndexError("index arrays must contain integers") from None
+                resolved[c] = _resolve_int(value, shape[axis], axis)
             entries.append(("arr", (ishape, resolved)))
             axis += 1
         else:
@@ -369,11 +388,14 @@ def _array_index(shape, index):
         )
 
     arr_axes = [a for a, (kind, _) in enumerate(entries) if kind == "arr"]
-    # NumPy keeps the gathered axis where the advanced block is when the
-    # advanced axes are contiguous, but moves it to the front when a slice
-    # separates them. An int between arrays does not count as a separator.
-    between = entries[arr_axes[0]: arr_axes[-1] + 1]
-    contiguous = not any(kind == "slice" for kind, _ in between)
+    # Scalar integers also participate in NumPy's advanced indexing block.
+    # Inspect the original tokens so a zero-width ellipsis still separates it.
+    block_positions = [
+        i for i, entry in enumerate(index)
+        if entry is not Ellipsis and not isinstance(entry, slice)
+    ]
+    between = index[block_positions[0]:block_positions[-1] + 1]
+    contiguous = not any(e is Ellipsis or isinstance(e, slice) for e in between)
 
     # The index arrays broadcast together to one block of axes, just like NumPy.
     ishapes = [entries[a][1][0] for a in arr_axes]

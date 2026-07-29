@@ -114,7 +114,8 @@ MESSAGES = {
         "index.arrays": "Advanced indexing with integer arrays.",
         "index.gather": "Axes {axes} gather {count} position{plural} in shape {shape}.",
         "index.slice_separates": (
-            "A slice separates the gathered axes, so the gathered axis moves to the front."
+            "A slice or ellipsis separates the integer indexing block, "
+            "so its broadcast axes move to the front."
         ),
     },
 }
