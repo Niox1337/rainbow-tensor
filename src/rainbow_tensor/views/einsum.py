@@ -131,8 +131,10 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
             assignment = dict(fixed)
             assignment.update(zip(contracted, values))
             term = 1
-            for labels, value_fn in zip(input_axes, source_values):
-                source_coord = tuple(assignment[label] for label in labels)
+            for labels, shape, value_fn in zip(input_axes, shapes, source_values):
+                source_coord = tuple(
+                    0 if size == 1 else assignment[label] for label, size in zip(labels, shape)
+                )
                 term *= value_fn(source_coord)
             total += term
         return total

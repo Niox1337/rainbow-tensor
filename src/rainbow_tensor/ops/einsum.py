@@ -144,7 +144,12 @@ def _validate_einsum_labels(labels, role):
 
 
 def einsum_index_sizes(input_axes, shapes):
-    """Return the size for each subscript label after validating operands."""
+    """Return broadcast label sizes while preserving each operand's diagonals.
+
+    A label shared across operands may broadcast a singleton dimension. When
+    a label repeats within one operand, its axes must have exactly equal sizes
+    because those axes select a diagonal rather than broadcast independently.
+    """
     if len(input_axes) != len(shapes):
         raise ValueError("einsum inputs and shapes must have the same length")
 
@@ -154,13 +159,21 @@ def einsum_index_sizes(input_axes, shapes):
             raise ValueError(
                 f"einsum operand {operand} has {len(labels)} labels for rank {len(shape)}"
             )
+        operand_sizes = {}
         for label, size in zip(labels, shape):
-            if label in sizes and sizes[label] != size:
+            if label in operand_sizes and operand_sizes[label] != size:
                 raise ValueError(
                     f"einsum label {label!r} has inconsistent sizes "
-                    f"{sizes[label]} and {size}"
+                    f"{operand_sizes[label]} and {size} within operand {operand}"
                 )
-            sizes[label] = size
+            operand_sizes[label] = size
+            previous = sizes.get(label, 1)
+            if previous != size and previous != 1 and size != 1:
+                raise ValueError(
+                    f"einsum label {label!r} has inconsistent sizes "
+                    f"{previous} and {size}"
+                )
+            sizes[label] = size if previous == 1 else previous
     return sizes
 
 
@@ -200,8 +213,10 @@ def einsum_selected_coords(input_axes, output_axes, shapes):
     for values in product(*ranges):
         assignment = dict(fixed)
         assignment.update(zip(contracted, values))
-        for operand, labels in enumerate(input_axes):
-            selected[operand].append(tuple(assignment[label] for label in labels))
+        for operand, (labels, shape) in enumerate(zip(input_axes, shapes)):
+            selected[operand].append(
+                tuple(0 if size == 1 else assignment[label] for label, size in zip(labels, shape))
+            )
 
     if not contracted:
         for operand, labels in enumerate(input_axes):
