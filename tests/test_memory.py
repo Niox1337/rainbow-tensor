@@ -162,7 +162,7 @@ def test_memory_preserves_shape_validation(invalid_shape):
         memory(invalid_shape)
 
 
-@pytest.mark.parametrize("strides, itemsize", [((4, 8), 4), ((1.5,), 4), ((4,), 0)])
+@pytest.mark.parametrize("strides, itemsize", [((4, 8), 4), ((1.5,), 4), ((4,), -1)])
 def test_invalid_optional_metadata_is_reported_as_unknown(strides, itemsize):
     class Array:
         shape = (2,)
@@ -177,8 +177,17 @@ def test_invalid_optional_metadata_is_reported_as_unknown(strides, itemsize):
 
     if strides != (4,):
         assert visual.metadata["strides"] is None
-    if itemsize == 0:
+    if itemsize < 0:
         assert visual.metadata["itemsize"] is None
+
+
+def test_zero_byte_dtype_has_a_known_item_size():
+    """A valid zero-byte dtype is distinct from missing storage metadata."""
+    visual = memory(np.zeros((2,), dtype="V0"))
+
+    assert visual.metadata["itemsize"] == 0
+    assert visual.metadata["strides"] == (0,)
+    assert "Item size: 0 bytes." in visual.text
 
 
 def test_custom_renderer_preserves_metadata_and_explanation():

@@ -57,7 +57,7 @@ def _metadata(array, normalized):
         metadata["dtype"] = str(dtype)
 
     itemsize = _integer(_attribute(array, "itemsize"))
-    if itemsize is not None and itemsize > 0:
+    if itemsize is not None and itemsize >= 0:
         metadata["itemsize"] = itemsize
 
     strides = _attribute(array, "strides")
