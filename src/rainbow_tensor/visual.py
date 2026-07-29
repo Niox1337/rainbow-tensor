@@ -24,6 +24,8 @@ class TensorVisual:
     stay available for inspection and testing. ``metadata`` holds optional
     operation details, such as the storage attributes reported by `memory`.
     Unknown metadata is explicit rather than inferred from a shape.
+    Math views also attach a bounded, immutable ``trace`` describing one output.
+    Other views leave ``trace`` as ``None``.
     """
 
     def __init__(
@@ -36,6 +38,7 @@ class TensorVisual:
         renderer="svg",
         mime_type="image/svg+xml",
         metadata=None,
+        trace=None,
     ):
         self.svg = svg
         self.content = svg
@@ -47,6 +50,7 @@ class TensorVisual:
         self.renderer = renderer
         self.mime_type = mime_type
         self.metadata = dict(metadata) if metadata is not None else {}
+        self.trace = trace
 
     def _repr_svg_(self):
         if self.mime_type == "image/svg+xml":

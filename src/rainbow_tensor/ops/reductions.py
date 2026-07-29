@@ -60,6 +60,16 @@ def matmul_source_terms(out_coord, a_shape, b_shape):
     back through broadcasting, and a promoted vector axis is dropped from the
     returned operand coordinate.
     """
+    return list(iter_matmul_source_terms(out_coord, a_shape, b_shape))
+
+
+def iter_matmul_source_terms(out_coord, a_shape, b_shape):
+    """Yield each source-coordinate pair in ascending contraction-index order.
+
+    Unlike ``matmul_source_terms``, this iterator does not materialize the full
+    contraction. A trace can therefore inspect its first terms without walking
+    the rest, while existing callers can retain the list-returning helper.
+    """
     aa, bb, a1, b1 = _matmul_promote(a_shape, b_shape)
     k = aa[-1]
     a_batch, b_batch = aa[:-2], bb[:-2]
@@ -78,14 +88,12 @@ def matmul_source_terms(out_coord, a_shape, b_shape):
 
     a_batch_coord = broadcast_source_coord(batch_coord, a_batch)
     b_batch_coord = broadcast_source_coord(batch_coord, b_batch)
-    terms = []
     for j in range(k):
         a_full = a_batch_coord + (row, j)
         b_full = b_batch_coord + (j, col)
         a_coord = a_full[1:] if a1 else a_full
         b_coord = b_full[:-1] if b1 else b_full
-        terms.append((a_coord, b_coord))
-    return terms
+        yield a_coord, b_coord
 
 
 # Axis reductions ----------------------------------------------------------

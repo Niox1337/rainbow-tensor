@@ -35,6 +35,12 @@ Result object
 .. autoclass:: TensorVisual
    :members:
 
+.. autoclass:: OutputTrace
+   :members:
+
+.. autoclass:: OperandRef
+   :members:
+
 Renderers
 ---------
 

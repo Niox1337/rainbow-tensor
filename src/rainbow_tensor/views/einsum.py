@@ -7,19 +7,18 @@ It is self contained apart from the shared rendering substrate in
 on the shared caption helper the other families use.
 """
 
-from itertools import product
-
 from ..explanations import t
 from ..ops import (
     einsum_contracted_labels,
-    einsum_index_sizes,
     einsum_result_shape,
     einsum_selected_coords,
     parse_einsum_subscripts,
 )
+from ..ops.einsum import einsum_source_terms, einsum_term_count
 from ..renderers import resolve_renderer
 from ..shape import extract_shape, format_shape
 from ..theme import resolve_theme
+from ..tracing import _build_trace, _normalize_focus, _trace_explanation
 from ..visual import _preview_explanation, _source_value, _value_fn_for, _visual
 
 # Role colour families, chosen so free, shared, and contracted labels read as
@@ -119,22 +118,12 @@ def _einsum_caption_parts(name, labels, shape, theme, label_colors):
 
 def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
     """Build a value function for the einsum output panel."""
-    sizes = einsum_index_sizes(input_axes, shapes)
-    contracted = einsum_contracted_labels(input_axes, output_axes)
-    ranges = [range(sizes[label]) for label in contracted]
-
     def result_value(coord):
         output_coord = () if not output_axes else coord
-        fixed = dict(zip(output_axes, output_coord))
         total = 0
-        for values in product(*ranges):
-            assignment = dict(fixed)
-            assignment.update(zip(contracted, values))
+        for source_coords in einsum_source_terms(input_axes, output_axes, shapes, output_coord):
             term = 1
-            for labels, shape, value_fn in zip(input_axes, shapes, source_values):
-                source_coord = tuple(
-                    0 if size == 1 else assignment[label] for label, size in zip(labels, shape)
-                )
+            for source_coord, value_fn in zip(source_coords, source_values):
                 term *= value_fn(source_coord)
             total += term
         return total
@@ -142,13 +131,18 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
     return result_value
 
 
-def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
+def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=None):
     """Visualise an einsum expression.
 
     Each operand is drawn with its subscript labels. Every label keeps one
     colour across all operand captions, operand figures, and the output, drawn
     from a colour family for its role, so free, shared, and contracted labels
     stay visually distinct. The output panel shows the derived free index shape.
+
+    ``focus`` is an output coordinate tuple, with negative coordinates accepted
+    and ``()`` required for a scalar output. Supplying it highlights that output
+    and its input factors. ``visual.trace`` records the first eight ordered
+    terms, including repeated factors introduced by singleton broadcasting.
     """
     if not arrays:
         raise ValueError("einsum needs at least one operand")
@@ -158,10 +152,15 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
     shapes = [extract_shape(array) for array in arrays]
     input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays), shapes)
     result = einsum_result_shape(subscripts, shapes)
+    focused = _normalize_focus(focus, result)
     display_result = result or (1,)
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     label_colors = _einsum_label_colors(input_axes, output_axes)
-    selected = einsum_selected_coords(input_axes, output_axes, shapes)
+    selected = einsum_selected_coords(input_axes, output_axes, shapes, focused)
+    trace = _build_trace(
+        "einsum", focused, einsum_term_count(input_axes, output_axes, shapes),
+        einsum_source_terms(input_axes, output_axes, shapes, focused),
+    )
     result_value = _einsum_result_value_fn(input_axes, output_axes, shapes, source_values)
     contracted = einsum_contracted_labels(input_axes, output_axes)
 
@@ -178,6 +177,8 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
                 ),
             }
         )
+        if focus is not None:
+            panels[-1]["selected"] = selected[i]
 
     panels.append(
         {
@@ -190,6 +191,8 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
             ),
         }
     )
+    if focus is not None:
+        panels[-1]["selected"] = [focused or (0,)]
     connectors = ["*"] * (len(arrays) - 1) + ["->"]
     input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
     output_text = "".join(output_axes) or "scalar"
@@ -203,6 +206,8 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
         contracted_line,
         t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([*shapes, display_result], theme)
+    if focus is not None:
+        explanation.extend(_trace_explanation(trace))
     content = renderer.render_panels(
         panels=panels,
         connectors=connectors,
@@ -210,6 +215,8 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None):
         theme=theme,
         precision=precision,
     )
-    return _visual(
+    visual = _visual(
         content, shapes[0], renderer, selected=selected, result=result, explanation=explanation
     )
+    visual.trace = trace
+    return visual

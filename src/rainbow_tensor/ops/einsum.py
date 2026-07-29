@@ -7,6 +7,7 @@ result against NumPy.
 """
 
 from itertools import product
+from math import prod
 from string import ascii_letters
 
 
@@ -197,29 +198,58 @@ def einsum_result_shape(subscripts, shapes):
     return tuple(sizes[label] for label in output_axes)
 
 
-def einsum_selected_coords(input_axes, output_axes, shapes):
-    """Return source coordinates that feed the first output element.
+def einsum_term_count(input_axes, output_axes, shapes):
+    """Count products contributing to one output without enumerating them."""
+    sizes = einsum_index_sizes(input_axes, shapes)
+    contracted = einsum_contracted_labels(input_axes, output_axes)
+    return prod(sizes[label] for label in contracted)
 
-    These coordinates give the renderer a small concrete contraction to
-    highlight. For matrix multiplication this marks the row in the first
-    operand and the column in the second operand.
+
+def einsum_source_terms(input_axes, output_axes, shapes, output_coord):
+    """Yield ordered operand coordinates for each product in one output.
+
+    Contracted labels follow their first appearance in the inputs, with the
+    final label changing fastest. A singleton operand axis always reads zero,
+    retaining repeated factors when that axis broadcasts over contracted terms.
     """
     sizes = einsum_index_sizes(input_axes, shapes)
     contracted = einsum_contracted_labels(input_axes, output_axes)
-    fixed = {label: 0 for label in output_axes}
-    selected = [[] for _ in input_axes]
-    ranges = [range(sizes[label]) for label in contracted]
-
-    for values in product(*ranges):
+    fixed = dict(zip(output_axes, output_coord))
+    # itertools.product pools every input range before its first yield. Decode
+    # a flat term position instead so a bounded trace stays small for long axes.
+    for position in range(prod(sizes[label] for label in contracted)):
         assignment = dict(fixed)
-        assignment.update(zip(contracted, values))
-        for operand, (labels, shape) in enumerate(zip(input_axes, shapes)):
-            selected[operand].append(
+        for label in reversed(contracted):
+            position, assignment[label] = divmod(position, sizes[label])
+        yield tuple(
+            tuple(0 if size == 1 else assignment[label] for label, size in zip(labels, shape))
+            for labels, shape in zip(input_axes, shapes)
+        )
+
+
+def einsum_selected_coords(input_axes, output_axes, shapes, output_coord=None):
+    """Return unique source coordinates that feed one chosen output element.
+
+    The first output remains the default for existing callers. Each operand's
+    selection is enumerated independently, avoiding the full Cartesian product
+    of contracted labels that never occur in that operand.
+    """
+    einsum_index_sizes(input_axes, shapes)
+    contracted = einsum_contracted_labels(input_axes, output_axes)
+    if output_coord is None:
+        output_coord = (0,) * len(output_axes)
+    fixed = dict(zip(output_axes, output_coord))
+    selected = []
+    for labels, shape in zip(input_axes, shapes):
+        operand_sizes = dict(zip(labels, shape))
+        active = [label for label in contracted if operand_sizes.get(label, 1) != 1]
+        ranges = [range(operand_sizes[label]) for label in active]
+        coords = []
+        for values in product(*ranges):
+            assignment = dict(fixed)
+            assignment.update(zip(active, values))
+            coords.append(
                 tuple(0 if size == 1 else assignment[label] for label, size in zip(labels, shape))
             )
-
-    if not contracted:
-        for operand, labels in enumerate(input_axes):
-            selected[operand].append(tuple(fixed[label] for label in labels))
-
-    return [sorted(set(coords)) for coords in selected]
+        selected.append(sorted(coords))
+    return selected

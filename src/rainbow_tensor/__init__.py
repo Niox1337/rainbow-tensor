@@ -36,6 +36,7 @@ from .theme import (
     set_default_axis_colors,
     set_default_theme,
 )
+from .tracing import OperandRef, OutputTrace
 from .views import (
     broadcast,
     concatenate,
@@ -78,6 +79,8 @@ __all__ = [
     "broadcast",
     "einsum",
     "TensorVisual",
+    "OperandRef",
+    "OutputTrace",
     "SvgRenderer",
     "SVG",
     "get_default_renderer",

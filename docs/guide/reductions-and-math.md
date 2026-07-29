@@ -54,3 +54,30 @@ rt.einsum("...ij,...jk->...ik", (2, 2, 3), (2, 3, 4))
 The output shape is derived from the free labels and checked with the same size
 rules as NumPy. A dedicated `matmul` view exists for the common matrix multiply
 that `einsum("ik,kj->ij", a, b)` also expresses.
+
+## Focus on one output
+
+Pass `focus=` to `sum`, `mean`, `matmul`, or `einsum` to choose the output
+whose contributing source cells are highlighted.
+
+```python
+visual = rt.matmul(a, b, focus=(1, 2))
+visual
+visual.trace.output_coord       # (1, 2)
+visual.trace.term_count         # 3
+visual.trace.terms              # ordered references to the three products
+
+rt.sum(a, 1, focus=(-1,))        # follow the last row's sum
+rt.einsum("ij,jk->ik", a, b, focus=(1, 2))
+```
+
+Coordinates are tuples in the output shape. Negative entries count from the
+end, and a scalar output uses `focus=()`. Invalid coordinates fail before
+reading array values.
+
+Every math visual exposes an immutable `OutputTrace`. Its `terms` contain
+`OperandRef` objects naming the operand number and source coordinate.
+Multiply references in each term, add the terms, then divide by `divisor`
+for a mean. The trace preserves repeated factors caused by broadcasting.
+It stores at most eight terms and reports `complete=False` when more exist.
+This bounded coordinate description does not evaluate the numeric result.
