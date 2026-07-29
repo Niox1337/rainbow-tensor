@@ -16,6 +16,7 @@ carries an optional hover title with its coordinate and flat index.
 import math
 
 from .layout import build_layout
+from .selection import BasicSelection
 from .theme import LIGHT, resolve_theme
 
 # Back-compatible colour constants, sourced from the light preset so existing
@@ -267,6 +268,11 @@ def _label_element(x, y, parts):
     )
 
 
+def _selection_for_render(selected):
+    """Keep compact selections lazy and make explicit iterables reusable."""
+    return selected if isinstance(selected, BasicSelection) else list(selected or [])
+
+
 def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_tint=None):
     """Render the frames and cells of one tensor in local coordinates.
 
@@ -277,7 +283,7 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     is an optional function mapping a coordinate to a ``(fill, border)`` pair,
     used to colour each result cell by the operand it came from.
     """
-    has_selection = len(selected_list) > 0
+    has_selection = bool(selected_list)
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
 
     # Grow the cells if any value is wider than the default, then lay out again
@@ -326,12 +332,12 @@ def render_svg(
     per-cell title used for tooltips.
     """
     theme = resolve_theme(theme)
-    selected_list = list(selected or [])
+    selected_list = _selection_for_render(selected)
 
     body, body_w, body_h, theme = _render_body(
         shape, selected_list, value_fn, theme, precision, hover
     )
-    has_selection = len(selected_list) > 0
+    has_selection = bool(selected_list)
     parts = [body]
 
     if label_parts:
@@ -411,7 +417,7 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
         ptheme = panel.get("theme") or theme
         body, w, h, ptheme = _render_body(
             panel["shape"],
-            list(panel.get("selected") or []),
+            _selection_for_render(panel.get("selected")),
             panel.get("value_fn"),
             ptheme,
             precision,

@@ -18,6 +18,7 @@ overflowing the canvas.
 from dataclasses import dataclass, field
 from math import prod
 
+from .selection import BasicSelection
 from .shape import flat_index
 from .theme import LIGHT
 
@@ -176,13 +177,18 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     :func:`visible_positions`, so a large N-D tensor still fits on screen.
     """
     t = theme or LIGHT
-    sel = {tuple(coord) for coord in (selected or [])}
-    pinned = _selected_positions_by_axis(sel, len(shape))
+    sel = selected if isinstance(selected, BasicSelection) else {
+        tuple(coord) for coord in (selected or [])
+    }
 
     cell_w, cell_h, gap = t.cell_w, t.cell_h, t.cell_gap
     row_pad, row_gap = t.row_pad, t.row_gap
     block_pad, block_gap, pad = t.block_pad, t.block_gap, t.padding
     limits = axis_visible_limits(shape, t.max_cells, t.max_visible_cells)
+    if isinstance(sel, BasicSelection):
+        pinned = {axis: sel.axis_pins(axis, limit) for axis, limit in enumerate(limits)}
+    else:
+        pinned = _selected_positions_by_axis(sel, len(shape))
 
     def positions_for(axis):
         return visible_positions(shape[axis], limits[axis], pinned.get(axis))
@@ -267,7 +273,10 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
                 layout.cells.append(Cell(gx, gy, cell_w, cell_h, glyph, None, ellipsis=True))
             else:
                 key = prefix + (p,)
-                frame_sel = any(co[: axis + 1] == key for co in sel)
+                frame_sel = (
+                    sel.matches_prefix(key) if isinstance(sel, BasicSelection)
+                    else any(co[: axis + 1] == key for co in sel)
+                )
                 layout.frames.append(
                     Frame(tx, ty, tile_w, tile_h, axis=axis, selected=frame_sel)
                 )

@@ -182,7 +182,7 @@ def result_shape(shape, index):
         size = shape[axis]
         axis += 1
         if isinstance(tok, slice):
-            out.append(len(expand_slice(tok, size)))
+            out.append(len(range(*tok.indices(size))))
     return tuple(out)
 
 

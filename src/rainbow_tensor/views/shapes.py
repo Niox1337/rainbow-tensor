@@ -12,10 +12,9 @@ from ..indexing import (
     format_token,
     is_advanced,
     result_shape,
-    selected_coordinates,
-    validate_index,
 )
 from ..renderers import resolve_renderer
+from ..selection import BasicSelection
 from ..shape import extract_shape
 from ..theme import resolve_theme
 from ..visual import _preview_explanation, _value_fn_for, _visual
@@ -105,6 +104,10 @@ def index(array, index, theme=None, precision=2, renderer=None):
     tensor. ``theme`` and ``precision`` behave as in :func:`shape`. The
     returned :class:`TensorVisual` renders as SVG in a notebook through
     ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
+
+    For basic indexing, ``visual.selected`` is a compact iterable rather than
+    a list. Its ``count`` gives the full number of selected coordinates without
+    enumeration. Use ``list(visual.selected)`` to materialize them explicitly.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -128,8 +131,7 @@ def index(array, index, theme=None, precision=2, renderer=None):
             content, normalized, renderer, selected=selected, result=result, explanation=explanation
         )
 
-    validate_index(index, normalized)
-    selected = selected_coordinates(normalized, index)
+    selected = BasicSelection(normalized, index)
     result = result_shape(normalized, index)
     explanation = explain_index(normalized, index) + _preview_explanation([normalized], theme)
     label_parts = _index_label_parts(index, theme)
