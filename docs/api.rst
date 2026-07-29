@@ -8,6 +8,7 @@ Shape and indexing
 
 .. autofunction:: shape
 .. autofunction:: index
+.. autofunction:: memory
 
 Shape changing and combining
 ----------------------------

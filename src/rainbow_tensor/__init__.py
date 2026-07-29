@@ -16,6 +16,7 @@ Public API:
 """
 
 from .explanations import get_language, set_language
+from .memory import memory
 from .renderers import (
     SVG,
     SvgRenderer,
@@ -59,6 +60,7 @@ from .visual import TensorVisual
 __version__ = "1.0.1"
 __all__ = [
     "shape",
+    "memory",
     "index",
     "reshape",
     "transpose",

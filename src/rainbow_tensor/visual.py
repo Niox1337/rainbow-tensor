@@ -21,7 +21,9 @@ class TensorVisual:
     The ``svg`` attribute holds the SVG string, and ``text`` holds the plain
     explanation. In a notebook the image is displayed first and the explanation
     is printed as standard output underneath it. Outside a notebook both values
-    stay available for inspection and testing.
+    stay available for inspection and testing. ``metadata`` holds optional
+    operation details, such as the storage attributes reported by `memory`.
+    Unknown metadata is explicit rather than inferred from a shape.
     """
 
     def __init__(
@@ -33,6 +35,7 @@ class TensorVisual:
         explanation=None,
         renderer="svg",
         mime_type="image/svg+xml",
+        metadata=None,
     ):
         self.svg = svg
         self.content = svg
@@ -43,6 +46,7 @@ class TensorVisual:
         self.text = "\n".join(self.explanation)
         self.renderer = renderer
         self.mime_type = mime_type
+        self.metadata = dict(metadata) if metadata is not None else {}
 
     def _repr_svg_(self):
         if self.mime_type == "image/svg+xml":

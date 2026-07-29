@@ -59,6 +59,8 @@ notebooks in the `examples` folder.
   repeat, and take
 - [Themes and configuration](guide/themes-and-configuration) covers themes,
   global axis colours, backend arrays, and renderers
+- [Memory layout](guide/memory) explains byte strides, contiguous arrays,
+  and the difference between owning data and being backed by another object
 
 ```{toctree}
 :maxdepth: 2
@@ -71,6 +73,7 @@ guide/reshaping
 guide/reductions-and-math
 guide/combining
 guide/themes-and-configuration
+guide/memory
 ```
 
 ```{toctree}
