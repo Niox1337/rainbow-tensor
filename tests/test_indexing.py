@@ -21,9 +21,10 @@ def test_reject_non_tuple_index(index):
         validate_index(index, (2, 2, 2))
 
 
-def test_reject_wrong_length():
-    with pytest.raises(ValueError):
-        validate_index((0, slice(None)), (2, 2, 2))
+def test_omitted_trailing_axes_expand_to_full_slices():
+    assert validate_index((0, slice(None)), (2, 2, 2)) == (
+        0, slice(None), slice(None)
+    )
 
 
 def test_reject_out_of_range_integer():

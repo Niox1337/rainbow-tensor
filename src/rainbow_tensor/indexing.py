@@ -11,6 +11,7 @@ like their nonzero integer arrays; see :func:`advanced_index`.
 
 import itertools
 from math import prod
+from operator import index as integer_index
 
 from .explanations import t
 from .ops import broadcast_result_shape, broadcast_source_coord
@@ -28,15 +29,21 @@ def _resolve_int(entry, size, axis):
 
 
 def _shape_of(obj):
-    """Best-effort shape of an array-like or a nested list."""
+    """Read an array shape or validate the rectangular shape of a nested list.
+
+    Every sibling must have the same shape. Inferring only from the first
+    child would silently drop values from longer siblings in a ragged input.
+    """
     if hasattr(obj, "shape"):
-        return tuple(int(d) for d in obj.shape)
-    dims = []
-    cur = obj
-    while isinstance(cur, list):
-        dims.append(len(cur))
-        cur = cur[0] if cur else None
-    return tuple(dims)
+        return tuple(integer_index(d) for d in obj.shape)
+    if not isinstance(obj, list):
+        return ()
+    if not obj:
+        return (0,)
+    child_shape = _shape_of(obj[0])
+    if any(_shape_of(child) != child_shape for child in itertools.islice(obj, 1, None)):
+        raise ValueError("index arrays must be rectangular, got a ragged nested list")
+    return (len(obj),) + child_shape
 
 
 def _get(obj, coord):
@@ -72,8 +79,20 @@ def _first_leaf(entry):
 
 
 def _is_bool_array(entry):
-    """True for an index-array entry whose elements are booleans."""
-    return _is_array_like(entry) and _is_bool(_first_leaf(entry))
+    """Identify boolean arrays even when empty, without importing a backend.
+
+    A declared dtype preserves the kind of an empty array. Lists have no dtype,
+    so every leaf must be boolean. Mixed lists such as ``[True, 2]`` are integer
+    indices rather than masks.
+    """
+    if not _is_array_like(entry):
+        return False
+    dtype_kind = getattr(getattr(entry, "dtype", None), "kind", None)
+    if dtype_kind is not None:
+        return dtype_kind == "b"
+    return _is_bool(_first_leaf(entry)) and all(
+        _is_bool(_get(entry, coord)) for coord in coordinates(_shape_of(entry))
+    )
 
 
 def validate_index(index, shape):
@@ -83,8 +102,8 @@ def validate_index(index, shape):
     slices, a single ``Ellipsis``, or ``None`` (newaxis). The returned tuple
     has the ellipsis expanded into full slices and integers resolved to their
     non-negative position, with ``None`` kept in place to mark an inserted
-    size 1 axis. The axis consuming entries (integers and slices) must cover
-    the tensor rank exactly.
+    size 1 axis. Integer scalars follow Python's integer index protocol. Omitted
+    trailing axes are filled with full slices, matching NumPy indexing.
     """
     if not isinstance(index, tuple):
         raise TypeError(
@@ -94,6 +113,17 @@ def validate_index(index, shape):
 
     if sum(e is Ellipsis for e in index) > 1:
         raise IndexError("an index can have at most one ellipsis '...'")
+
+    normalized = []
+    for entry in index:
+        if entry is not None and entry is not Ellipsis and not isinstance(entry, slice):
+            if not _is_bool(entry):
+                try:
+                    entry = integer_index(entry)
+                except TypeError:
+                    pass  # The validation below reports the unsupported entry.
+        normalized.append(entry)
+    index = tuple(normalized)
 
     consuming = sum(
         isinstance(e, slice) or (isinstance(e, int) and not isinstance(e, bool))
@@ -114,7 +144,7 @@ def validate_index(index, shape):
             axis += len(fill)
         elif entry is None:
             tokens.append(None)
-        elif isinstance(entry, bool):
+        elif _is_bool(entry):
             raise TypeError(f"axis {axis}: boolean indices are not supported")
         elif isinstance(entry, int):
             tokens.append(_resolve_int(entry, shape[axis], axis))
@@ -128,11 +158,7 @@ def validate_index(index, shape):
                 f"Only integers, slices, Ellipsis, and None are supported"
             )
 
-    if axis != len(shape):
-        raise ValueError(
-            f"index covers {axis} axes but tensor has rank {len(shape)}. "
-            f"Use '...' to fill the remaining axes"
-        )
+    tokens.extend(slice(None) for _ in range(len(shape) - axis))
     return tuple(tokens)
 
 
@@ -267,6 +293,8 @@ def advanced_index(shape, index):
     have any shape and broadcast against each other. Their values must support
     the integer index protocol, so floating-point values are never truncated.
     A boolean array on consecutive axes acts like its nonzero integer arrays.
+    Empty boolean dimensions select nothing, and omitted trailing axes are
+    filled with full slices.
     Newaxis and boolean scalar entries remain unsupported in this mode.
     """
     if not isinstance(index, tuple):
@@ -275,13 +303,18 @@ def advanced_index(shape, index):
 
 
 def _mask_index(shape, mask):
+    """Select a full-rank boolean mask, allowing empty mask dimensions."""
     mshape = _shape_of(mask)
-    if mshape != tuple(shape):
+    if len(mshape) != len(shape) or any(
+        size not in (0, expected) for size, expected in zip(mshape, shape)
+    ):
         raise IndexError(
             f"boolean mask shape {mshape} does not match tensor shape {tuple(shape)}"
         )
+    if not _is_bool_array(mask):
+        raise TypeError("a standalone array index must be a boolean mask")
     selected = []
-    for coord in coordinates(shape):
+    for coord in (() if 0 in mshape else coordinates(mshape)):
         value = _get(mask, coord)
         if not _is_bool(value):
             raise TypeError(
@@ -302,23 +335,15 @@ def _mask_index(shape, mask):
 
 
 def _array_index(shape, index):
-    from operator import index as integer_index
-
     ndim = len(shape)
     if sum(e is Ellipsis for e in index) > 1:
         raise IndexError("an index can have at most one ellipsis '...'")
     if any(e is None for e in index):
         raise IndexError("newaxis (None) is not supported with advanced indexing")
 
-    def boolean_array(entry):
-        # A mixed list such as [True, 2] is an integer index, not a mask.
-        return _is_bool_array(entry) and all(
-            _is_bool(_get(entry, coord)) for coord in coordinates(_shape_of(entry))
-        )
-
     def consumes(e):
         # A boolean array consumes one axis per dimension, like its nonzero arrays.
-        if boolean_array(e):
+        if _is_bool_array(e):
             return len(_shape_of(e))
         if e is Ellipsis or e is None:
             return 0
@@ -350,19 +375,19 @@ def _array_index(shape, index):
         elif isinstance(e, slice):
             entries.append(("slice", e))
             axis += 1
-        elif boolean_array(e):
+        elif _is_bool_array(e):
             # A boolean array spanning d axes acts like its nonzero integer
             # arrays: d paired index arrays selecting each True position.
             bshape_ = _shape_of(e)
             d = len(bshape_)
             expected = tuple(shape[axis:axis + d])
-            if bshape_ != expected:
+            if any(size not in (0, target) for size, target in zip(bshape_, expected)):
                 raise IndexError(
                     f"boolean index on axes {axis}..{axis + d - 1} has shape "
                     f"{format_shape(bshape_)} but the tensor axes are "
                     f"{format_shape(expected)}"
                 )
-            nz = [c for c in coordinates(bshape_) if _get(e, c)]
+            nz = [] if 0 in bshape_ else [c for c in coordinates(bshape_) if _get(e, c)]
             for col in range(d):
                 resolved = {(k,): nz[k][col] for k in range(len(nz))}
                 entries.append(("arr", ((len(nz),), resolved)))
@@ -381,11 +406,7 @@ def _array_index(shape, index):
         else:
             raise TypeError(f"axis {axis}: unsupported index entry {e!r}")
 
-    if axis != ndim:
-        raise ValueError(
-            f"index covers {axis} axes but tensor has rank {ndim}. "
-            f"Use '...' to fill the remaining axes"
-        )
+    entries.extend(("slice", slice(None)) for _ in range(ndim - axis))
 
     arr_axes = [a for a, (kind, _) in enumerate(entries) if kind == "arr"]
     # Scalar integers also participate in NumPy's advanced indexing block.

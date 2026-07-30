@@ -5,6 +5,7 @@ generates the display values used when only a shape is provided.
 """
 
 import itertools
+from operator import index as integer_index
 
 
 def extract_shape(obj):
@@ -26,8 +27,9 @@ def extract_shape(obj):
 def validate_shape(shape):
     """Validate a shape and return it as a ``tuple[int, ...]``.
 
-    The shape must be a non-empty sequence of positive integers. Any rank is
-    accepted; the layout nests frames to arbitrary depth.
+    The shape must be a non-empty sequence of positive integers. Dimensions
+    follow Python's integer index protocol and are normalized to Python ints.
+    Boolean and floating-point dimensions remain invalid. Any rank is accepted.
     """
     if not isinstance(shape, tuple):
         try:
@@ -40,13 +42,19 @@ def validate_shape(shape):
     if len(shape) == 0:
         raise ValueError("shape must have at least one dimension, got an empty shape")
 
+    normalized = []
     for dim in shape:
-        if isinstance(dim, bool) or not isinstance(dim, int):
+        if isinstance(dim, bool) or type(dim).__name__.startswith("bool"):
             raise TypeError(f"shape dimensions must be integers, got {dim!r}")
+        try:
+            dim = integer_index(dim)
+        except TypeError:
+            raise TypeError(f"shape dimensions must be integers, got {dim!r}") from None
         if dim <= 0:
             raise ValueError(f"shape dimensions must be positive, got {dim!r}")
+        normalized.append(dim)
 
-    return shape
+    return tuple(normalized)
 
 
 def coordinates(shape):
