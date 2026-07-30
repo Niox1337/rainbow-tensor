@@ -72,6 +72,9 @@ def test_refuses_unsupported():
     # mask shape must match the tensor
     with pytest.raises(IndexError):
         advanced_index((2, 3), np.array([True, False, True]))
-    # newaxis with advanced indexing
-    with pytest.raises(IndexError):
-        advanced_index((3, 4), (None, [0, 1]))
+
+
+def test_newaxis_with_advanced_indexing():
+    selected, result, _ = advanced_index((3, 4), (None, [0, 1]))
+    assert result == (1, 2, 4)
+    assert selected == [(row, column) for row in (0, 1) for column in range(4)]

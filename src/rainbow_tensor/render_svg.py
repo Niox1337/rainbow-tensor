@@ -15,8 +15,8 @@ carries an optional hover title with its coordinate and flat index.
 
 import math
 
+from .index_mapping import CompactSelection
 from .layout import build_layout
-from .selection import BasicSelection
 from .theme import LIGHT, resolve_theme
 
 # Back-compatible colour constants, sourced from the light preset so existing
@@ -270,7 +270,7 @@ def _label_element(x, y, parts):
 
 def _selection_for_render(selected):
     """Keep compact selections lazy and make explicit iterables reusable."""
-    return selected if isinstance(selected, BasicSelection) else list(selected or [])
+    return selected if isinstance(selected, CompactSelection) else list(selected or [])
 
 
 def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_tint=None):

@@ -10,11 +10,9 @@ like their nonzero integer arrays; see :func:`advanced_index`.
 """
 
 import itertools
-from math import prod
 from operator import index as integer_index
 
 from .explanations import t
-from .ops import broadcast_result_shape, broadcast_source_coord
 from .shape import coordinates, format_shape
 
 
@@ -282,201 +280,19 @@ def is_advanced(index, shape):
 
 
 def advanced_index(shape, index):
-    """Compute selection, result shape, and explanation for advanced indexing.
+    """Materialize unique source highlights for a supported advanced index.
 
-    Returns ``(selected_coords, result_shape, explanation_lines)``. A standalone
-    boolean mask of matching shape selects every True position. Integer index
-    arrays gather coordinates and follow NumPy: integer scalars and arrays form
-    one indexing block. Its broadcast axes stay in place when the block is
-    contiguous and move to the front when a slice or ellipsis separates it.
-    Even an ellipsis that consumes no axes separates the block. Index arrays may
-    have any shape and broadcast against each other. Their values must support
-    the integer index protocol, so floating-point values are never truncated.
-    A boolean array on consecutive axes acts like its nonzero integer arrays.
-    Empty boolean dimensions select nothing, and omitted trailing axes are
-    filled with full slices.
-    Newaxis and boolean scalar entries remain unsupported in this mode.
+    Returns ``(selected_coords, result_shape, explanation_lines)`` and retains
+    the historical list return type. Arrays broadcast with NumPy's axis placement,
+    including integer scalars, slices, ellipsis, and ``None``. Boolean masks may
+    span consecutive source axes. Boolean scalar indices remain unsupported.
+
+    This compatibility helper explicitly enumerates the source selection. Views
+    should use :class:`rainbow_tensor.index_mapping.IndexMapping` to resolve
+    individual result coordinates and query compact highlights without expanding
+    slice products. Repeated output picks are preserved by that mapping separately.
     """
-    if not isinstance(index, tuple):
-        return _mask_index(shape, index)
-    return _array_index(shape, index)
+    from .index_mapping import IndexMapping
 
-
-def _mask_index(shape, mask):
-    """Select a full-rank boolean mask, allowing empty mask dimensions."""
-    mshape = _shape_of(mask)
-    if len(mshape) != len(shape) or any(
-        size not in (0, expected) for size, expected in zip(mshape, shape)
-    ):
-        raise IndexError(
-            f"boolean mask shape {mshape} does not match tensor shape {tuple(shape)}"
-        )
-    if not _is_bool_array(mask):
-        raise TypeError("a standalone array index must be a boolean mask")
-    selected = []
-    for coord in (() if 0 in mshape else coordinates(mshape)):
-        value = _get(mask, coord)
-        if not _is_bool(value):
-            raise TypeError(
-                "a standalone array index must be a boolean mask; got value of "
-                f"type {type(value).__name__}"
-            )
-        if value:
-            selected.append(coord)
-    result = (len(selected),)
-    plural = "s" if len(selected) != 1 else ""
-    explanation = [
-        t("common.original_shape", shape=format_shape(shape)),
-        t("index.mask"),
-        t("index.mask_keeps", count=len(selected), plural=plural),
-        t("common.result_shape", shape=format_shape(result)),
-    ]
-    return selected, result, explanation
-
-
-def _array_index(shape, index):
-    ndim = len(shape)
-    if sum(e is Ellipsis for e in index) > 1:
-        raise IndexError("an index can have at most one ellipsis '...'")
-    if any(e is None for e in index):
-        raise IndexError("newaxis (None) is not supported with advanced indexing")
-
-    def consumes(e):
-        # A boolean array consumes one axis per dimension, like its nonzero arrays.
-        if _is_bool_array(e):
-            return len(_shape_of(e))
-        if e is Ellipsis or e is None:
-            return 0
-        return 1
-
-    consuming = sum(consumes(e) for e in index)
-    if consuming > ndim:
-        raise IndexError(
-            f"too many indices for tensor of rank {ndim}: {consuming} axes indexed"
-        )
-    fill = ndim - consuming
-
-    # One ("int"|"slice"|"arr", value) entry per source axis, in axis order.
-    entries = []
-    axis = 0
-    for e in index:
-        if _is_array_like(e):
-            dtype_kind = getattr(getattr(e, "dtype", None), "kind", None)
-            if dtype_kind is not None and dtype_kind not in "biu":
-                raise IndexError("index arrays must have an integer or boolean dtype")
-        if e is Ellipsis:
-            entries.extend(("slice", slice(None)) for _ in range(fill))
-            axis += fill
-        elif _is_bool(e):
-            raise TypeError(f"axis {axis}: boolean scalar indices are not supported")
-        elif not _is_array_like(e) and hasattr(e, "__index__"):
-            entries.append(("int", _resolve_int(integer_index(e), shape[axis], axis)))
-            axis += 1
-        elif isinstance(e, slice):
-            entries.append(("slice", e))
-            axis += 1
-        elif _is_bool_array(e):
-            # A boolean array spanning d axes acts like its nonzero integer
-            # arrays: d paired index arrays selecting each True position.
-            bshape_ = _shape_of(e)
-            d = len(bshape_)
-            expected = tuple(shape[axis:axis + d])
-            if any(size not in (0, target) for size, target in zip(bshape_, expected)):
-                raise IndexError(
-                    f"boolean index on axes {axis}..{axis + d - 1} has shape "
-                    f"{format_shape(bshape_)} but the tensor axes are "
-                    f"{format_shape(expected)}"
-                )
-            nz = [] if 0 in bshape_ else [c for c in coordinates(bshape_) if _get(e, c)]
-            for col in range(d):
-                resolved = {(k,): nz[k][col] for k in range(len(nz))}
-                entries.append(("arr", ((len(nz),), resolved)))
-            axis += d
-        elif _is_array_like(e):
-            ishape = _shape_of(e)
-            resolved = {}
-            for c in coordinates(ishape):
-                try:
-                    value = integer_index(_get(e, c))
-                except TypeError:
-                    raise IndexError("index arrays must contain integers") from None
-                resolved[c] = _resolve_int(value, shape[axis], axis)
-            entries.append(("arr", (ishape, resolved)))
-            axis += 1
-        else:
-            raise TypeError(f"axis {axis}: unsupported index entry {e!r}")
-
-    entries.extend(("slice", slice(None)) for _ in range(ndim - axis))
-
-    arr_axes = [a for a, (kind, _) in enumerate(entries) if kind == "arr"]
-    # Scalar integers also participate in NumPy's advanced indexing block.
-    # Inspect the original tokens so a zero-width ellipsis still separates it.
-    block_positions = [
-        i for i, entry in enumerate(index)
-        if entry is not Ellipsis and not isinstance(entry, slice)
-    ]
-    between = index[block_positions[0]:block_positions[-1] + 1]
-    contiguous = not any(e is Ellipsis or isinstance(e, slice) for e in between)
-
-    # The index arrays broadcast together to one block of axes, just like NumPy.
-    ishapes = [entries[a][1][0] for a in arr_axes]
-    try:
-        bshape = broadcast_result_shape(ishapes)
-    except ValueError:
-        raise IndexError(
-            f"index arrays could not be broadcast together: shapes "
-            f"{[format_shape(s) for s in ishapes]}"
-        ) from None
-
-    slice_axes = [a for a, (kind, _) in enumerate(entries) if kind == "slice"]
-    slice_pos = {a: expand_slice(entries[a][1], shape[a]) for a in slice_axes}
-
-    if contiguous:
-        result = []
-        placed = False
-        for axis_, (kind, _) in enumerate(entries):
-            if kind == "slice":
-                result.append(len(slice_pos[axis_]))
-            elif kind == "arr" and not placed:
-                result.extend(bshape)
-                placed = True
-        result_shape_ = tuple(result)
-    else:
-        result_shape_ = tuple(bshape) + tuple(len(slice_pos[a]) for a in slice_axes)
-
-    selected = []
-    seen = set()
-    for bidx in coordinates(bshape):
-        fixed = {}
-        for a, (kind, value) in enumerate(entries):
-            if kind == "int":
-                fixed[a] = value
-            elif kind == "arr":
-                ishape, resolved = value
-                fixed[a] = resolved[broadcast_source_coord(bidx, ishape)]
-        for combo in itertools.product(*[slice_pos[a] for a in slice_axes]):
-            full = dict(fixed)
-            full.update(zip(slice_axes, combo))
-            key = tuple(full[a] for a in range(ndim))
-            if key not in seen:
-                seen.add(key)
-                selected.append(key)
-
-    count = prod(bshape)
-    axes_text = ", ".join(str(a) for a in arr_axes)
-    explanation = [
-        t("common.original_shape", shape=format_shape(shape)),
-        t("common.index", index=format_index(index)),
-        t("index.arrays"),
-        t(
-            "index.gather",
-            axes=axes_text,
-            count=count,
-            plural="s" if count != 1 else "",
-            shape=format_shape(bshape),
-        ),
-    ]
-    if not contiguous:
-        explanation.append(t("index.slice_separates"))
-    explanation.append(t("common.result_shape", shape=format_shape(result_shape_)))
-    return selected, result_shape_, explanation
+    mapping = IndexMapping(shape, index)
+    return list(mapping.selection), mapping.result_shape, mapping.explanation
