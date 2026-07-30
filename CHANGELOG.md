@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+### Added
+
+- `index(..., show_result=True)` compares the source with the ordered result, including repeated picks, reverse slices, scalar results, and empty results
+- `visual.index_mapping` resolves result positions back to the original source without constructing the indexed tensor
+- `focus` and bounded coordinate traces explain one output of sum, mean, matmul, and einsum
+- Optional `explore` notebook controls update a focused output and retain the latest static visual for SVG export
+- `memory` reports available byte strides, contiguity, and ownership metadata
+- CPU backend contract jobs validate PyTorch, JAX, and TensorFlow independently
+
+### Changed
+
+- Basic and advanced source selections are compact iterables. Explicit list conversion materializes coordinates. `index_mapping.result_count` counts output positions including repeats, while the lower-level `advanced_index` helper continues to return a list
+- Reduction values are evaluated only when requested. `max_terms` defaults to 10,000 per output cell and skipped values appear as question marks
+- Numerical previews explicitly describe Python scalar arithmetic and distinguish array values from generated placeholders. Backend accumulation dtype, rounding, and overflow can differ
+- Shapes and basic indices accept the integer index protocol. Omitted trailing axes become full slices, and advanced indexing supports inserted `None` axes
+
+### Fixed
+
+- Ragged index lists are rejected instead of losing values, and empty boolean masks retain their type and axis consumption
+- Advanced-index axis placement follows scalar, slice, and ellipsis ordering
+- Einsum accepts singleton broadcasting across operands while keeping diagonal dimensions strict
+- Valid zero-byte dtype metadata remains visible in memory explanations
+
 ## 1.0.1
 
 ### Changed
