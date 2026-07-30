@@ -283,6 +283,8 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     is an optional function mapping a coordinate to a ``(fill, border)`` pair,
     used to colour each result cell by the operand it came from.
     """
+    if 0 in shape:
+        return _render_empty_body(theme)
     has_selection = bool(selected_list)
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
 
@@ -306,6 +308,24 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
         tint = cell_tint(cell.coord) if cell_tint and cell.coord is not None else None
         parts.append(_render_cell(cell, has_selection, theme, precision, hover, tint))
     return "".join(parts), layout.width, layout.height, theme
+
+
+def _render_empty_body(theme):
+    """Identify an empty result without inventing a cell or reading its values."""
+    padding = theme.padding
+    width = max(160, 2 * padding + 2 * theme.cell_w)
+    height = 2 * padding + theme.cell_h + 2 * theme.row_pad
+    body = (
+        f'<g role="note" aria-label="Empty result, no elements">'
+        f'<rect x="{padding:.0f}" y="{padding:.0f}" '
+        f'width="{width - 2 * padding:.0f}" height="{height - 2 * padding:.0f}" '
+        f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{theme.neutral}" '
+        f'stroke-width="{theme.frame_width}" stroke-dasharray="4 4"/>'
+        f'<text x="{width / 2:.0f}" y="{height / 2:.0f}" text-anchor="middle" '
+        f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
+        f'fill="{theme.text_muted}">No elements</text></g>'
+    )
+    return body, width, height, theme
 
 
 def render_svg(

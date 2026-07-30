@@ -75,6 +75,7 @@ def test_empty_result_svg_has_no_fabricated_value_cells():
     root = ET.fromstring(visual.svg)
     titles = root.findall(".//{http://www.w3.org/2000/svg}title")
     assert len(titles) == 12  # Only the source has values.
+    assert "No elements" in visual.svg
     assert "The result is empty" in visual.text
 
 
