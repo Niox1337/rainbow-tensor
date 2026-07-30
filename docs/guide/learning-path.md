@@ -93,7 +93,7 @@ values were not evaluated. A partial sum is never presented as a full result.
 
 ```python
 rt.sum((2, 100_000), axis=1)      # show the relation without the long sum
-rt.sum(a, axis=1, max_terms=None) # explicitly allow exact evaluation
+rt.sum(a, axis=1, max_terms=None) # evaluate every term using Python scalars
 ```
 
 For a runnable walkthrough, open

@@ -82,6 +82,26 @@ for a mean. The trace preserves repeated factors caused by broadcasting.
 It stores at most eight terms and reports `complete=False` when more exist.
 This bounded coordinate description does not evaluate the numeric result.
 
+## Understand the numerical model
+
+These figures explain coordinates and arithmetic using Python scalar values.
+They do not call a framework's native reduction or matrix multiplication kernel.
+Backend accumulation dtype, rounding, and overflow can therefore differ.
+
+```python
+x = np.array([1e8, 1, -1e8], dtype=np.float32)
+visual = rt.sum(x, axis=0)
+visual                           # Python-scalar preview: 1.0
+np.sum(x)                        # NumPy float32 accumulation: 0.0
+visual.metadata["numeric_semantics"]
+```
+
+The metadata reports `arithmetic="python_scalar"` and one `operand_sources`
+entry per operand. `array_values` means values read from the input array.
+`generated_values` means row-major placeholders generated from a shape tuple.
+The figure states this model even when a computation is skipped. Use the original
+framework operation when you need its native numerical result.
+
 ## Separate display and computation limits
 
 Reductions evaluate requested output groups on demand and reuse their values
