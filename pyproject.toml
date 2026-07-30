@@ -33,6 +33,7 @@ dev = [
     "ruff>=0.1",
     "build>=1.0",
 ]
+interactive = ["ipywidgets>=8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

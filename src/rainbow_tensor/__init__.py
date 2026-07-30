@@ -16,6 +16,7 @@ Public API:
 """
 
 from .explanations import get_language, set_language
+from .interactive import FocusExplorer, explore
 from .memory import memory
 from .renderers import (
     SVG,
@@ -81,6 +82,8 @@ __all__ = [
     "TensorVisual",
     "OperandRef",
     "OutputTrace",
+    "explore",
+    "FocusExplorer",
     "SvgRenderer",
     "SVG",
     "get_default_renderer",

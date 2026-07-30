@@ -1,0 +1,148 @@
+"""Notebook controls keep static focus behavior and computation limits intact."""
+
+import builtins
+import subprocess
+import sys
+
+import numpy as np
+import pytest
+
+import rainbow_tensor as rt
+
+
+@pytest.fixture
+def explorers():
+    pytest.importorskip("ipywidgets")
+    created = []
+
+    def make(operation, *args, **kwargs):
+        explorer = rt.explore(operation, *args, **kwargs)
+        created.append(explorer)
+        return explorer
+
+    yield make
+    for explorer in created:
+        explorer.close()
+
+
+def test_static_import_does_not_load_widgets():
+    code = (
+        "import sys\nimport rainbow_tensor as rt\n"
+        "rt.shape((2, 3))\nassert 'ipywidgets' not in sys.modules\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
+
+
+def test_missing_widgets_gives_install_instruction(monkeypatch):
+    original = builtins.__import__
+
+    def without_widgets(name, *args, **kwargs):
+        if name == "ipywidgets":
+            raise ModuleNotFoundError("ipywidgets")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_widgets)
+    with pytest.raises(ImportError, match=r"rainbow-tensor\[interactive\]"):
+        rt.explore(rt.sum, (2, 3), axis=1)
+
+
+def test_unsupported_operation_is_rejected():
+    with pytest.raises(ValueError, match="supports"):
+        rt.explore(rt.shape, (2, 3))
+
+
+def test_button_changes_focus_and_preserves_static_export(explorers, tmp_path):
+    a = np.arange(6).reshape(2, 3)
+    b = np.arange(12).reshape(3, 4)
+    explorer = explorers(rt.matmul, a, b)
+    explorer.coordinates[0].value = 1
+    explorer.coordinates[1].value = 2
+    explorer.update_button.click()
+    assert explorer.focus == (1, 2)
+    assert explorer.visual.trace.output_coord == (1, 2)
+    assert explorer.visual.svg == rt.matmul(a, b, focus=(1, 2)).svg
+    path = tmp_path / "focused.svg"
+    explorer.visual.save(path)
+    assert path.read_text(encoding="utf-8") == explorer.visual.svg
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+def test_negative_focus_and_mutated_values_are_refreshed(explorers, operation):
+    array = np.arange(6).reshape(2, 3)
+    explorer = explorers(operation, array, axis=1)
+    old = explorer.visual.svg
+    array[1] = [10, 20, 30]
+    visual = explorer.set_focus((-1,))
+    assert explorer.focus == (1,)
+    assert visual.svg == operation(array, axis=1, focus=(1,)).svg
+    assert visual.svg != old
+
+
+def test_scalar_result_has_no_coordinate_controls(explorers):
+    explorer = explorers(rt.einsum, "i,i->", (3,), (3,))
+    assert explorer.coordinates == ()
+    explorer.update_button.click()
+    assert explorer.visual.trace.output_coord == ()
+
+
+def test_budget_is_not_relaxed_by_interaction(explorers):
+    explorer = explorers(rt.matmul, (2, 1_000_000), (1_000_000, 2), max_terms=10)
+    visual = explorer.set_focus((1, 1))
+    assert visual.metadata["value_evaluation"]["status"] == "skipped"
+    assert visual.metadata["value_evaluation"]["max_terms"] == 10
+    assert len(visual.trace.terms) == 8
+
+
+def test_invalid_python_update_preserves_visual(explorers):
+    explorer = explorers(rt.sum, (2, 3), axis=1)
+    before = explorer.visual
+    with pytest.raises(IndexError):
+        explorer.set_focus((2,))
+    assert explorer.visual is before
+    assert explorer.focus == (0,)
+
+
+def test_button_error_preserves_visual(explorers):
+    array = np.arange(6).reshape(2, 3)
+    explorer = explorers(rt.sum, array, axis=1)
+    before = explorer.visual
+    array.shape = (3, 2)
+    explorer.update_button.click()
+    assert explorer.visual is before
+    assert "output shape changed" in explorer.status.value
+
+
+def test_closed_explorer_rejects_updates(explorers):
+    explorer = explorers(rt.sum, (2, 3), axis=1)
+    layout = explorer.widget.layout
+    style = explorer.update_button.style
+    explorer.close()
+    explorer.close()
+    assert layout.comm is None
+    assert style.comm is None
+    with pytest.raises(RuntimeError, match="closed"):
+        explorer.set_focus((1,))
+
+
+def test_changed_default_renderer_cannot_replace_svg_with_plain_text(explorers):
+    class TextRenderer:
+        name = "interactive-test-text"
+        mime_type = "text/plain"
+
+        def render_tensor(self, **kwargs):
+            return "plain tensor"
+
+        def render_panels(self, **kwargs):
+            return "plain panels"
+
+    explorer = explorers(rt.sum, (2, 3), axis=1)
+    before = explorer.visual
+    original = rt.get_default_renderer()
+    try:
+        rt.set_default_renderer(TextRenderer())
+        with pytest.raises(ValueError, match="SVG renderer"):
+            explorer.set_focus((1,))
+        assert explorer.visual is before
+        assert explorer.focus == (0,)
+    finally:
+        rt.set_default_renderer(original)
