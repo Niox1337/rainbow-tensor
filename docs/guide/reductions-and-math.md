@@ -81,3 +81,28 @@ Multiply references in each term, add the terms, then divide by `divisor`
 for a mean. The trace preserves repeated factors caused by broadcasting.
 It stores at most eight terms and reports `complete=False` when more exist.
 This bounded coordinate description does not evaluate the numeric result.
+
+## Separate display and computation limits
+
+Reductions evaluate requested output groups on demand and reuse their values
+within one render. Hidden output groups do not trigger reads. Matmul and einsum
+also compute values on demand.
+
+All four functions accept `max_terms=10_000`, the maximum number of source
+contributions or products to sum for each output cell. If the count exceeds the
+limit, the output displays `?` and no partial arithmetic result is used.
+Set `max_terms=None` to allow full evaluation explicitly.
+
+```python
+visual = rt.einsum("ij,jk->ik", (2, 1_000_000), (1_000_000, 2), focus=(1, 1))
+visual.metadata["value_evaluation"]["status"]  # "skipped"
+visual.trace.term_count                       # 1_000_000
+```
+
+When a contraction is skipped, source highlights may show only the bounded
+trace sample. The explanation states that sampling was used. Source cells that
+are actually visible are still read to draw the input panels.
+
+This is a per-output limit, not a total memory or time limit. A term in a
+multi-operand einsum may read several operands. The separate theme option
+`max_visible_cells` limits the number of displayed cells in each panel.

@@ -76,6 +76,13 @@ rt.shape(torch.arange(6).reshape(2, 3))
 rt.shape(jnp.arange(6).reshape(2, 3))
 ```
 
+The CPU contract suite compares index, reshape, transpose, sum, mean, matmul,
+and einsum values with NumPy for integer, floating-point, and transposed
+inputs. Separate CI jobs install PyTorch, JAX, and TensorFlow explicitly.
+A missing required framework fails its job rather than skipping it.
+Local runs may skip frameworks that are not installed. GPU transfers, compiled
+tracers, and framework-specific accumulation dtypes are outside this contract.
+
 ## Renderers
 
 SVG is the default renderer. A custom renderer can be registered for other

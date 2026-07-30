@@ -57,6 +57,33 @@ x = np.arange(20).reshape(4, 5)
 rt.index(x, ([0, 2, 3], [1, 4, 0]))
 ```
 
+Integer scalars participate in the gathered block. If a slice or ellipsis
+separates them from integer arrays, the gathered axes move to the front.
+Even an ellipsis that fills zero axes can affect this ordering.
+Floating-point index arrays are rejected rather than rounded or truncated.
+
+## Large basic selections
+
+Basic indexing stores source-axis ranges, so a large selection does not need
+a list of every coordinate before drawing its preview.
+
+```python
+visual = rt.index((1_000_000, 1_000_000), (Ellipsis,))
+visual.selected.count            # 1_000_000_000_000
+visual.selected[0]               # (0, 0)
+(10, 20) in visual.selected      # True
+```
+
+`visual.selected` supports lazy iteration, integer lookup, and explicit slices.
+Use `.count` for selections larger than Python's `len` limit. Converting the
+selection to a list still materializes it, so reserve that for small examples.
+The lower-level `selected_coordinates` helper continues to return a list.
+
+Advanced index arrays and masks currently materialize their selected source
+coordinates. Their highlights represent unique source positions, so repeated
+indices do not create duplicate source cells in the picture. Mixing `None`
+with advanced indexing and boolean scalar indices remains unsupported.
+
 ## Clear errors
 
 An out of range index points at the offending axis instead of failing deep

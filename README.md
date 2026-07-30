@@ -53,6 +53,8 @@ Shape changing, combining, and broadcasting views draw the source and the result
 - **Reshaping and moving axes** with `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, and `expand_dims`
 - **Reductions and math** with `sum`, `mean`, `matmul`, and `einsum`
 - **Combining** with `concatenate`, `stack`, `broadcast`, `repeat`, and `take`
+- **Output explanations** with `focus=` on sums, means, matmul, and einsum
+- **Memory layout** with `memory`, including byte strides and data ownership
 
 ```python
 rt.sum(np.arange(12).reshape(3, 4), 0)
@@ -65,6 +67,34 @@ rt.einsum("ij,jk->ik", np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4))
 ```
 
 ![Einsum ij and jk to ik](examples/images/einsum_ij_jk_ik.svg)
+
+## Follow one output
+
+Choose an output coordinate to highlight its contributing source cells and
+read the corresponding formula.
+
+```python
+a = np.arange(6).reshape(2, 3)
+b = np.arange(12).reshape(3, 4)
+
+visual = rt.matmul(a, b, focus=(1, 2))
+visual                             # highlights 3 * 2 + 4 * 6 + 5 * 10 = 80
+visual.trace.terms                 # ordered, inspectable source references
+rt.mean(a, axis=1, focus=(-1,))     # follow the last row
+rt.memory(a.T)                     # explain strides and storage ownership
+```
+
+Start with [the learning guide](docs/guide/learning-path.md) or run
+[`07_explaining_outputs.ipynb`](examples/07_explaining_outputs.ipynb).
+
+## Keep previews small
+
+Basic slice selections store ranges instead of expanding every selected
+coordinate. Reductions compute only the output groups a renderer requests.
+Math views also accept `max_terms`, defaulting to 10,000 terms per output cell.
+When a calculation exceeds that limit, the output shows `?` with an explanation
+instead of performing a partial calculation. Use `max_terms=None` to opt into
+full evaluation.
 
 ## Themes
 

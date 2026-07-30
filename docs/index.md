@@ -47,6 +47,8 @@ figure, so the package stays inspectable and testable outside a notebook.
 The user guide walks through each feature group in order, mirroring the runnable
 notebooks in the `examples` folder.
 
+- [Learning path](guide/learning-path) follows one output through its source
+  terms, compares a sum with a mean, and introduces memory layout
 - [Shapes](guide/shapes) draws a tensor and explains the colour scheme, float
   precision, saving, and big tensor previews
 - [Indexing](guide/indexing) covers integers, slices, ellipsis, new axes,
@@ -67,6 +69,7 @@ notebooks in the `examples` folder.
 :caption: User guide
 :hidden:
 
+guide/learning-path
 guide/shapes
 guide/indexing
 guide/reshaping
