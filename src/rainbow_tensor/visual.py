@@ -26,6 +26,7 @@ class TensorVisual:
     Unknown metadata is explicit rather than inferred from a shape.
     Math views also attach a bounded, immutable ``trace`` describing one output.
     Other views leave ``trace`` as ``None``.
+    Index views attach an ``index_mapping`` for ordered output-to-source lookup.
     """
 
     def __init__(
@@ -51,6 +52,7 @@ class TensorVisual:
         self.mime_type = mime_type
         self.metadata = dict(metadata) if metadata is not None else {}
         self.trace = trace
+        self.index_mapping = None
 
     def _repr_svg_(self):
         if self.mime_type == "image/svg+xml":
