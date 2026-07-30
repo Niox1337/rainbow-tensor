@@ -45,6 +45,17 @@ def trace_value(trace, arrays):
     ) / trace.divisor
 
 
+def test_focus_equations_use_the_same_names_as_the_visible_panels():
+    """A learner can match every factor in the equation to a labelled panel."""
+    matrix = rt.matmul((2, 3), (3, 4), focus=(1, 2))
+    reduction = rt.mean((2, 3), 1, focus=(1,))
+    contraction = rt.einsum("ij,jk->ik", (2, 3), (3, 4), focus=(1, 2))
+
+    assert "A[1, 0] * B[0, 2]" in matrix.text
+    assert "(source[1, 0] + source[1, 1] + source[1, 2]) / 3" in reduction.text
+    assert "operand 0[1, 0] * operand 1[0, 2]" in contraction.text
+
+
 @pytest.mark.parametrize("operation", [rt.sum, rt.mean])
 @pytest.mark.parametrize("axis", [1, -2])
 def test_reduction_focus_tracks_sources_and_preserves_group_tints(operation, axis):

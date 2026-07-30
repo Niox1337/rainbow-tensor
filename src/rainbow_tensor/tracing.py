@@ -88,8 +88,17 @@ def _trace_explanation(trace):
     def subscript(coordinate):
         return ", ".join(map(str, coordinate)) if coordinate else "()"
 
+    def operand_name(operand):
+        if trace.operation == "matmul":
+            return ("A", "B")[operand]
+        if trace.operation in ("sum", "mean"):
+            return "source"
+        return f"operand {operand}"
+
     expression = " + ".join(
-        " * ".join(f"operand {ref.operand}[{subscript(ref.coordinate)}]" for ref in term)
+        " * ".join(
+            f"{operand_name(ref.operand)}[{subscript(ref.coordinate)}]" for ref in term
+        )
         for term in trace.terms
     )
     if not trace.complete:
