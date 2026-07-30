@@ -41,6 +41,14 @@ Result object
 .. autoclass:: OperandRef
    :members:
 
+Notebook controls
+-----------------
+
+.. autofunction:: explore
+
+.. autoclass:: FocusExplorer
+   :members:
+
 Renderers
 ---------
 

@@ -87,6 +87,21 @@ rt.memory(a.T)                     # explain strides and storage ownership
 Start with [the learning guide](docs/guide/learning-path.md) or run
 [`07_explaining_outputs.ipynb`](examples/07_explaining_outputs.ipynb).
 
+## Compare an index with its result
+
+```python
+x = np.array([10, 20, 30])
+rt.index(x, ([2, 0, 2],), show_result=True)  # source -> [30, 10, 30]
+```
+
+The comparison keeps source colours and highlights the result. Repeated picks
+stay repeated, and reverse slices retain their order. See the
+[indexing guide](docs/guide/indexing.md) for output-to-source coordinate lookup.
+
+For optional notebook controls, install `rainbow-tensor[interactive]` and use
+`rt.explore(rt.matmul, a, b, focus=(1, 2))`. The
+[interactive guide](docs/guide/interactive.md) covers coordinate updates and export.
+
 ## Keep previews small
 
 Basic slice selections store ranges instead of expanding every selected
@@ -95,6 +110,10 @@ Math views also accept `max_terms`, defaulting to 10,000 terms per output cell.
 When a calculation exceeds that limit, the output shows `?` with an explanation
 instead of performing a partial calculation. Use `max_terms=None` to opt into
 full evaluation.
+
+Numerical previews use Python scalar arithmetic. Accumulation dtype, rounding,
+and overflow can differ from a framework's native kernels. Each math view
+explains that model and identifies any generated placeholder operands.
 
 ## Themes
 

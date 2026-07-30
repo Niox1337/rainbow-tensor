@@ -63,6 +63,8 @@ notebooks in the `examples` folder.
   global axis colours, backend arrays, and renderers
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
+- [Interactive focus](guide/interactive) adds optional keyboard controls and
+  keeps the latest result available for static export
 
 ```{toctree}
 :maxdepth: 2
@@ -77,6 +79,7 @@ guide/reductions-and-math
 guide/combining
 guide/themes-and-configuration
 guide/memory
+guide/interactive
 ```
 
 ```{toctree}
