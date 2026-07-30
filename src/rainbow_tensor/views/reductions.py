@@ -8,6 +8,7 @@ that fold into each result group.
 import builtins
 from functools import cache
 
+from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
 from ..explanations import t
 from ..ops import (
     matmul_result_shape,
@@ -16,6 +17,7 @@ from ..ops import (
 )
 from ..ops.reductions import iter_matmul_source_terms
 from ..renderers import resolve_renderer
+from ..selection import BasicSelection
 from ..shape import extract_shape, flat_index, format_shape
 from ..theme import resolve_theme
 from ..tracing import _build_trace, _normalize_focus, _trace_explanation
@@ -33,7 +35,9 @@ from ..visual import (
 _py_sum = builtins.sum
 
 
-def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
+def matmul(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+):
     """Visualise a matrix multiplication ``a @ b``.
 
     ``a`` and ``b`` are array-likes or shape tuples. Vector, matrix, and batched
@@ -46,6 +50,12 @@ def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
     ``focus`` selects an output coordinate instead of the first one. Negative
     indices are supported and a scalar output uses ``()``. ``visual.trace``
     records up to eight ordered source terms without reading array values.
+
+    ``max_terms`` limits contraction terms per output cell, defaulting to
+    10,000. Outputs that exceed it display ``?`` without partial evaluation.
+    Pass ``None`` to evaluate every term. Source previews and coordinate traces
+    remain available when numerical output is skipped. Evaluation details are
+    stored in ``visual.metadata["value_evaluation"]``.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -53,11 +63,15 @@ def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
     b_shape = extract_shape(b)
     result = matmul_result_shape(a_shape, b_shape)
     focused = _normalize_focus(focus, result)
+    evaluation = value_evaluation(a_shape[-1], max_terms)
     display_result = result or (1,)
     a_value = _source_value(a, a_shape)
     b_value = _source_value(b, b_shape)
 
+    @cache
     def result_value(coord):
+        if evaluation["status"] == "skipped":
+            return "?"
         out_coord = () if not result else coord
         terms = iter_matmul_source_terms(out_coord, a_shape, b_shape)
         return _py_sum(a_value(ac) * b_value(bc) for ac, bc in terms)
@@ -65,7 +79,10 @@ def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
     trace = _build_trace(
         "matmul", focused, a_shape[-1], iter_matmul_source_terms(focused, a_shape, b_shape)
     )
-    terms0 = list(iter_matmul_source_terms(focused, a_shape, b_shape))
+    if evaluation["status"] == "skipped":
+        terms0 = [tuple(ref.coordinate for ref in term) for term in trace.terms]
+    else:
+        terms0 = list(iter_matmul_source_terms(focused, a_shape, b_shape))
     a_selected = sorted({ac for ac, _ in terms0})
     b_selected = sorted({bc for _, bc in terms0})
     result_selected = [focused or (0,)]
@@ -98,6 +115,7 @@ def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
             "The highlighted row and column combine into the focused output element."
         ),
     ] + _preview_explanation([a_shape, b_shape, display_result], theme)
+    explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -132,10 +150,11 @@ def matmul(a, b, theme=None, precision=2, renderer=None, *, focus=None):
         content, a_shape, renderer, selected=a_selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["value_evaluation"] = evaluation
     return visual
 
 
-def _reduce(array, axis, op_name, theme, precision, renderer, focus=None):
+def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
     """Render a reduction without evaluating hidden output groups.
 
     Each requested output coordinate is evaluated once per visual. A second
@@ -150,11 +169,13 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus=None):
     focused = _normalize_focus(focus, result)
     source_value = _source_value(array, shape)
     axis = axis + len(shape) if axis < 0 else axis
+    evaluation = value_evaluation(shape[axis], max_terms)
 
     # Mark the source elements that collapse into the focused result element, and
     # tint every other group so values that fold into the same result share one
     # background while the focused group stays clearly highlighted.
-    selected = list(reduce_source_coords(focused, shape, axis))
+    source_index = focused[:axis] + (slice(None),) + focused[axis:]
+    selected = BasicSelection(shape, source_index)
     focused_group = flat_index(focused, result) if result else 0
     trace = _build_trace(
         op_name, focused, shape[axis],
@@ -198,6 +219,8 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus=None):
     @cache
     def result_value(coord):
         """Evaluate one visible group using a streaming sum of source values."""
+        if evaluation["status"] == "skipped":
+            return "?"
         rc = () if not result else coord
         total = _py_sum(source_value(sc) for sc in reduce_source_coords(rc, shape, axis))
         return total / shape[axis] if op_name == "mean" else total
@@ -212,6 +235,7 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus=None):
             "and the focused group is highlighted."
         ),
     ] + _preview_explanation([shape, disp], theme)
+    explanation.extend(evaluation_explanation(evaluation))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -240,10 +264,13 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus=None):
         content, shape, renderer, selected=selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["value_evaluation"] = evaluation
     return visual
 
 
-def sum(array, axis, theme=None, precision=2, renderer=None, *, focus=None):
+def sum(
+    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+):
     """Visualise a sum reduction over ``axis``.
 
     The source panel marks the elements that collapse into the first result
@@ -253,11 +280,18 @@ def sum(array, axis, theme=None, precision=2, renderer=None, *, focus=None):
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.
     ``visual.trace`` retains up to eight ordered source terms for that output.
+
+    ``max_terms`` limits source terms per output cell, defaulting to 10,000.
+    Longer reductions show ``?`` instead of evaluating a partial sum. Set it
+    to ``None`` to evaluate every term. The coordinate selection stays compact,
+    and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
-    return _reduce(array, axis, "sum", theme, precision, renderer, focus)
+    return _reduce(array, axis, "sum", theme, precision, renderer, focus, max_terms)
 
 
-def mean(array, axis, theme=None, precision=2, renderer=None, *, focus=None):
+def mean(
+    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+):
     """Visualise a mean reduction over ``axis``.
 
     The source panel marks the elements that collapse into the first result
@@ -267,5 +301,10 @@ def mean(array, axis, theme=None, precision=2, renderer=None, *, focus=None):
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.
     ``visual.trace`` retains up to eight terms and the mean's divisor.
+
+    ``max_terms`` limits source terms per output cell, defaulting to 10,000.
+    Longer reductions show ``?`` instead of evaluating a partial mean. Set it
+    to ``None`` to evaluate every term. The coordinate selection stays compact,
+    and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
-    return _reduce(array, axis, "mean", theme, precision, renderer, focus)
+    return _reduce(array, axis, "mean", theme, precision, renderer, focus, max_terms)

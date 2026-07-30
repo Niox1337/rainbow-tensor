@@ -7,6 +7,9 @@ It is self contained apart from the shared rendering substrate in
 on the shared caption helper the other families use.
 """
 
+from functools import cache
+
+from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
 from ..explanations import t
 from ..ops import (
     einsum_contracted_labels,
@@ -116,9 +119,12 @@ def _einsum_caption_parts(name, labels, shape, theme, label_colors):
     return parts
 
 
-def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
-    """Build a value function for the einsum output panel."""
+def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values, evaluation):
+    """Compute complete visible outputs once, or show unknown values when skipped."""
+    @cache
     def result_value(coord):
+        if evaluation["status"] == "skipped":
+            return "?"
         output_coord = () if not output_axes else coord
         total = 0
         for source_coords in einsum_source_terms(input_axes, output_axes, shapes, output_coord):
@@ -131,7 +137,10 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values):
     return result_value
 
 
-def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=None):
+def einsum(
+    subscripts, *arrays, theme=None, precision=2, renderer=None, focus=None,
+    max_terms=DEFAULT_MAX_TERMS,
+):
     """Visualise an einsum expression.
 
     Each operand is drawn with its subscript labels. Every label keeps one
@@ -143,6 +152,12 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
     and ``()`` required for a scalar output. Supplying it highlights that output
     and its input factors. ``visual.trace`` records the first eight ordered
     terms, including repeated factors introduced by singleton broadcasting.
+
+    ``max_terms`` limits products summed for each output cell, defaulting to
+    10,000. Outputs that exceed it display ``?`` without partial evaluation.
+    Set it to ``None`` to evaluate every term. Source highlights are sampled
+    when values are skipped, while ``visual.trace.term_count`` retains the full
+    count. Details are stored in ``visual.metadata["value_evaluation"]``.
     """
     if not arrays:
         raise ValueError("einsum needs at least one operand")
@@ -153,15 +168,25 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
     input_axes, output_axes = parse_einsum_subscripts(subscripts, len(arrays), shapes)
     result = einsum_result_shape(subscripts, shapes)
     focused = _normalize_focus(focus, result)
+    term_count = einsum_term_count(input_axes, output_axes, shapes)
+    evaluation = value_evaluation(term_count, max_terms)
     display_result = result or (1,)
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     label_colors = _einsum_label_colors(input_axes, output_axes)
-    selected = einsum_selected_coords(input_axes, output_axes, shapes, focused)
     trace = _build_trace(
-        "einsum", focused, einsum_term_count(input_axes, output_axes, shapes),
+        "einsum", focused, term_count,
         einsum_source_terms(input_axes, output_axes, shapes, focused),
     )
-    result_value = _einsum_result_value_fn(input_axes, output_axes, shapes, source_values)
+    if evaluation["status"] == "skipped":
+        selected = [
+            sorted({term[operand].coordinate for term in trace.terms})
+            for operand in range(len(arrays))
+        ]
+    else:
+        selected = einsum_selected_coords(input_axes, output_axes, shapes, focused)
+    result_value = _einsum_result_value_fn(
+        input_axes, output_axes, shapes, source_values, evaluation
+    )
     contracted = einsum_contracted_labels(input_axes, output_axes)
 
     panels = []
@@ -177,7 +202,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
                 ),
             }
         )
-        if focus is not None:
+        if focus is not None or evaluation["status"] == "skipped":
             panels[-1]["selected"] = selected[i]
 
     panels.append(
@@ -191,7 +216,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
             ),
         }
     )
-    if focus is not None:
+    if focus is not None or evaluation["status"] == "skipped":
         panels[-1]["selected"] = [focused or (0,)]
     connectors = ["*"] * (len(arrays) - 1) + ["->"]
     input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
@@ -206,6 +231,7 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
         contracted_line,
         t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([*shapes, display_result], theme)
+    explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     content = renderer.render_panels(
@@ -219,4 +245,5 @@ def einsum(subscripts, *arrays, theme=None, precision=2, renderer=None, focus=No
         content, shapes[0], renderer, selected=selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["value_evaluation"] = evaluation
     return visual
