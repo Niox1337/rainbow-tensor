@@ -10,6 +10,7 @@ from functools import cache
 
 from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
 from ..explanations import t
+from ..numerics import numeric_explanation, numeric_semantics
 from ..ops import (
     matmul_result_shape,
     reduce_result_shape,
@@ -41,11 +42,17 @@ def matmul(
     """Visualise a matrix multiplication ``a @ b``.
 
     ``a`` and ``b`` are array-likes or shape tuples. Vector, matrix, and batched
-    matrix multiplication are all supported, matching ``numpy.matmul``. The two
+    matrix multiplication follow the shape rules of ``numpy.matmul``. The two
     operands and the output are drawn side by side. The shared inner axis is
     marked in the accent colour, and the row of the first operand and the column
     of the second operand that combine into the first output element are
     highlighted, so the contraction reads directly off the figure.
+
+    Numerical previews use Python scalar arithmetic on values read from the
+    inputs, not the backend's matrix multiplication kernel. Accumulation dtype,
+    rounding, and overflow may differ. Shape tuples supply generated row-major
+    placeholder values. ``visual.metadata["numeric_semantics"]`` records this
+    model and each operand's value source, even when evaluation is skipped.
 
     ``focus`` selects an output coordinate instead of the first one. Negative
     indices are supported and a scalar output uses ``()``. ``visual.trace``
@@ -64,6 +71,7 @@ def matmul(
     result = matmul_result_shape(a_shape, b_shape)
     focused = _normalize_focus(focus, result)
     evaluation = value_evaluation(a_shape[-1], max_terms)
+    semantics = numeric_semantics((a, b))
     display_result = result or (1,)
     a_value = _source_value(a, a_shape)
     b_value = _source_value(b, b_shape)
@@ -116,6 +124,7 @@ def matmul(
         ),
     ] + _preview_explanation([a_shape, b_shape, display_result], theme)
     explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
+    explanation.extend(numeric_explanation(semantics))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -151,6 +160,7 @@ def matmul(
     )
     visual.trace = trace
     visual.metadata["value_evaluation"] = evaluation
+    visual.metadata["numeric_semantics"] = semantics
     return visual
 
 
@@ -170,6 +180,7 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
     source_value = _source_value(array, shape)
     axis = axis + len(shape) if axis < 0 else axis
     evaluation = value_evaluation(shape[axis], max_terms)
+    semantics = numeric_semantics((array,))
 
     # Mark the source elements that collapse into the focused result element, and
     # tint every other group so values that fold into the same result share one
@@ -236,6 +247,7 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
         ),
     ] + _preview_explanation([shape, disp], theme)
     explanation.extend(evaluation_explanation(evaluation))
+    explanation.extend(numeric_explanation(semantics))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -265,6 +277,7 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
     )
     visual.trace = trace
     visual.metadata["value_evaluation"] = evaluation
+    visual.metadata["numeric_semantics"] = semantics
     return visual
 
 
@@ -276,6 +289,12 @@ def sum(
     The source panel marks the elements that collapse into the first result
     element, and the result panel holds the per group sums with the reduced
     axis gone.
+
+    Numerical previews use Python scalar arithmetic, not a native backend
+    reduction. Accumulation dtype, rounding, and overflow may differ. Shape
+    tuples supply generated row-major placeholder values. The model and value
+    source are recorded in ``visual.metadata["numeric_semantics"]`` even when
+    evaluation is skipped.
 
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.
@@ -297,6 +316,13 @@ def mean(
     The source panel marks the elements that collapse into the first result
     element, and the result panel holds the per group means with the reduced
     axis gone.
+
+    Numerical previews sum input values with Python scalar arithmetic and
+    divide by the axis size, rather than calling a native backend reduction.
+    Accumulation dtype, rounding, and overflow may differ. Shape tuples supply
+    generated row-major placeholder values. The model and value source are
+    recorded in ``visual.metadata["numeric_semantics"]`` even when evaluation
+    is skipped.
 
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.

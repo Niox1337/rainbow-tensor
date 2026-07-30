@@ -11,6 +11,7 @@ from functools import cache
 
 from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
 from ..explanations import t
+from ..numerics import numeric_explanation, numeric_semantics
 from ..ops import (
     einsum_contracted_labels,
     einsum_result_shape,
@@ -148,6 +149,12 @@ def einsum(
     from a colour family for its role, so free, shared, and contracted labels
     stay visually distinct. The output panel shows the derived free index shape.
 
+    Numerical previews multiply and accumulate input values with Python scalar
+    arithmetic, not the backend's einsum kernel. Accumulation dtype, rounding,
+    and overflow may differ. Shape tuples supply generated row-major placeholder
+    values. ``visual.metadata["numeric_semantics"]`` records this model and each
+    operand's value source, even when evaluation is skipped.
+
     ``focus`` is an output coordinate tuple, with negative coordinates accepted
     and ``()`` required for a scalar output. Supplying it highlights that output
     and its input factors. ``visual.trace`` records the first eight ordered
@@ -170,6 +177,7 @@ def einsum(
     focused = _normalize_focus(focus, result)
     term_count = einsum_term_count(input_axes, output_axes, shapes)
     evaluation = value_evaluation(term_count, max_terms)
+    semantics = numeric_semantics(arrays)
     display_result = result or (1,)
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     label_colors = _einsum_label_colors(input_axes, output_axes)
@@ -232,6 +240,7 @@ def einsum(
         t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([*shapes, display_result], theme)
     explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
+    explanation.extend(numeric_explanation(semantics))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     content = renderer.render_panels(
@@ -246,4 +255,5 @@ def einsum(
     )
     visual.trace = trace
     visual.metadata["value_evaluation"] = evaluation
+    visual.metadata["numeric_semantics"] = semantics
     return visual
