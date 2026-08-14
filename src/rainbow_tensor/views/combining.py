@@ -12,17 +12,15 @@ from ..ops import (
     broadcast_stretched_axes,
     concatenate_result_shape,
     concatenate_source,
-    repeat_result_shape,
     repeat_source_coord,
     repeat_source_positions,
     stack_result_shape,
     stack_source,
     take_axis_and_indices,
-    take_result_shape,
     take_source_coord,
 )
 from ..renderers import resolve_renderer
-from ..shape import extract_shape, format_shape
+from ..shape import _check_axis, extract_shape, format_shape
 from ..theme import resolve_theme
 from ..visual import (
     _operand_tint,
@@ -46,9 +44,9 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    axis = axis + len(shape) if axis < 0 else axis
+    axis = _check_axis(axis, len(shape))
     source_positions = repeat_source_positions(shape[axis], repeats)
-    result = repeat_result_shape(shape, repeats, axis)
+    result = shape[:axis] + (len(source_positions),) + shape[axis + 1:]
     source_value = _source_value(array, shape)
 
     def result_value(coord):
@@ -98,8 +96,9 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
+    indices = tuple(indices)
     axis, resolved = take_axis_and_indices(shape, indices, axis)
-    result = take_result_shape(shape, indices, axis)
+    result = shape[:axis] + (len(resolved),) + shape[axis + 1:]
     source_value = _source_value(array, shape)
     gathered = set(resolved)
 
@@ -203,7 +202,7 @@ def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None):
     theme = resolve_theme(theme)
     shapes = [extract_shape(a) for a in arrays]
     result = concatenate_result_shape(shapes, axis)
-    axis_r = axis + len(shapes[0]) if axis < 0 else axis
+    axis_r = _check_axis(axis, len(shapes[0]))
 
     def origin_fn(coord):
         return concatenate_source(coord, shapes, axis_r)
@@ -231,7 +230,7 @@ def stack(arrays, axis=0, theme=None, precision=2, renderer=None):
     shapes = [extract_shape(a) for a in arrays]
     result = stack_result_shape(shapes, axis)
     ndim = len(shapes[0])
-    axis_r = axis + ndim + 1 if axis < 0 else axis
+    axis_r = _check_axis(axis, ndim + 1)
 
     def origin_fn(coord):
         return stack_source(coord, axis_r, ndim)

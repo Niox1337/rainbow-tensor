@@ -8,7 +8,7 @@ cross check every result against NumPy.
 
 from math import prod
 
-from ..shape import _check_axis, flat_index
+from ..shape import _as_integer, _check_axis, _integer_or_sequence, flat_index
 
 
 def unflatten(flat, shape):
@@ -27,9 +27,10 @@ def reshape_result_shape(old_shape, new_shape):
     """Resolve ``new_shape`` against ``old_shape`` and validate the element count.
 
     One axis may be ``-1`` and is inferred from the remaining axes, matching
-    the NumPy convention. The total number of elements must stay the same.
+    the NumPy convention. Dimensions follow the integer index protocol, with
+    booleans and floats rejected. The total number of elements must stay the same.
     """
-    new = tuple(new_shape)
+    new = tuple(_as_integer(dim, "reshape dimensions") for dim in new_shape)
     neg = [i for i, d in enumerate(new) if d == -1]
     if len(neg) > 1:
         raise ValueError("can only specify one unknown dimension with -1")
@@ -46,7 +47,7 @@ def reshape_result_shape(old_shape, new_shape):
         new = tuple(total // rest if d == -1 else d for d in new)
     if prod(new) != total:
         raise ValueError(
-            f"cannot reshape tensor of size {total} into shape {tuple(new_shape)}"
+            f"cannot reshape tensor of size {total} into shape {new}"
         )
     return new
 
@@ -66,11 +67,12 @@ def reshape_source_coord(result_coord, old_shape, new_shape):
 def transpose_axes(ndim, axes):
     """Validate ``axes`` and return the permutation as a tuple.
 
-    ``None`` reverses the axis order, matching ``numpy.transpose``.
+    ``None`` reverses the axis order, matching ``numpy.transpose``. Each axis
+    follows the integer index protocol and negative axes count from the end.
     """
     if axes is None:
         return tuple(reversed(range(ndim)))
-    axes = tuple(axes)
+    axes = tuple(_check_axis(axis, ndim) for axis in axes)
     if sorted(axes) != list(range(ndim)):
         raise ValueError(
             f"axes {axes} is not a permutation of the {ndim} tensor axes"
@@ -112,7 +114,8 @@ def swapaxes_axes(ndim, axis1, axis2):
 
 def _normalize_axis_seq(axis, ndim):
     """Resolve an axis or sequence of axes to a tuple of distinct positions."""
-    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    axes = _integer_or_sequence(axis, "axis")
+    axes = (axes,) if isinstance(axes, int) else axes
     resolved = tuple(_check_axis(a, ndim) for a in axes)
     if len(set(resolved)) != len(resolved):
         raise ValueError(f"repeated axis in {axes}")
@@ -153,7 +156,8 @@ def squeeze_axes(shape, axis=None):
     ndim = len(shape)
     if axis is None:
         return tuple(i for i, size in enumerate(shape) if size == 1)
-    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    axes = _integer_or_sequence(axis, "axis")
+    axes = (axes,) if isinstance(axes, int) else axes
     removed = []
     for a in axes:
         r = _check_axis(a, ndim)
@@ -193,7 +197,8 @@ def expand_dims_axes(ndim, axis):
     has ``ndim + len(axis)`` axes. Negative positions count from the end of the
     result, matching ``numpy.expand_dims``.
     """
-    axes = (axis,) if isinstance(axis, int) else tuple(axis)
+    axes = _integer_or_sequence(axis, "axis")
+    axes = (axes,) if isinstance(axes, int) else axes
     out_ndim = ndim + len(axes)
     inserted = [_check_axis(a, out_ndim) for a in axes]
     if len(set(inserted)) != len(inserted):

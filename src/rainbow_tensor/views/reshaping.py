@@ -22,7 +22,7 @@ from ..ops import (
     transpose_source_coord,
 )
 from ..renderers import resolve_renderer
-from ..shape import extract_shape, format_shape
+from ..shape import _check_axis, extract_shape, format_shape
 from ..theme import resolve_theme
 from ..visual import (
     _preview_explanation,
@@ -146,9 +146,9 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
     swap is traceable.
     """
     ndim = len(extract_shape(array))
-    perm = swapaxes_axes(ndim, axis1, axis2)
-    axis1_r = axis1 + ndim if axis1 < 0 else axis1
-    axis2_r = axis2 + ndim if axis2 < 0 else axis2
+    axis1_r = _check_axis(axis1, ndim)
+    axis2_r = _check_axis(axis2, ndim)
+    perm = swapaxes_axes(ndim, axis1_r, axis2_r)
     return _permute_view(
         array,
         perm,
@@ -197,7 +197,7 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
     shape = extract_shape(array)
     removed = squeeze_axes(shape, axis)
     removed_set = set(removed)
-    result = squeeze_result_shape(shape, axis)
+    result = squeeze_result_shape(shape, removed)
     source_value = _source_value(array, shape)
     surviving = [i for i in range(len(shape)) if i not in removed_set]
     display_result = result or (1,)
@@ -275,7 +275,7 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
     shape = extract_shape(array)
     inserted = expand_dims_axes(len(shape), axis)
     inserted_set = set(inserted)
-    result = expand_dims_result_shape(shape, axis)
+    result = expand_dims_result_shape(shape, inserted)
     source_value = _source_value(array, shape)
 
     def result_value(coord):

@@ -19,7 +19,7 @@ from ..ops import (
 from ..ops.reductions import iter_matmul_source_terms
 from ..renderers import resolve_renderer
 from ..selection import BasicSelection
-from ..shape import extract_shape, flat_index, format_shape
+from ..shape import _check_axis, extract_shape, flat_index, format_shape
 from ..theme import resolve_theme
 from ..tracing import _build_trace, _normalize_focus, _trace_explanation
 from ..visual import (
@@ -175,10 +175,10 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
+    axis = _check_axis(axis, len(shape))
     result = reduce_result_shape(shape, axis)
     focused = _normalize_focus(focus, result)
     source_value = _source_value(array, shape)
-    axis = axis + len(shape) if axis < 0 else axis
     evaluation = value_evaluation(shape[axis], max_terms)
     semantics = numeric_semantics((array,))
 

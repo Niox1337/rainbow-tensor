@@ -6,7 +6,7 @@ these mappings into values to draw and the tests cross check every result
 against NumPy.
 """
 
-from ..shape import _check_axis
+from ..shape import _as_integer, _check_axis, _integer_or_sequence
 
 # Repeat -------------------------------------------------------------------
 
@@ -17,12 +17,14 @@ def repeat_source_positions(axis_size, repeats):
     ``repeats`` is a single count applied to every element, or one count per
     element along the axis, matching ``numpy.repeat``. Element ``i`` contributes
     ``repeats[i]`` adjacent result positions, so the returned list reads as the
-    materialised copies in order.
+    materialised copies in order. Counts follow the integer index protocol,
+    so booleans and floats are rejected instead of silently coerced.
     """
+    repeats = _integer_or_sequence(repeats, "repeats")
     if isinstance(repeats, int):
         counts = [repeats] * axis_size
     else:
-        counts = [int(r) for r in repeats]
+        counts = repeats
         if len(counts) != axis_size:
             raise ValueError(
                 f"repeats has length {len(counts)} but axis has size {axis_size}"
@@ -60,13 +62,14 @@ def take_axis_and_indices(shape, indices, axis):
 
     The axis is normalised against the rank and each index is normalised against
     the axis size, so negative axes and negative indices both work like
-    ``numpy.take``. An out of range index raises a clear error.
+    ``numpy.take``. Indices follow the integer index protocol, with booleans
+    and floats rejected. An out of range index raises a clear error.
     """
     axis = _check_axis(axis, len(shape))
     size = shape[axis]
     resolved = []
     for raw in indices:
-        i = int(raw)
+        i = _as_integer(raw, "take indices")
         r = i + size if i < 0 else i
         if not 0 <= r < size:
             raise ValueError(

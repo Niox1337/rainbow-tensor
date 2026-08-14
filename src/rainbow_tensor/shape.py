@@ -44,12 +44,7 @@ def validate_shape(shape):
 
     normalized = []
     for dim in shape:
-        if isinstance(dim, bool) or type(dim).__name__.startswith("bool"):
-            raise TypeError(f"shape dimensions must be integers, got {dim!r}")
-        try:
-            dim = integer_index(dim)
-        except TypeError:
-            raise TypeError(f"shape dimensions must be integers, got {dim!r}") from None
+        dim = _as_integer(dim, "shape dimensions")
         if dim <= 0:
             raise ValueError(f"shape dimensions must be positive, got {dim!r}")
         normalized.append(dim)
@@ -70,8 +65,35 @@ def flat_index(coord, shape):
     return index
 
 
+def _as_integer(value, name):
+    """Return an index-protocol integer without accepting booleans or floats.
+
+    NumPy boolean scalars are rejected without importing an array backend.
+    Unlike ``int``, the index protocol never truncates floating-point values.
+    """
+    if isinstance(value, bool) or type(value).__name__.startswith("bool"):
+        raise TypeError(f"{name} must be integers, got {value!r}")
+    try:
+        return integer_index(value)
+    except TypeError:
+        raise TypeError(f"{name} must be integers, got {value!r}") from None
+
+
+def _integer_or_sequence(value, name):
+    """Normalize an integer or consume an iterable of integers exactly once."""
+    try:
+        return _as_integer(value, name)
+    except TypeError:
+        try:
+            values = iter(value)
+        except TypeError:
+            raise TypeError(f"{name} must be an integer or an iterable of integers") from None
+        return tuple(_as_integer(item, name) for item in values)
+
+
 def _check_axis(axis, ndim):
-    """Resolve a possibly negative axis and bounds check it."""
+    """Normalize an integer-protocol axis, resolve negatives and check bounds."""
+    axis = _as_integer(axis, "axis")
     resolved = axis + ndim if axis < 0 else axis
     if not 0 <= resolved < ndim:
         raise ValueError(f"axis {axis} is out of range for a rank {ndim} tensor")
