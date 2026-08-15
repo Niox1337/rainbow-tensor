@@ -5,6 +5,7 @@ describe unique coordinates separately, so drawing a preview never expands the
 Cartesian product of selected slices or broadcasted index arrays.
 """
 
+from collections import Counter
 from itertools import zip_longest
 from math import prod
 from operator import index as integer_index
@@ -82,6 +83,90 @@ class _ArrayIndex:
         return self.values[broadcast_source_coord(broadcast_coordinate, self.shape)]
 
 
+def _positions_compatible(constraints, broadcast_rank):
+    """Join candidate positions through their shared, non-singleton axes.
+
+    Each candidate list is scanned at most once per query to index projections
+    by the axes already bound by earlier arrays. Coordinates on private axes
+    cannot constrain another array and are dropped, along with duplicate
+    projections. Disconnected groups of broadcast axes are checked separately,
+    so their matches never form a Cartesian product. The indexes use space
+    proportional to the candidate inputs, rather than to their broadcast product.
+
+    Multiway joins can still branch over distinct compatible projections. This
+    is not a linear-time guarantee for arbitrary cyclic constraints, but later
+    arrays never rescan an entire candidate list for every earlier position.
+    """
+    if len(constraints) < 2:
+        return True
+    aligned = [
+        (
+            {
+                broadcast_rank - len(array.shape) + axis: axis
+                for axis, size in enumerate(array.shape) if size != 1
+            },
+            matches,
+        )
+        for array, matches in constraints
+    ]
+    uses = Counter(axis for axes, _ in aligned for axis in axes)
+    components = []
+    for axes, matches in aligned:
+        shared = {axis: local for axis, local in axes.items() if uses[axis] > 1}
+        if not shared:
+            continue
+        members = [(shared, matches)]
+        member_axes = set(shared)
+        separate = []
+        for group, group_axes in components:
+            if member_axes.isdisjoint(group_axes):
+                separate.append((group, group_axes))
+            else:
+                members.extend(group)
+                member_axes.update(group_axes)
+        components = separate + [(members, member_axes)]
+
+    def join_component(members):
+        bound = set()
+        indexed = []
+        pending = list(members)
+        while pending:
+            # Resolve already-bound filters first, then extend connected axes.
+            position = min(
+                range(len(pending)),
+                key=lambda i: (
+                    not pending[i][0].keys() <= bound,
+                    bound.isdisjoint(pending[i][0]),
+                    len(pending[i][1]),
+                ),
+            )
+            axes, matches = pending.pop(position)
+            common = tuple(axis for axis in axes if axis in bound)
+            added = tuple(axis for axis in axes if axis not in bound)
+            buckets = {}
+            for coordinate in matches:
+                key = tuple(coordinate[axes[axis]] for axis in common)
+                values = tuple(coordinate[axes[axis]] for axis in added)
+                buckets.setdefault(key, set()).add(values)
+            indexed.append((common, added, buckets))
+            bound.update(axes)
+
+        def compatible(position, bindings):
+            if position == len(indexed):
+                return True
+            common, added, buckets = indexed[position]
+            key = tuple(bindings[axis] for axis in common)
+            for values in buckets.get(key, ()):
+                current = dict(zip(added, values))
+                if compatible(position + 1, bindings | current):
+                    return True
+            return False
+
+        return compatible(0, {})
+
+    return all(join_component(members) for members, _ in components)
+
+
 class _AdvancedSelection:
     """Query unique source highlights without expanding selected slice products.
 
@@ -128,26 +213,7 @@ class _AdvancedSelection:
                 if not matches:
                     return False
                 constraints.append((array, matches))
-        constraints.sort(key=lambda item: len(item[1]))
-
-        def compatible(position, bindings):
-            if position == len(constraints):
-                return True
-            array, matches = constraints[position]
-            offset = len(mapping.broadcast_shape) - len(array.shape)
-            for coordinate in matches:
-                current = {
-                    offset + axis: value
-                    for axis, (value, size) in enumerate(zip(coordinate, array.shape))
-                    if size != 1
-                }
-                if all(axis not in bindings or bindings[axis] == value
-                       for axis, value in current.items()):
-                    if compatible(position + 1, bindings | current):
-                        return True
-            return False
-
-        return compatible(0, {})
+        return _positions_compatible(constraints, len(mapping.broadcast_shape))
 
     def axis_pins(self, axis, limit):
         if not self:
