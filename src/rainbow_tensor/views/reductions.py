@@ -6,9 +6,14 @@ that fold into each result group.
 """
 
 import builtins
-from functools import cache
 
-from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
+from ..evaluation import (
+    DEFAULT_MAX_TERMS,
+    DEFAULT_MAX_TOTAL_TERMS,
+    budgeted_values,
+    evaluation_explanation,
+    evaluation_plan,
+)
 from ..explanations import t
 from ..numerics import numeric_explanation, numeric_semantics
 from ..ops import (
@@ -37,7 +42,8 @@ _py_sum = builtins.sum
 
 
 def matmul(
-    a, b, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+    a, b, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS,
+    max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
     """Visualise a matrix multiplication ``a @ b``.
 
@@ -60,7 +66,9 @@ def matmul(
 
     ``max_terms`` limits contraction terms per output cell, defaulting to
     10,000. Outputs that exceed it display ``?`` without partial evaluation.
-    Pass ``None`` to evaluate every term. Source previews and coordinate traces
+    ``max_total_terms`` additionally caps all visible output terms at 100,000.
+    If either limit is exceeded, all output values are skipped. Set both limits
+    to ``None`` to remove them. Source previews and coordinate traces
     remain available when numerical output is skipped. Evaluation details are
     stored in ``visual.metadata["value_evaluation"]``.
     """
@@ -70,16 +78,17 @@ def matmul(
     b_shape = extract_shape(b)
     result = matmul_result_shape(a_shape, b_shape)
     focused = _normalize_focus(focus, result)
-    evaluation = value_evaluation(a_shape[-1], max_terms)
     semantics = numeric_semantics((a, b))
     display_result = result or (1,)
+    result_selected = [focused or (0,)]
+    evaluation = evaluation_plan(
+        a_shape[-1], max_terms, max_total_terms, display_result, result_selected, theme
+    )
     a_value = _source_value(a, a_shape)
     b_value = _source_value(b, b_shape)
 
-    @cache
+    @budgeted_values(evaluation)
     def result_value(coord):
-        if evaluation["status"] == "skipped":
-            return "?"
         out_coord = () if not result else coord
         terms = iter_matmul_source_terms(out_coord, a_shape, b_shape)
         return _py_sum(a_value(ac) * b_value(bc) for ac, bc in terms)
@@ -93,7 +102,6 @@ def matmul(
         terms0 = list(iter_matmul_source_terms(focused, a_shape, b_shape))
     a_selected = sorted({ac for ac, _ in terms0})
     b_selected = sorted({bc for _, bc in terms0})
-    result_selected = [focused or (0,)]
 
     a_inner = len(a_shape) - 1
     b_inner = len(b_shape) - 2 if len(b_shape) >= 2 else 0
@@ -164,7 +172,7 @@ def matmul(
     return visual
 
 
-def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
+def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, max_total_terms):
     """Render a reduction without evaluating hidden output groups.
 
     Each requested output coordinate is evaluated once per visual. A second
@@ -179,7 +187,6 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
     result = reduce_result_shape(shape, axis)
     focused = _normalize_focus(focus, result)
     source_value = _source_value(array, shape)
-    evaluation = value_evaluation(shape[axis], max_terms)
     semantics = numeric_semantics((array,))
 
     # Mark the source elements that collapse into the focused result element, and
@@ -226,12 +233,13 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
         return _operand_tint(theme, group - 1)
 
     selected_result = [focused or (0,)]
+    evaluation = evaluation_plan(
+        shape[axis], max_terms, max_total_terms, disp, selected_result, result_theme
+    )
 
-    @cache
+    @budgeted_values(evaluation)
     def result_value(coord):
         """Evaluate one visible group using a streaming sum of source values."""
-        if evaluation["status"] == "skipped":
-            return "?"
         rc = () if not result else coord
         total = _py_sum(source_value(sc) for sc in reduce_source_coords(rc, shape, axis))
         return total / shape[axis] if op_name == "mean" else total
@@ -282,7 +290,8 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms):
 
 
 def sum(
-    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS,
+    max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
     """Visualise a sum reduction over ``axis``.
 
@@ -301,15 +310,19 @@ def sum(
     ``visual.trace`` retains up to eight ordered source terms for that output.
 
     ``max_terms`` limits source terms per output cell, defaulting to 10,000.
-    Longer reductions show ``?`` instead of evaluating a partial sum. Set it
-    to ``None`` to evaluate every term. The coordinate selection stays compact,
+    ``max_total_terms`` caps the sum of terms across visible outputs at 100,000.
+    Exceeding either limit shows ``?`` for all outputs without partial sums.
+    Set both limits to ``None`` to remove them. The selection stays compact,
     and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
-    return _reduce(array, axis, "sum", theme, precision, renderer, focus, max_terms)
+    return _reduce(
+        array, axis, "sum", theme, precision, renderer, focus, max_terms, max_total_terms
+    )
 
 
 def mean(
-    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS
+    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS,
+    max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
     """Visualise a mean reduction over ``axis``.
 
@@ -329,8 +342,11 @@ def mean(
     ``visual.trace`` retains up to eight terms and the mean's divisor.
 
     ``max_terms`` limits source terms per output cell, defaulting to 10,000.
-    Longer reductions show ``?`` instead of evaluating a partial mean. Set it
-    to ``None`` to evaluate every term. The coordinate selection stays compact,
+    ``max_total_terms`` caps the sum of terms across visible outputs at 100,000.
+    Exceeding either limit shows ``?`` for all outputs without partial means.
+    Set both limits to ``None`` to remove them. The selection stays compact,
     and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
-    return _reduce(array, axis, "mean", theme, precision, renderer, focus, max_terms)
+    return _reduce(
+        array, axis, "mean", theme, precision, renderer, focus, max_terms, max_total_terms
+    )

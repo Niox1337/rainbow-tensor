@@ -7,9 +7,13 @@ It is self contained apart from the shared rendering substrate in
 on the shared caption helper the other families use.
 """
 
-from functools import cache
-
-from ..evaluation import DEFAULT_MAX_TERMS, evaluation_explanation, value_evaluation
+from ..evaluation import (
+    DEFAULT_MAX_TERMS,
+    DEFAULT_MAX_TOTAL_TERMS,
+    budgeted_values,
+    evaluation_explanation,
+    evaluation_plan,
+)
 from ..explanations import t
 from ..numerics import numeric_explanation, numeric_semantics
 from ..ops import (
@@ -122,10 +126,8 @@ def _einsum_caption_parts(name, labels, shape, theme, label_colors):
 
 def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values, evaluation):
     """Compute complete visible outputs once, or show unknown values when skipped."""
-    @cache
+    @budgeted_values(evaluation)
     def result_value(coord):
-        if evaluation["status"] == "skipped":
-            return "?"
         output_coord = () if not output_axes else coord
         total = 0
         for source_coords in einsum_source_terms(input_axes, output_axes, shapes, output_coord):
@@ -141,6 +143,7 @@ def _einsum_result_value_fn(input_axes, output_axes, shapes, source_values, eval
 def einsum(
     subscripts, *arrays, theme=None, precision=2, renderer=None, focus=None,
     max_terms=DEFAULT_MAX_TERMS,
+    max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
     """Visualise an einsum expression.
 
@@ -162,7 +165,9 @@ def einsum(
 
     ``max_terms`` limits products summed for each output cell, defaulting to
     10,000. Outputs that exceed it display ``?`` without partial evaluation.
-    Set it to ``None`` to evaluate every term. Source highlights are sampled
+    ``max_total_terms`` additionally caps all visible output terms at 100,000.
+    If either limit is exceeded, all output values are skipped. Set both limits
+    to ``None`` to remove them. Source highlights are sampled
     when values are skipped, while ``visual.trace.term_count`` retains the full
     count. Details are stored in ``visual.metadata["value_evaluation"]``.
     """
@@ -176,11 +181,15 @@ def einsum(
     result = einsum_result_shape(subscripts, shapes)
     focused = _normalize_focus(focus, result)
     term_count = einsum_term_count(input_axes, output_axes, shapes)
-    evaluation = value_evaluation(term_count, max_terms)
     semantics = numeric_semantics(arrays)
     display_result = result or (1,)
-    source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     label_colors = _einsum_label_colors(input_axes, output_axes)
+    result_theme = _einsum_theme(output_axes, theme, label_colors)
+    evaluation = evaluation_plan(
+        term_count, max_terms, max_total_terms, display_result,
+        [focused or (0,)] if focus is not None else None, result_theme,
+    )
+    source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     trace = _build_trace(
         "einsum", focused, term_count,
         einsum_source_terms(input_axes, output_axes, shapes, focused),
@@ -217,7 +226,7 @@ def einsum(
         {
             "shape": display_result,
             "value_fn": result_value,
-            "theme": _einsum_theme(output_axes, theme, label_colors),
+            "theme": result_theme,
             "cell_tint": _einsum_leaf_tint(output_axes, theme, label_colors),
             "caption_parts": _einsum_caption_parts(
                 "output", output_axes, display_result, theme, label_colors

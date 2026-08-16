@@ -93,6 +93,18 @@ def test_budget_is_not_relaxed_by_interaction(explorers):
     assert len(visual.trace.terms) == 8
 
 
+def test_total_budget_is_preserved_when_focus_changes(explorers):
+    explorer = explorers(rt.sum, (2, 3), axis=1, max_total_terms=3)
+    explorer.coordinates[0].value = 1
+    explorer.update_button.click()
+    evaluation = explorer.visual.metadata["value_evaluation"]
+    assert evaluation["status"] == "skipped"
+    assert evaluation["reason"] == "max_total_terms"
+    assert evaluation["max_total_terms"] == 3
+    assert evaluation["total_terms"] == 6
+    assert explorer.visual.trace.output_coord == (1,)
+
+
 def test_invalid_python_update_preserves_visual(explorers):
     explorer = explorers(rt.sum, (2, 3), axis=1)
     before = explorer.visual
