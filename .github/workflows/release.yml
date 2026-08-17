@@ -1,10 +1,8 @@
 name: Release
-
 on:
   push:
     tags:
       - "v*"
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,7 +17,6 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest
-
   build:
     needs: test
     runs-on: ubuntu-latest
@@ -32,12 +29,13 @@ jobs:
         run: |
           pip install --upgrade build
           python -m build
+      - name: Validate distributions
+        run: python scripts/check_distribution.py --interactive
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
-
   publish:
     needs: build
     runs-on: ubuntu-latest

@@ -22,3 +22,6 @@ jobs:
         run: pytest
       - name: Build
         run: python -m build
+      - name: Validate distributions
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_distribution.py --interactive
