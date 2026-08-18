@@ -106,10 +106,10 @@ For optional notebook controls, install `rainbow-tensor[interactive]` and use
 
 Basic slice selections store ranges instead of expanding every selected
 coordinate. Reductions compute only the output groups a renderer requests.
-Math views also accept `max_terms`, defaulting to 10,000 terms per output cell.
-When a calculation exceeds that limit, the output shows `?` with an explanation
-instead of performing a partial calculation. Use `max_terms=None` to opt into
-full evaluation.
+Math views accept `max_terms`, defaulting to 10,000 terms per output cell, and
+`max_total_terms`, defaulting to 100,000 across the visible outputs. When either
+limit is exceeded, output values show `?` with an explanation instead of partial
+results. Set both limits to `None` to allow full evaluation of the preview.
 
 Numerical previews use Python scalar arithmetic. Accumulation dtype, rounding,
 and overflow can differ from a framework's native kernels. Each math view
@@ -133,11 +133,17 @@ Runnable notebooks for every feature group live in [`examples`](examples), and m
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,interactive]"
 pytest
 ruff check .
 python -m build
+python scripts/check_distribution.py --interactive
 ```
+
+The distribution check expects one wheel and one source archive in `dist`.
+Use `--dist-dir PATH` when building into another directory. It creates a fresh
+temporary environment, installs dependencies, checks both installed packages,
+and runs the source archive's tests with its included SVG fixtures.
 
 ## License
 

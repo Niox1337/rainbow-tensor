@@ -24,9 +24,9 @@ start at zero. `sum`, `mean`, and `einsum` work the same way. A scalar output
 has no coordinate fields, only the update button.
 
 The controls reuse the static operations, including their numerical model and
-`max_terms` budget. Selecting another output never raises that budget. A value
-that was skipped remains a question mark until you explicitly request a larger
-budget when creating the explorer.
+`max_terms` and `max_total_terms` budgets. Each update plans the new visible
+outputs under the same limits. Selecting another output never raises either
+limit. If the new plan exceeds a limit, output values appear as question marks.
 
 ## Keep a static result
 

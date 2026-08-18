@@ -4,6 +4,10 @@ These views join several tensors into one or stretch one to a new shape. Each
 operand is drawn in its own tint, so the seam between operands or the new axis
 stays clear.
 
+Axes, repeat counts, and take indices accept Python integers, NumPy integer
+scalars, and objects implementing `__index__`. Boolean and floating-point
+arguments are rejected without silently truncating them.
+
 ```python
 import numpy as np
 import rainbow_tensor as rt

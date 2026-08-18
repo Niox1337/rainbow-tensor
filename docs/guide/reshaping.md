@@ -4,6 +4,10 @@ These views rearrange a tensor without changing its values. The source and the
 result sit in one figure with a connector, and each axis keeps its colour so you
 can trace where it lands.
 
+Axes and reshape dimensions accept Python integers, NumPy integer scalars, and
+objects implementing `__index__`. Boolean and floating-point arguments are
+rejected before reading array values. Negative axes count from the end.
+
 ```python
 import numpy as np
 import rainbow_tensor as rt

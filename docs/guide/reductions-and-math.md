@@ -109,20 +109,36 @@ within one render. Hidden output groups do not trigger reads. Matmul and einsum
 also compute values on demand.
 
 All four functions accept `max_terms=10_000`, the maximum number of source
-contributions or products to sum for each output cell. If the count exceeds the
-limit, the output displays `?` and no partial arithmetic result is used.
-Set `max_terms=None` to allow full evaluation explicitly.
+contributions or products to sum for each output cell, and
+`max_total_terms=100_000`, the maximum across the visible output panel.
+The layout is planned before reading values. If either limit is exceeded, every
+output value displays `?`. No partial arithmetic result is used, and changing
+the order in which cells are rendered cannot change the budget decision.
+Set either limit to `None` to remove that limit, or set both to `None` to remove
+both limits.
 
 ```python
 visual = rt.einsum("ij,jk->ik", (2, 1_000_000), (1_000_000, 2), focus=(1, 1))
 visual.metadata["value_evaluation"]["status"]  # "skipped"
 visual.trace.term_count                       # 1_000_000
+
+visual = rt.sum((20, 10_000), axis=1)
+visual.metadata["value_evaluation"]["reason"]  # "max_total_terms"
 ```
 
 When a contraction is skipped, source highlights may show only the bounded
 trace sample. The explanation states that sampling was used. Source cells that
 are actually visible are still read to draw the input panels.
 
-This is a per-output limit, not a total memory or time limit. A term in a
-multi-operand einsum may read several operands. The separate theme option
-`max_visible_cells` limits the number of displayed cells in each panel.
+The metadata records `output_count`, the number of planned visible outputs,
+and `total_terms`, their combined calculation cost. Its `scope` is
+`per_output_cell_and_preview`, and `reason` identifies the exceeded limit or is
+`None` when values can be evaluated. These counts describe the plan, even if a
+custom renderer reads fewer cells. Custom renderers may choose different output
+coordinates within the planned cell count. Repeated requests are cached. Extra
+distinct coordinates return `?` and cannot add unbudgeted work.
+
+These are calculation limits, not memory or elapsed-time guarantees. A term in
+a multi-operand einsum may read several operands. Reading displayed input cells
+is separate from calculating outputs. The theme option `max_visible_cells`
+limits the number of displayed cells in each panel.
