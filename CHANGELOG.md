@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.1 (unreleased)
+
+### Fixed
+
+- Axis arguments, reshape dimensions, repeat counts, and take indices consistently accept the integer index protocol and reject booleans or floating-point values before reading array data
+- Iterable axis and count arguments are consumed once, and transpose accepts negative axes
+- Advanced-index highlight queries use shared-coordinate lookups instead of repeatedly scanning duplicate candidates, with disconnected broadcast groups handled separately
+- Source distributions include their SVG test fixtures and distribution checker
+
+### Added
+
+- `max_total_terms=100_000` limits the combined calculation cost of visible math outputs alongside the existing per-output `max_terms` limit
+- CI verifies fresh wheel and source-distribution installations, including optional notebook controls, and release artifacts must pass these checks before publication
+
+### Changed
+
+- Math previews plan visible output work before reading values and show `?` for every output if either calculation limit is exceeded. Set both limits to `None` to remove them
+- Evaluation metadata reports the planned output count, total terms, and exceeded limit, with `scope="per_output_cell_and_preview"`
+- Custom renderers can choose different output coordinates within the planned cell count. Repeated computed values are cached, while excess or skipped requests return `?` without retaining their coordinates
+
 ## 1.1.0 (2026-09-21)
 
 ### Added
