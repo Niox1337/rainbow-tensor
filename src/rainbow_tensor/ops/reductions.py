@@ -6,6 +6,8 @@ No tensor library is imported, so the views layer turns these mappings into
 values to draw and the tests cross check every result against NumPy.
 """
 
+from math import prod
+
 from ..shape import _check_axis
 from .combining import broadcast_result_shape, broadcast_source_coord
 
@@ -99,14 +101,89 @@ def iter_matmul_source_terms(out_coord, a_shape, b_shape):
 # Axis reductions ----------------------------------------------------------
 
 
-def reduce_result_shape(shape, axis):
-    """Return the shape after collapsing ``axis``."""
-    axis = _check_axis(axis, len(shape))
-    return tuple(s for i, s in enumerate(shape) if i != axis)
+def normalize_reduction_axes(axis, ndim):
+    """Return distinct reduction axes in ascending source-axis order.
+
+    ``None`` selects every axis. An integer follows Python's index protocol,
+    and a tuple selects zero or more axes. Negative axes count from the end.
+    Booleans, floats and non-tuple containers are rejected. Sorting makes
+    source-term order independent of the order in which axes were supplied.
+    """
+    if axis is None:
+        return tuple(range(ndim))
+    axes = axis if isinstance(axis, tuple) else (axis,)
+    resolved = tuple(_check_axis(value, ndim) for value in axes)
+    if len(set(resolved)) != len(resolved):
+        raise ValueError("reduction axes may not repeat")
+    return tuple(sorted(resolved))
 
 
-def reduce_source_coords(result_coord, shape, axis):
-    """Yield every source coordinate that collapses into ``result_coord``."""
-    axis = _check_axis(axis, len(shape))
-    for k in range(shape[axis]):
-        yield result_coord[:axis] + (k,) + result_coord[axis:]
+def validate_keepdims(keepdims):
+    """Normalize a Python or NumPy boolean scalar without importing NumPy."""
+    if not isinstance(keepdims, bool) and type(keepdims).__name__ not in ("bool", "bool_"):
+        raise TypeError("keepdims must be a boolean")
+    return bool(keepdims)
+
+
+def reduce_result_shape(shape, axis=None, *, keepdims=False):
+    """Return the reduced shape, optionally retaining length-one reduced axes.
+
+    ``axis=None`` reduces every axis, while ``axis=()`` leaves the shape intact.
+    The default drops reduced axes, preserving the original single-axis API.
+    """
+    axes = normalize_reduction_axes(axis, len(shape))
+    keepdims = validate_keepdims(keepdims)
+    reduced = set(axes)
+    if keepdims:
+        return tuple(1 if i in reduced else size for i, size in enumerate(shape))
+    return tuple(size for i, size in enumerate(shape) if i not in reduced)
+
+
+def reduce_term_count(shape, axis=None):
+    """Count contributions per output without enumerating any source coordinates.
+
+    The product over no reduced axes is one, so an empty axis tuple has one
+    source term per output and a mean divisor of one.
+    """
+    axes = normalize_reduction_axes(axis, len(shape))
+    return prod(shape[i] for i in axes)
+
+
+def reduce_source_index(result_coord, shape, axis=None, *, keepdims=False):
+    """Return a compact basic index for one output's contributing source group.
+
+    ``result_coord`` is an already normalized coordinate in the result shape.
+    Reduced source axes become full slices, while surviving axes are fixed at
+    their output positions. With ``keepdims``, the reduced length-one output
+    positions are ignored. The index can construct a compact ``BasicSelection``
+    without materializing its Cartesian product.
+    """
+    axes = normalize_reduction_axes(axis, len(shape))
+    keepdims = validate_keepdims(keepdims)
+    reduced = set(axes)
+    surviving = iter(result_coord)
+    return tuple(
+        slice(None) if i in reduced else (result_coord[i] if keepdims else next(surviving))
+        for i in range(len(shape))
+    )
+
+
+def reduce_source_coords(result_coord, shape, axis=None, *, keepdims=False):
+    """Yield one output's source coordinates in deterministic row-major order.
+
+    ``result_coord`` is already normalized in the result shape. An odometer
+    advances only reduced axes, with the last source axis changing fastest.
+    Memory depends on rank rather than the number of terms, and no axis ranges
+    are pooled. An empty axis tuple yields exactly the output coordinate itself.
+    """
+    axes = normalize_reduction_axes(axis, len(shape))
+    source_index = reduce_source_index(result_coord, shape, axes, keepdims=keepdims)
+    coordinate = [0 if isinstance(token, slice) else token for token in source_index]
+    count = prod(shape[i] for i in axes)
+    for _ in range(count):
+        yield tuple(coordinate)
+        for i in reversed(axes):
+            coordinate[i] += 1
+            if coordinate[i] < shape[i]:
+                break
+            coordinate[i] = 0

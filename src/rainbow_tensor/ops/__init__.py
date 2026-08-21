@@ -36,8 +36,12 @@ from .einsum import (
 from .reductions import (
     matmul_result_shape,
     matmul_source_terms,
+    normalize_reduction_axes,
     reduce_result_shape,
     reduce_source_coords,
+    reduce_source_index,
+    reduce_term_count,
+    validate_keepdims,
 )
 from .reshaping import (
     expand_dims_axes,
@@ -72,9 +76,12 @@ __all__ = [
     "matmul_result_shape",
     "matmul_source_terms",
     "moveaxis_axes",
+    "normalize_reduction_axes",
     "parse_einsum_subscripts",
     "reduce_result_shape",
     "reduce_source_coords",
+    "reduce_source_index",
+    "reduce_term_count",
     "repeat_result_shape",
     "repeat_source_coord",
     "repeat_source_positions",
@@ -93,4 +100,5 @@ __all__ = [
     "transpose_result_shape",
     "transpose_source_coord",
     "unflatten",
+    "validate_keepdims",
 ]
