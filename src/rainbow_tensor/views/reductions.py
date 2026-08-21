@@ -21,10 +21,16 @@ from ..ops import (
     reduce_result_shape,
     reduce_source_coords,
 )
-from ..ops.reductions import iter_matmul_source_terms
+from ..ops.reductions import (
+    iter_matmul_source_terms,
+    normalize_reduction_axes,
+    reduce_source_index,
+    reduce_term_count,
+    validate_keepdims,
+)
 from ..renderers import resolve_renderer
 from ..selection import BasicSelection
-from ..shape import _check_axis, extract_shape, flat_index, format_shape
+from ..shape import extract_shape, flat_index, format_shape
 from ..theme import resolve_theme
 from ..tracing import _build_trace, _normalize_focus, _trace_explanation
 from ..visual import (
@@ -172,7 +178,9 @@ def matmul(
     return visual
 
 
-def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, max_total_terms):
+def _reduce(
+    array, axis, op_name, theme, precision, renderer, keepdims, focus, max_terms, max_total_terms
+):
     """Render a reduction without evaluating hidden output groups.
 
     Each requested output coordinate is evaluated once per visual. A second
@@ -183,26 +191,32 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, 
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    axis = _check_axis(axis, len(shape))
-    result = reduce_result_shape(shape, axis)
+    axes = normalize_reduction_axes(axis, len(shape))
+    keepdims = validate_keepdims(keepdims)
+    result = reduce_result_shape(shape, axes, keepdims=keepdims)
     focused = _normalize_focus(focus, result)
     source_value = _source_value(array, shape)
     semantics = numeric_semantics((array,))
+    term_count = reduce_term_count(shape, axes)
+    reduced = set(axes)
 
     # Mark the source elements that collapse into the focused result element, and
     # tint every other group so values that fold into the same result share one
     # background while the focused group stays clearly highlighted.
-    source_index = focused[:axis] + (slice(None),) + focused[axis:]
+    source_index = reduce_source_index(focused, shape, axes, keepdims=keepdims)
     selected = BasicSelection(shape, source_index)
     focused_group = flat_index(focused, result) if result else 0
     trace = _build_trace(
-        op_name, focused, shape[axis],
-        ((coord,) for coord in reduce_source_coords(focused, shape, axis)),
-        divisor=shape[axis] if op_name == "mean" else 1,
+        op_name, focused, term_count,
+        ((coord,) for coord in reduce_source_coords(focused, shape, axes, keepdims=keepdims)),
+        divisor=term_count if op_name == "mean" else 1,
     )
 
     def source_tint(coord):
-        rc = coord[:axis] + coord[axis + 1:]
+        rc = (
+            tuple(0 if i in reduced else c for i, c in enumerate(coord))
+            if keepdims else tuple(c for i, c in enumerate(coord) if i not in reduced)
+        )
         group = flat_index(rc, result) if result else 0
         if group == focused_group:
             return None  # this group is shown through the selected highlight
@@ -213,15 +227,23 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, 
     # The surviving axes keep their original source colours instead of being
     # recoloured by their new position, so reducing a non-last axis does not
     # swap an axis frame to a different colour.
-    surviving = [i for i in range(len(shape)) if i != axis]
+    surviving = [i for i in range(len(shape)) if i not in reduced]
     if result:
+        colors = (
+            tuple(
+                theme.surface_selected if i in reduced else theme.axis_color(i)
+                for i in range(len(shape))
+            ) if keepdims else tuple(theme.axis_color(i) for i in surviving)
+        )
         result_theme = theme.variant(
-            axis_colors=tuple(theme.axis_color(surviving[r]) for r in range(len(result)))
+            axis_colors=colors
         )
     else:
         result_theme = theme
 
     def result_color(ax):
+        if keepdims and ax in reduced:
+            return theme.surface_selected
         return result_theme.axis_color(ax) if ax < len(result) - 1 else theme.text_muted
 
     # The result element of each group takes the same background as its source
@@ -234,26 +256,42 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, 
 
     selected_result = [focused or (0,)]
     evaluation = evaluation_plan(
-        shape[axis], max_terms, max_total_terms, disp, selected_result, result_theme
+        term_count, max_terms, max_total_terms, disp, selected_result, result_theme
     )
 
     @budgeted_values(evaluation)
     def result_value(coord):
         """Evaluate one visible group using a streaming sum of source values."""
         rc = () if not result else coord
-        total = _py_sum(source_value(sc) for sc in reduce_source_coords(rc, shape, axis))
-        return total / shape[axis] if op_name == "mean" else total
+        total = _py_sum(
+            source_value(sc) for sc in reduce_source_coords(rc, shape, axes, keepdims=keepdims)
+        )
+        return total / term_count if op_name == "mean" else total
 
+    if len(axes) == 1:
+        reducing = t("reduce.reducing", axis=axes[0], op=op_name)
+        combines = t("reduce.combines", count=term_count, axis=axes[0])
+    elif axes:
+        reducing = f"Reducing axes {axes} with {op_name}."
+        combines = f"Each result element combines {term_count} values from axes {axes}."
+    else:
+        reducing = "No axes are reduced because axis=()."
+        combines = "Each result element uses the source value at the same coordinate."
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
-        t("reduce.reducing", axis=axis, op=op_name),
+        reducing,
         t("common.result_shape", shape=format_shape(result)),
-        t("reduce.combines", count=shape[axis], axis=axis),
+        combines,
         t("reduce.share_background") if focus is None else (
             "Values that fold into the same result share its background, "
             "and the focused group is highlighted."
         ),
     ] + _preview_explanation([shape, disp], theme)
+    if keepdims and axes:
+        explanation.append(
+            f"keepdims=True retains axes {axes} at length 1 for broadcasting. "
+            "Their result dimensions use the highlight colour."
+        )
     explanation.extend(evaluation_explanation(evaluation))
     explanation.extend(numeric_explanation(semantics))
     if focus is not None:
@@ -286,18 +324,29 @@ def _reduce(array, axis, op_name, theme, precision, renderer, focus, max_terms, 
     visual.trace = trace
     visual.metadata["value_evaluation"] = evaluation
     visual.metadata["numeric_semantics"] = semantics
+    visual.metadata["reduction"] = {
+        "axes": axes, "keepdims": keepdims, "term_count": term_count,
+    }
     return visual
 
 
 def sum(
-    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS,
+    array, axis=None, theme=None, precision=2, renderer=None, *, keepdims=False, focus=None,
+    max_terms=DEFAULT_MAX_TERMS,
     max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
-    """Visualise a sum reduction over ``axis``.
+    """Visualise a sum over all axes, one axis, or a tuple of distinct axes.
 
     The source panel marks the elements that collapse into the first result
-    element, and the result panel holds the per group sums with the reduced
-    axis gone.
+    element. ``axis=None`` reduces every axis, an integer reduces one axis,
+    and a tuple reduces its named axes. Negative axes count from the end.
+    ``axis=()`` leaves each value in its original position. Boolean and
+    floating-point axes are rejected rather than coerced.
+
+    ``keepdims=True`` retains every reduced axis at length one so the result
+    can broadcast against the source. Those dimensions use the highlight
+    colour. The default removes reduced axes, preserving surviving colours.
+    ``visual.metadata["reduction"]`` records the normalized axes and term count.
 
     Numerical previews use Python scalar arithmetic, not a native backend
     reduction. Accumulation dtype, rounding, and overflow may differ. Shape
@@ -307,7 +356,9 @@ def sum(
 
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.
-    ``visual.trace`` retains up to eight ordered source terms for that output.
+    ``visual.trace`` retains up to eight terms in source row-major order,
+    regardless of the order of axes in the tuple. Retained axes need a zero
+    in the focus coordinate, for example ``(0, 1, 0)`` for shape ``(1, 3, 1)``.
 
     ``max_terms`` limits source terms per output cell, defaulting to 10,000.
     ``max_total_terms`` caps the sum of terms across visible outputs at 100,000.
@@ -316,22 +367,31 @@ def sum(
     and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
     return _reduce(
-        array, axis, "sum", theme, precision, renderer, focus, max_terms, max_total_terms
+        array, axis, "sum", theme, precision, renderer, keepdims, focus, max_terms, max_total_terms
     )
 
 
 def mean(
-    array, axis, theme=None, precision=2, renderer=None, *, focus=None, max_terms=DEFAULT_MAX_TERMS,
+    array, axis=None, theme=None, precision=2, renderer=None, *, keepdims=False, focus=None,
+    max_terms=DEFAULT_MAX_TERMS,
     max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
-    """Visualise a mean reduction over ``axis``.
+    """Visualise a mean over all axes, one axis, or a tuple of distinct axes.
 
     The source panel marks the elements that collapse into the first result
-    element, and the result panel holds the per group means with the reduced
-    axis gone.
+    element. ``axis=None`` reduces every axis, an integer reduces one axis,
+    and a tuple reduces its named axes. Negative axes count from the end.
+    ``axis=()`` leaves each value in its original position. Boolean and
+    floating-point axes are rejected rather than coerced.
+
+    ``keepdims=True`` retains every reduced axis at length one so the result
+    can broadcast against the source. Those dimensions use the highlight
+    colour. The default removes reduced axes, preserving surviving colours.
+    ``visual.metadata["reduction"]`` records the normalized axes and term count.
 
     Numerical previews sum input values with Python scalar arithmetic and
-    divide by the axis size, rather than calling a native backend reduction.
+    divide by the product of the reduced axis sizes, rather than calling a
+    native backend reduction. An empty axis tuple has a divisor of one.
     Accumulation dtype, rounding, and overflow may differ. Shape tuples supply
     generated row-major placeholder values. The model and value source are
     recorded in ``visual.metadata["numeric_semantics"]`` even when evaluation
@@ -339,7 +399,9 @@ def mean(
 
     Pass ``focus`` as an output coordinate tuple to explain another group.
     Negative coordinates are supported and a scalar result uses ``()``.
-    ``visual.trace`` retains up to eight terms and the mean's divisor.
+    ``visual.trace`` retains up to eight terms in source row-major order and
+    the mean's divisor. Axis tuple order does not affect the trace. Retained
+    axes need a zero in the focus coordinate.
 
     ``max_terms`` limits source terms per output cell, defaulting to 10,000.
     ``max_total_terms`` caps the sum of terms across visible outputs at 100,000.
@@ -348,5 +410,5 @@ def mean(
     and ``visual.metadata["value_evaluation"]`` records the evaluation decision.
     """
     return _reduce(
-        array, axis, "mean", theme, precision, renderer, focus, max_terms, max_total_terms
+        array, axis, "mean", theme, precision, renderer, keepdims, focus, max_terms, max_total_terms
     )
