@@ -145,3 +145,39 @@ def test_cpu_backend_operation_matches_numpy_cells(backend, dtype, layout, opera
     assert actual.shape == expected.shape
     np.testing.assert_array_equal(renderer.panels[0], reference)
     np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("operation", ["sum", "mean"])
+@pytest.mark.parametrize("keepdims", [False, True])
+@pytest.mark.parametrize("axis", [None, (), (0,), (0, 2), (-1, 0)])
+def test_cpu_backend_multi_axis_reduction_cells(backend, operation, keepdims, axis):
+    reference = (np.arange(24, dtype="float32").reshape(2, 3, 4) - 8) / 4
+    array = backend.array(reference)
+    expected = getattr(np, operation)(reference, axis=axis, keepdims=keepdims)
+    focus = tuple(size - 1 for size in expected.shape)
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(
+        array, axis=axis, keepdims=keepdims, focus=focus, renderer=renderer,
+    )
+
+    assert visual.shape == reference.shape
+    assert visual.result_shape == expected.shape
+    assert visual.trace.output_coord == focus
+    assert renderer.panels[-1].shape == (expected.shape or (1,))
+    np.testing.assert_array_equal(renderer.panels[0], reference)
+    actual = renderer.panels[-1].reshape(expected.shape)
+    np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("operation", ["sum", "mean"])
+def test_cpu_backend_transposed_tuple_reduction_cells(backend, operation):
+    array, reference = _source(backend, "float32", "transposed")
+    expected = getattr(np, operation)(reference, axis=(1, 0), keepdims=True)
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(array, axis=(1, 0), keepdims=True, renderer=renderer)
+
+    assert visual.shape == reference.shape
+    assert visual.result_shape == expected.shape == (1, 1)
+    assert renderer.panels[-1].shape == expected.shape
+    np.testing.assert_array_equal(renderer.panels[0], reference)
+    np.testing.assert_allclose(renderer.panels[-1], expected, rtol=1e-6, atol=1e-6)

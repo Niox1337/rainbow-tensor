@@ -158,3 +158,91 @@ def test_changed_default_renderer_cannot_replace_svg_with_plain_text(explorers):
         assert explorer.focus == (0,)
     finally:
         rt.set_default_renderer(original)
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+def test_kept_reduction_controls_refresh_focus_and_values(explorers, operation):
+    array = np.arange(24).reshape(2, 3, 4)
+    explorer = explorers(operation, array, axis=(0, 2), keepdims=True)
+    assert explorer.result_shape == (1, 3, 1)
+    assert tuple(control.min for control in explorer.coordinates) == (0, 0, 0)
+    assert tuple(control.max for control in explorer.coordinates) == (0, 2, 0)
+
+    explorer.coordinates[1].value = 2
+    explorer.update_button.click()
+    assert explorer.focus == (0, 2, 0)
+    assert explorer.visual.trace.output_coord == (0, 2, 0)
+    assert {
+        term[0].coordinate for term in explorer.visual.trace.terms
+    } == {(i, 2, k) for i in range(2) for k in range(4)}
+    before = explorer.visual.svg
+    array[:, 2, :] += 100
+    visual = explorer.set_focus((-1, -1, -1))
+    assert explorer.focus == (0, 2, 0)
+    assert tuple(control.value for control in explorer.coordinates) == (0, 2, 0)
+    assert visual.svg == operation(array, axis=(0, 2), keepdims=True, focus=(0, 2, 0)).svg
+    assert visual.svg != before
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+@pytest.mark.parametrize("keepdims", [False, True])
+def test_all_axis_reduction_controls_follow_result_rank(explorers, operation, keepdims):
+    array = np.arange(6).reshape(2, 3)
+    explorer = explorers(operation, array, keepdims=keepdims)
+    expected_shape = (1, 1) if keepdims else ()
+    expected_focus = (0, 0) if keepdims else ()
+    assert explorer.result_shape == expected_shape
+    assert tuple(control.max for control in explorer.coordinates) == expected_focus
+    explorer.update_button.click()
+    assert explorer.visual.trace.output_coord == expected_focus
+    assert explorer.visual.trace.term_count == 6
+    assert explorer.visual.svg == operation(array, keepdims=keepdims, focus=expected_focus).svg
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+@pytest.mark.parametrize("keepdims", [False, True])
+def test_empty_axis_tuple_preserves_coordinate_controls(explorers, operation, keepdims):
+    array = np.arange(6).reshape(2, 3)
+    explorer = explorers(operation, array, axis=(), keepdims=keepdims)
+    assert explorer.result_shape == array.shape
+    assert tuple(control.max for control in explorer.coordinates) == (1, 2)
+    visual = explorer.set_focus((-1, -1))
+    assert explorer.focus == (1, 2)
+    assert visual.trace.output_coord == (1, 2)
+    assert visual.trace.term_count == 1
+    assert visual.trace.divisor == 1
+    assert visual.trace.terms[0][0].coordinate == (1, 2)
+    assert visual.svg == operation(array, axis=(), keepdims=keepdims, focus=(1, 2)).svg
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+def test_invalid_kept_axis_focus_preserves_visual_and_controls(explorers, operation):
+    explorer = explorers(operation, (2, 3, 4), axis=(0, 2), keepdims=True, focus=(0, 1, 0))
+    before = explorer.visual
+    with pytest.raises(IndexError):
+        explorer.set_focus((1, 1, 0))
+    assert explorer.visual is before
+    assert explorer.focus == (0, 1, 0)
+    assert tuple(control.value for control in explorer.coordinates) == (0, 1, 0)
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+@pytest.mark.parametrize("limits, reason", [
+    ({"max_terms": 7}, "max_terms"),
+    ({"max_terms": 8, "max_total_terms": 23}, "max_total_terms"),
+])
+def test_kept_reduction_focus_preserves_both_budgets(explorers, operation, limits, reason):
+    explorer = explorers(operation, (2, 3, 4), axis=(0, 2), keepdims=True, **limits)
+    before = dict(explorer.visual.metadata["value_evaluation"])
+    explorer.coordinates[1].value = 2
+    explorer.update_button.click()
+    evaluation = explorer.visual.metadata["value_evaluation"]
+    assert evaluation == before
+    assert evaluation["status"] == "skipped"
+    assert evaluation["reason"] == reason
+    for key, limit in limits.items():
+        assert evaluation[key] == limit
+    assert evaluation["term_count"] == 8
+    assert evaluation["output_count"] == 3
+    assert evaluation["total_terms"] == 24
+    assert explorer.visual.trace.output_coord == (0, 2, 0)
