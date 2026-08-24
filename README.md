@@ -51,7 +51,7 @@ Shape changing, combining, and broadcasting views draw the source and the result
 
 - **Shapes and indexing** with `shape` and `index`, covering integers, slices, ellipsis, new axes, boolean masks, and fancy integer arrays
 - **Reshaping and moving axes** with `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, and `expand_dims`
-- **Reductions and math** with `sum`, `mean`, `matmul`, and `einsum`
+- **Reductions and math** with `sum`, `mean`, `matmul`, and `einsum`, including multiple reduction axes and `keepdims`
 - **Combining** with `concatenate`, `stack`, `broadcast`, `repeat`, and `take`
 - **Output explanations** with `focus=` on sums, means, matmul, and einsum
 - **Memory layout** with `memory`, including byte strides and data ownership
@@ -61,6 +61,19 @@ rt.sum(np.arange(12).reshape(3, 4), 0)
 ```
 
 ![Sum over axis 0](examples/images/sum_axis0.svg)
+
+Reduce several axes together and keep their positions for later broadcasting:
+
+```python
+x = np.arange(24).reshape(2, 3, 4)
+rt.mean(x, axis=(0, 2), keepdims=True, focus=(0, 1, 0))  # (2, 3, 4) -> (1, 3, 1)
+```
+
+The focused mean combines eight source values and divides by eight. Omit `axis`
+to reduce every axis, or pass `axis=()` to preserve every element. The
+[reduction guide](docs/guide/reductions-and-math.md) explains the shape rules,
+and [`10_reduction_axes.ipynb`](examples/10_reduction_axes.ipynb) works through
+row normalisation with `keepdims` and broadcasting.
 
 ```python
 rt.einsum("ij,jk->ik", np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4))

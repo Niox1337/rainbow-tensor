@@ -28,6 +28,32 @@ The controls reuse the static operations, including their numerical model and
 outputs under the same limits. Selecting another output never raises either
 limit. If the new plan exceeds a limit, output values appear as question marks.
 
+## Explore a reduction that keeps its axes
+
+The coordinate fields follow the result shape, including any size-one axes
+retained by `keepdims=True`:
+
+```python
+x = np.arange(24).reshape(2, 3, 4)
+reduction_explorer = rt.explore(
+    rt.mean, x, axis=(0, 2), keepdims=True, focus=(0, 1, 0)
+)
+reduction_explorer
+```
+
+The result shape is `(1, 3, 1)`. Only the middle coordinate can change, while
+the other two stay at 0. Each output averages `2 * 4 = 8` source values.
+
+```python
+reduction_explorer.set_focus((0, 2, 0))
+reduction_explorer.visual.trace.divisor  # 8
+```
+
+Without `keepdims`, the same operation has shape `(3,)` and uses `focus=(2,)`.
+With `axis=None`, the default, all axes reduce to a scalar unless they are kept.
+With `axis=()`, no axes are reduced and the fields follow the original shape.
+Call `reduction_explorer.close()` when finished with this example.
+
 ## Keep a static result
 
 The latest successful result is a normal `TensorVisual`:

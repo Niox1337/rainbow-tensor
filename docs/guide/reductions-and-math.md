@@ -5,19 +5,79 @@ side so the reduced or contracted axis is easy to see.
 
 ```python
 import numpy as np
+from IPython.display import display
+
 import rainbow_tensor as rt
 ```
 
 ## Sum and mean
 
-`sum` and `mean` collapse one axis. The source values that fold into the same
-result element share one background colour with that result element, the first
-group stays highlighted, and every surviving axis keeps its original colour.
-`mean` divides each group by its count, so the result holds floats.
+Choose which axes to collapse with `axis`. It accepts one integer, a tuple of
+integers, or `None` to reduce every axis. Leaving it out also reduces every axis.
+Negative axes count from the end, so `axis=-1` selects the last axis. Each axis
+may appear only once in a tuple.
 
 ```python
-rt.sum(np.arange(24).reshape(2, 3, 4), 0)
-rt.mean(np.arange(24).reshape(2, 3, 4), 1)
+x = np.arange(24).reshape(2, 3, 4)
+display(rt.sum(x, axis=1))  # result shape (2, 4)
+display(rt.mean(x, axis=(0, 2)))  # result shape (3,)
+display(rt.sum(x))  # scalar result, shape ()
+```
+
+The source values that fold into one result element share its background colour.
+The focused group stays highlighted, and surviving axes keep their source colours.
+`mean` divides each group by the number of contributing values. Reducing axes
+`(0, 2)` of `x` uses `2 * 4 = 8` values per output, so its divisor is 8.
+
+### Keep reduced axes for broadcasting
+
+Pass `keepdims=True` as a keyword to leave reduced axes at length one. For `x`,
+the shapes are:
+
+| `axis` | Default result | With `keepdims=True` |
+| --- | --- | --- |
+| `None` | `()` | `(1, 1, 1)` |
+| `1` | `(2, 4)` | `(2, 1, 4)` |
+| `-1` | `(2, 3)` | `(2, 3, 1)` |
+| `(0, 2)` | `(3,)` | `(1, 3, 1)` |
+| `()` | `(2, 3, 4)` | `(2, 3, 4)` |
+
+The retained reduced axes use the accent colour. Keeping those size-one axes
+helps a reduction result line up with its original array. For example, divide
+each row by its own total to make that row sum to one:
+
+```python
+scores = np.array([[2., 4., 6.], [3., 6., 9.]])
+display(rt.sum(scores, axis=1, keepdims=True, focus=(1, 0)))
+
+row_totals = scores.sum(axis=1, keepdims=True)  # shape (2, 1), values [[12.], [18.]]
+display(rt.broadcast(scores, row_totals))     # (2, 3) and (2, 1) align by row
+normalized = scores / row_totals
+np.testing.assert_allclose(normalized.sum(axis=1), [1., 1.])
+```
+
+Without `keepdims`, the totals have shape `(2,)`. Broadcasting compares axes
+from the right, and its size 2 cannot align with the 3 columns. The extra
+length-one axis makes each total stretch across the columns of its own row.
+Rainbow Tensor draws the calculation. NumPy performs the division above.
+
+### Reduce no axes
+
+An empty axis tuple means that no axes are reduced. `rt.sum(x, axis=())` and
+`rt.mean(x, axis=())` preserve the shape and each element's value. Each output
+has one source contribution, and the mean divisor is 1. This says nothing about
+preserving a backend's dtype, since previews use the numerical model below.
+
+`axis=()` does not mean an empty input. Sources still need at least one axis
+and a positive size on every axis. Scalar and zero-sized source arrays are not
+supported, although reducing all axes of a supported source gives a scalar result.
+
+Reduction details are available without parsing the explanation:
+
+```python
+visual = rt.mean(x, axis=(-3, -1), keepdims=True)
+visual.metadata["reduction"]
+# {"axes": (0, 2), "keepdims": True, "term_count": 8}
 ```
 
 ## Matmul
@@ -75,6 +135,21 @@ Coordinates are tuples in the output shape. Negative entries count from the
 end, and a scalar output uses `focus=()`. Invalid coordinates fail before
 reading array values.
 
+For reductions, `keepdims` also changes the focus tuple. Reducing axes `(0, 2)`
+of `x` gives shape `(3,)`, so use `focus=(1,)`. Keeping the axes gives shape
+`(1, 3, 1)`, so the same group is `focus=(0, 1, 0)`.
+
+```python
+visual = rt.mean(x, axis=(2, 0), focus=(1,))
+visual.trace.term_count         # 8
+visual.trace.divisor            # 8
+# Source values: 4, 5, 6, 7, 16, 17, 18, 19. Their mean is 11.5.
+```
+
+Reduction traces follow source row-major coordinate order, with the last reduced
+source axis changing fastest. Reordering the axis tuple does not reorder the
+trace. Here `(2, 0)`, `(0, 2)`, and `(-3, -1)` all describe the same groups.
+
 Every math visual exposes an immutable `OutputTrace`. Its `terms` contain
 `OperandRef` objects naming the operand number and source coordinate.
 Multiply references in each term, add the terms, then divide by `divisor`
@@ -111,6 +186,9 @@ also compute values on demand.
 All four functions accept `max_terms=10_000`, the maximum number of source
 contributions or products to sum for each output cell, and
 `max_total_terms=100_000`, the maximum across the visible output panel.
+For a multi-axis sum or mean, the per-output term count is the product of the
+reduced axis sizes. `keepdims` does not change that count. Reducing no axes
+with `axis=()` costs one term per output.
 The layout is planned before reading values. If either limit is exceeded, every
 output value displays `?`. No partial arithmetic result is used, and changing
 the order in which cells are rendered cannot change the budget decision.
@@ -142,3 +220,6 @@ These are calculation limits, not memory or elapsed-time guarantees. A term in
 a multi-operand einsum may read several operands. Reading displayed input cells
 is separate from calculating outputs. The theme option `max_visible_cells`
 limits the number of displayed cells in each panel.
+
+For an executable walkthrough of axis choices and row normalization, open
+`examples/10_reduction_axes.ipynb` in Jupyter.

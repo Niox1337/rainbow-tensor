@@ -55,8 +55,8 @@ notebooks in the `examples` folder.
   boolean masks, and fancy integer arrays
 - [Reshaping and moving axes](guide/reshaping) covers reshape, transpose,
   swapaxes, moveaxis, squeeze, and expand_dims
-- [Reductions and math](guide/reductions-and-math) covers sum, mean, matmul,
-  and einsum
+- [Reductions and math](guide/reductions-and-math) covers sum, mean, multiple
+  reduction axes, `keepdims` for broadcasting, matmul, and einsum
 - [Combining tensors](guide/combining) covers concatenate, stack, broadcast,
   repeat, and take
 - [Themes and configuration](guide/themes-and-configuration) covers themes,

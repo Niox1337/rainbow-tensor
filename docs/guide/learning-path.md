@@ -6,6 +6,8 @@ computed?
 
 ```python
 import numpy as np
+from IPython.display import display
+
 import rainbow_tensor as rt
 
 a = np.arange(6).reshape(2, 3)
@@ -50,6 +52,31 @@ Both focus on the same row. Its sum is `3 + 4 + 5 = 12`, while its mean is
 including its trailing comma. Negative coordinates count from the end.
 A scalar output uses `focus=()`.
 
+## Keep an axis to normalize each row
+
+Suppose each row contains three scores. To turn them into fractions of that
+row's total, each row needs its own divisor:
+
+```python
+scores = np.array([[2., 4., 6.], [3., 6., 9.]])
+display(rt.sum(scores, axis=-1, keepdims=True, focus=(1, 0)))
+
+row_totals = scores.sum(axis=1, keepdims=True)  # shape (2, 1)
+display(rt.broadcast(scores, row_totals))
+normalized = scores / row_totals
+np.testing.assert_allclose(normalized.sum(axis=1), [1., 1.])
+rt.shape(normalized)
+```
+
+`keepdims=True` leaves one column for the totals, 12 and 18. Broadcasting
+stretches each total across its own row. Without that retained axis, the totals
+have shape `(2,)`, which cannot line up with the three columns.
+
+The visual explains the reduction and broadcasting. NumPy computes the array
+used for division. To combine several axes, pass a tuple such as `axis=(0, 2)`.
+Omitting `axis` reduces all axes, while `axis=()` reduces none. See the
+[reduction guide](reductions-and-math.md) for their result shapes and focus tuples.
+
 ## Read the same calculation as einsum
 
 ```python
@@ -87,14 +114,16 @@ materializes all selected coordinates, so use it only for small selections.
 
 The display budget and the arithmetic budget control different costs.
 `max_visible_cells` limits the drawn cells in each panel. For sums, means,
-matmul, and einsum, `max_terms` limits arithmetic terms per output element.
-When that limit is exceeded, outputs show `?` and the explanation says that
+matmul, and einsum, `max_terms` limits arithmetic terms per output element,
+and `max_total_terms` limits their total across the visible output panel.
+For a multi-axis reduction, one output uses the product of the reduced axis sizes.
+When either limit is exceeded, outputs show `?` and the explanation says that
 values were not evaluated. A partial sum is never presented as a full result.
 
 ```python
-rt.sum((2, 100_000), axis=1)      # show the relation without the long sum
-rt.sum(a, axis=1, max_terms=None) # evaluate every term using Python scalars
+rt.sum((2, 100_000), axis=1)  # show the relation without the long sum
+rt.sum(a, axis=1, max_terms=None, max_total_terms=None)  # remove both limits
 ```
 
-For a runnable walkthrough, open
-`examples/07_explaining_outputs.ipynb` in Jupyter.
+For runnable walkthroughs, open `examples/07_explaining_outputs.ipynb` and
+`examples/10_reduction_axes.ipynb` in Jupyter.
