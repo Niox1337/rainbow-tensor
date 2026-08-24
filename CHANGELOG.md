@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 (unreleased)
+
+### Added
+
+- `sum` and `mean` accept an omitted axis or `axis=None` for all axes, a tuple of axes, negative axes, and an empty tuple for an unchanged shape
+- Keyword-only `keepdims=True` retains reduced axes at length one for broadcasting, with those result dimensions marked in the highlight colour
+- Multi-axis focus identifies the full source group, reports the product of reduced dimensions as the mean divisor, and traces terms in source row-major order regardless of axis tuple order
+- Reduction metadata records normalized axes, `keepdims`, and the number of source terms per output
+- A beginner notebook connects reduction shapes to row normalisation, broadcasting, output traces, and optional interactive controls
+
+### Changed
+
+- Multi-axis source selections and traces stay compact, including when the contributing group is too large to evaluate within the preview budgets
+- CPU backend, interactive, and installed-distribution checks cover all-axis, multi-axis, and empty-axis reductions with and without retained dimensions
+
 ## 1.1.1 (2026-09-21)
 
 ### Fixed
