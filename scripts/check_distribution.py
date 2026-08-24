@@ -32,14 +32,22 @@ assert importlib.metadata.version("rainbow-tensor") == sys.argv[1]
 assert rt.__version__ == sys.argv[1]
 assert "ipywidgets" not in sys.modules
 array = np.arange(6).reshape(2, 3)
+cube = np.arange(24).reshape(2, 3, 4)
 visuals = [
     rt.shape(array),
     rt.index(array, (slice(None), 1)),
     rt.sum(array, axis=1),
     rt.matmul(array, np.arange(6).reshape(3, 2)),
+    rt.sum(array, keepdims=True),
+    rt.mean(array, axis=(), keepdims=True),
+    rt.sum(cube, axis=(0, 2), keepdims=True, focus=(0, 2, 0)),
 ]
 assert visuals[0].shape == (2, 3)
-assert [visual.result_shape for visual in visuals[1:]] == [(2,), (2,), (2, 2)]
+assert [visual.result_shape for visual in visuals[1:]] == [
+    (2,), (2,), (2, 2), (1, 1), (2, 3), (1, 3, 1),
+]
+assert visuals[-1].trace.output_coord == (0, 2, 0)
+assert visuals[-1].trace.term_count == 8
 for visual in visuals:
     assert ElementTree.fromstring(visual.svg).tag.endswith("svg")
     assert visual.mime_type == "image/svg+xml"
@@ -48,12 +56,17 @@ path = Path("smoke.svg")
 visuals[-1].save(path)
 assert path.read_text(encoding="utf-8") == visuals[-1].svg
 if sys.argv[2] == "interactive":
-    explorer = rt.explore(rt.sum, array, axis=1)
+    explorer = rt.explore(rt.mean, cube, axis=(-1, 0), keepdims=True)
     try:
-        visual = explorer.set_focus((1,))
-        assert explorer.focus == (1,)
-        assert visual.trace.output_coord == (1,)
-        assert visual.svg == rt.sum(array, axis=1, focus=(1,)).svg
+        assert tuple(control.max for control in explorer.coordinates) == (0, 2, 0)
+        explorer.coordinates[1].value = 2
+        explorer.update_button.click()
+        visual = explorer.visual
+        assert explorer.focus == (0, 2, 0)
+        assert visual.trace.output_coord == (0, 2, 0)
+        assert visual.svg == rt.mean(
+            cube, axis=(-1, 0), keepdims=True, focus=(0, 2, 0),
+        ).svg
     finally:
         explorer.close()
 print(f"Installed package smoke passed: {package_path}")
