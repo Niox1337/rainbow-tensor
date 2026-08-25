@@ -71,6 +71,9 @@ def test_omitting_axis_reduces_the_entire_array(operation):
     visual = operation(array, renderer=renderer)
     assert visual.result_shape == ()
     assert renderer.values[-1] == {(0,): getattr(np, operation.__name__)(array)}
+    assert "".join(text for text, _ in renderer.panels[-1]["caption_parts"]) == (
+        f"{operation.__name__} ()"
+    )
     assert visual.trace.output_coord == ()
     assert visual.metadata["reduction"]["axes"] == (0, 1)
 

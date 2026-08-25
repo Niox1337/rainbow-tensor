@@ -311,7 +311,7 @@ def _reduce(
             "cell_tint": result_tint,
             "theme": result_theme,
             "caption_parts": _shape_caption_parts(
-                op_name, disp, theme, color_for=result_color
+                op_name, result, theme, color_for=result_color
             ),
         },
     ]

@@ -15,6 +15,10 @@
 - Multi-axis source selections and traces stay compact, including when the contributing group is too large to evaluate within the preview budgets
 - CPU backend, interactive, and installed-distribution checks cover all-axis, multi-axis, and empty-axis reductions with and without retained dimensions
 
+### Fixed
+
+- Scalar sum and mean captions show the logical result shape `()` instead of the single-cell display shape `(1)`
+
 ## 1.1.1 (2026-09-21)
 
 ### Fixed
