@@ -17,6 +17,7 @@ import math
 
 from .index_mapping import CompactSelection
 from .layout import build_layout
+from .shape import format_shape_label
 from .theme import LIGHT, resolve_theme
 
 # Back-compatible colour constants, sourced from the light preset so existing
@@ -283,10 +284,10 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     is an optional function mapping a coordinate to a ``(fill, border)`` pair,
     used to colour each result cell by the operand it came from.
     """
-    if 0 in shape:
-        return _render_empty_body(theme)
-    has_selection = bool(selected_list)
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
+    if layout.empty:
+        return _render_empty_body(layout, theme)
+    has_selection = bool(selected_list)
 
     # Grow the cells if any value is wider than the default, then lay out again
     # so the widened cells sit on the correct grid.
@@ -310,13 +311,12 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     return "".join(parts), layout.width, layout.height, theme
 
 
-def _render_empty_body(theme):
-    """Identify an empty result without inventing a cell or reading its values."""
+def _render_empty_body(layout, theme):
+    """Render a zero-element layout without inventing a value or coordinate."""
     padding = theme.padding
-    width = max(160, 2 * padding + 2 * theme.cell_w)
-    height = 2 * padding + theme.cell_h + 2 * theme.row_pad
+    width, height = layout.width, layout.height
     body = (
-        f'<g role="note" aria-label="Empty result, no elements">'
+        f'<g role="note" aria-label="Empty tensor shape {escape(layout.shape)}, no elements">'
         f'<rect x="{padding:.0f}" y="{padding:.0f}" '
         f'width="{width - 2 * padding:.0f}" height="{height - 2 * padding:.0f}" '
         f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{theme.neutral}" '
@@ -350,9 +350,14 @@ def render_svg(
     ``theme`` chooses the palette and geometry, ``precision`` controls float
     formatting, ``legend`` toggles the axis legend, and ``hover`` toggles the
     per-cell title used for tooltips.
+
+    The logical scalar shape ``()`` displays one cell. Shapes with a zero
+    dimension display an empty marker and never invoke ``value_fn``.
     """
     theme = resolve_theme(theme)
-    selected_list = _selection_for_render(selected)
+    selected_list = [] if 0 in shape else _selection_for_render(selected)
+    if (not shape or 0 in shape) and not label_parts and not label:
+        label = f"Shape {format_shape_label(shape)}"
 
     body, body_w, body_h, theme = _render_body(
         shape, selected_list, value_fn, theme, precision, hover
@@ -427,6 +432,9 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
     text is emitted by ``TensorVisual``. This composes the existing single
     tensor body, so the source and the result of an operation, or several
     operands, sit in one figure.
+
+    Scalar panels keep shape ``()`` and pass that coordinate to ``value_fn``.
+    Empty panels show their shape and an empty marker without value callbacks.
     """
     theme = resolve_theme(theme)
     connectors = connectors or []
@@ -437,15 +445,27 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
         ptheme = panel.get("theme") or theme
         body, w, h, ptheme = _render_body(
             panel["shape"],
-            _selection_for_render(panel.get("selected")),
+            [] if 0 in panel["shape"] else _selection_for_render(panel.get("selected")),
             panel.get("value_fn"),
             ptheme,
             precision,
             hover,
             panel.get("cell_tint"),
         )
-        bodies.append((body, w, h, panel))
         caption = panel.get("caption_parts")
+        if not panel["shape"] or 0 in panel["shape"]:
+            if not caption:
+                caption = [(f"Shape {format_shape_label(panel['shape'])}", ptheme.heading)]
+                panel = dict(panel, caption_parts=caption)
+            caption_length = sum(len(str(text)) for text, _ in caption)
+            caption_width = (
+                _text_width(caption_length, CAPTION_FONT_SIZE, SANS_CHAR_RATIO)
+                + 2 * TEXT_MARGIN
+            )
+            if caption_width > w:
+                body = f'<g transform="translate({(caption_width - w) / 2:.0f}, 0)">{body}</g>'
+                w = caption_width
+        bodies.append((body, w, h, panel))
         if caption:
             panel_labels.append("".join(str(text) for text, _ in caption))
         else:

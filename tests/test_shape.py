@@ -17,7 +17,7 @@ class FakeArray:
         self.shape = shape
 
 
-@pytest.mark.parametrize("shape", [(3,), (2, 3), (2, 2, 2)])
+@pytest.mark.parametrize("shape", [(), (0,), (2, 0, 3), (3,), (2, 3), (2, 2, 2)])
 def test_valid_shapes(shape):
     assert validate_shape(shape) == shape
 
@@ -32,17 +32,15 @@ def test_extract_shape_from_array_like():
 
 def test_array_like_with_invalid_shape_uses_same_validation():
     with pytest.raises(ValueError):
-        extract_shape(FakeArray((2, 0)))
+        extract_shape(FakeArray((2, -1)))
 
 
-def test_reject_empty_shape():
-    with pytest.raises(ValueError):
-        validate_shape(())
+def test_extract_scalar_shape():
+    assert extract_shape(FakeArray(())) == ()
 
 
-def test_reject_zero_dimension():
-    with pytest.raises(ValueError):
-        validate_shape((2, 0))
+def test_extract_zero_dimension():
+    assert extract_shape(FakeArray((2, 0))) == (2, 0)
 
 
 def test_reject_negative_dimension():

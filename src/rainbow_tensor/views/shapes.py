@@ -75,6 +75,8 @@ def shape(array, theme=None, precision=2, renderer=None):
     module default. ``precision`` controls how floats are formatted. The
     returned :class:`TensorVisual` renders as SVG in a notebook through
     ``_repr_svg_`` and also exposes the SVG string for inspection and testing.
+    A scalar has shape ``()`` and one value. A shape containing zero has no
+    elements, so it displays an empty marker without reading array values.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -125,17 +127,15 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
     mapping = IndexMapping(normalized, index)
     selected = mapping.selection
     result = mapping.result_shape
-    preview_shapes = [normalized, result or (1,)] if show_result else [normalized]
+    preview_shapes = [normalized, result] if show_result else [normalized]
     explanation = mapping.explanation + _preview_explanation(preview_shapes, theme)
 
     if show_result:
         source_value = _source_value(array, normalized)
-        display_shape = result or (1,)
 
         def result_value(coordinate):
             """Read one displayed output through its ordered source mapping."""
-            output_coordinate = coordinate if result else ()
-            return source_value(mapping.source_coord(output_coordinate))
+            return source_value(mapping.source_coord(coordinate))
 
         panels = [
             {
@@ -144,9 +144,9 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
                 "caption_parts": _shape_caption_parts("source", normalized, theme),
             },
             {
-                "shape": display_shape,
+                "shape": result,
                 "value_fn": result_value,
-                "selected": BasicSelection(display_shape, (Ellipsis,)),
+                "selected": BasicSelection(result, (Ellipsis,)),
                 "caption_parts": _shape_caption_parts("result", result, theme),
             },
         ]

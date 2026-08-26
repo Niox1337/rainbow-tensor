@@ -27,7 +27,8 @@ def extract_shape(obj):
 def validate_shape(shape):
     """Validate a shape and return it as a ``tuple[int, ...]``.
 
-    The shape must be a non-empty sequence of positive integers. Dimensions
+    An empty tuple describes a scalar, and zero dimensions describe no elements.
+    Dimensions must be nonnegative integers. They
     follow Python's integer index protocol and are normalized to Python ints.
     Boolean and floating-point dimensions remain invalid. Any rank is accepted.
     """
@@ -39,21 +40,23 @@ def validate_shape(shape):
                 "shape must be a tuple of integers or an object with a .shape attribute"
             ) from exc
 
-    if len(shape) == 0:
-        raise ValueError("shape must have at least one dimension, got an empty shape")
-
     normalized = []
     for dim in shape:
         dim = _as_integer(dim, "shape dimensions")
-        if dim <= 0:
-            raise ValueError(f"shape dimensions must be positive, got {dim!r}")
+        if dim < 0:
+            raise ValueError(f"shape dimensions must be nonnegative, got {dim!r}")
         normalized.append(dim)
 
     return tuple(normalized)
 
 
 def coordinates(shape):
-    """Yield every coordinate in row-major order for the given shape."""
+    """Yield row-major coordinates, including ``()`` for a scalar.
+
+    An empty tensor yields nothing without materializing its other axes.
+    """
+    if 0 in shape:
+        return iter(())
     return itertools.product(*[range(dim) for dim in shape])
 
 

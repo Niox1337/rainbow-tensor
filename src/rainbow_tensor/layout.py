@@ -70,12 +70,18 @@ class Frame:
 
 @dataclass
 class Layout:
-    """All drawing data for one tensor."""
+    """Drawing data with its logical shape, including scalar and empty tensors.
+
+    Empty layouts reserve space for a marker but have no cells or frames.
+    A scalar layout contains one real cell whose coordinate is ``()``.
+    """
 
     cells: list = field(default_factory=list)
     frames: list = field(default_factory=list)
     width: float = 0.0
     height: float = 0.0
+    shape: tuple = ()
+    empty: bool = False
 
 
 def visible_positions(size, limit, pinned=None):
@@ -97,6 +103,8 @@ def visible_positions(size, limit, pinned=None):
 
 def axis_visible_limits(shape, per_axis_limit, cell_budget):
     """Return per axis limits that keep the preview under ``cell_budget``."""
+    if 0 in shape:
+        return tuple(shape)
     if per_axis_limit is None:
         limits = list(shape)
     else:
@@ -175,8 +183,18 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     frame, alternating horizontal and vertical with depth so a deep tensor
     stays compact. Each axis truncates independently through
     :func:`visible_positions`, so a large N-D tensor still fits on screen.
+
+    Scalars use their logical coordinate ``()``. Empty tensors reserve a
+    bounded marker region and never inspect selections or call ``value_fn``.
     """
     t = theme or LIGHT
+    shape = tuple(shape)
+    layout = Layout(shape=shape)
+    if 0 in shape:
+        layout.empty = True
+        layout.width = max(160, 2 * t.padding + 2 * t.cell_w)
+        layout.height = 2 * t.padding + t.cell_h + 2 * t.row_pad
+        return layout
     sel = selected if isinstance(selected, CompactSelection) else {
         tuple(coord) for coord in (selected or [])
     }
@@ -184,6 +202,21 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     cell_w, cell_h, gap = t.cell_w, t.cell_h, t.cell_gap
     row_pad, row_gap = t.row_pad, t.row_gap
     block_pad, block_gap, pad = t.block_pad, t.block_gap, t.padding
+    if not shape:
+        row_w = cell_w + 2 * row_pad
+        row_h = cell_h + 2 * row_pad
+        value = value_fn(()) if value_fn is not None else 0
+        selected_scalar = () in sel
+        layout.cells.append(
+            Cell(pad + row_pad, pad + row_pad, cell_w, cell_h, value, (),
+                 selected=selected_scalar, flat=0)
+        )
+        layout.frames.append(
+            Frame(pad, pad, row_w, row_h, axis=None, selected=selected_scalar)
+        )
+        layout.width = 2 * pad + row_w
+        layout.height = 2 * pad + row_h
+        return layout
     limits = axis_visible_limits(shape, t.max_cells, t.max_visible_cells)
     if isinstance(sel, CompactSelection):
         pinned = {axis: sel.axis_pins(axis, limit) for axis, limit in enumerate(limits)}
@@ -199,7 +232,6 @@ def build_layout(shape, selected=None, value_fn=None, theme=None):
     row_h = cell_h + 2 * row_pad
 
     ndim = len(shape)
-    layout = Layout()
 
     def place_cells(rx, ry, prefix):
         for i, c in enumerate(col_pos):
