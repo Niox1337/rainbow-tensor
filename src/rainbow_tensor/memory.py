@@ -1,5 +1,6 @@
 """Explain public NumPy-style storage metadata without importing an array backend."""
 
+from math import prod
 from operator import index
 
 from .views.shapes import shape
@@ -123,7 +124,9 @@ def memory(array, theme=None, precision=2, renderer=None):
             lines.append(f"Axis {axis}: a one-index step changes the byte offset by {stride}.")
         if any(stride < 0 for stride in strides):
             lines.append("A negative stride walks backwards through storage along that axis.")
-        if any(stride == 0 for stride in strides):
+        if prod(visual.shape) == 0:
+            lines.append("Empty tensors have no element addresses to traverse.")
+        elif any(stride == 0 for stride in strides):
             lines.append("A zero stride reuses the same storage along that axis.")
     lines.append(
         f"C-contiguous: {_yes_no(metadata['c_contiguous'])}. "

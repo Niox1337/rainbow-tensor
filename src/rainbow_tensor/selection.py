@@ -3,7 +3,7 @@
 from math import prod
 from operator import index as integer_index
 
-from .indexing import validate_index
+from .indexing import _range_length, validate_index
 
 
 class BasicSelection:
@@ -29,7 +29,9 @@ class BasicSelection:
             else:
                 axes.append(range(*token.indices(size)))
         self.axes = tuple(axes)
-        self.count = prod(len(axis) for axis in self.axes)
+        self.count = 0 if any(not axis for axis in self.axes) else prod(
+            _range_length(axis) for axis in self.axes
+        )
 
     def __bool__(self):
         return self.count != 0
@@ -51,7 +53,7 @@ class BasicSelection:
             raise IndexError("selection index out of range")
         coordinate = []
         for axis in reversed(self.axes):
-            position, offset = divmod(position, len(axis))
+            position, offset = divmod(position, _range_length(axis))
             coordinate.append(axis[offset])
         return tuple(reversed(coordinate))
 
@@ -85,7 +87,7 @@ class BasicSelection:
         positions = self.axes[axis]
         if positions.step < 0:
             positions = positions[::-1]
-        count = len(positions)
+        count = _range_length(positions)
         slots = count if positions.step == 1 else count * 2 - 1
         if slots <= limit:
             return tuple(positions)

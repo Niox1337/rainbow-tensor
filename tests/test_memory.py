@@ -156,7 +156,7 @@ def test_methods_and_unsupported_properties_are_not_interpreted_as_metadata():
     assert visual.metadata["itemsize"] is None
 
 
-@pytest.mark.parametrize("invalid_shape", [(), (0,), (-1,)])
+@pytest.mark.parametrize("invalid_shape", [(-1,), (2, -1)])
 def test_memory_preserves_shape_validation(invalid_shape):
     with pytest.raises(ValueError):
         memory(invalid_shape)

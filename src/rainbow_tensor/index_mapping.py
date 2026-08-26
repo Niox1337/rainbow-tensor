@@ -17,6 +17,7 @@ from .indexing import (
     _is_array_like,
     _is_bool,
     _is_bool_array,
+    _range_length,
     _resolve_int,
     _shape_of,
     explain_index,
@@ -59,7 +60,7 @@ def _pins(positions, limit):
         return ()
     if isinstance(positions, range) and positions.step < 0:
         positions = positions[::-1]
-    count = len(positions)
+    count = _range_length(positions) if isinstance(positions, range) else len(positions)
     contiguous = isinstance(positions, range) and positions.step == 1
     slots = count if contiguous else 2 * count - 1
     if slots <= limit:
@@ -234,7 +235,7 @@ class _AdvancedSelection:
         mapping = self.mapping
         array_axes = tuple(mapping.arrays)
         slice_axes = tuple(mapping.slices)
-        slice_shape = tuple(len(mapping.slices[axis]) for axis in slice_axes)
+        slice_shape = tuple(_range_length(mapping.slices[axis]) for axis in slice_axes)
         seen = set()
         for broadcast_coordinate in _coordinates(mapping.broadcast_shape):
             gathered = tuple(mapping.arrays[axis].at(broadcast_coordinate) for axis in array_axes)
@@ -365,6 +366,7 @@ class IndexMapping:
             )
         fill = ndim - consuming
         entries = []
+        array_specs = {}
         axis = 0
 
         def add_slice(token):
@@ -402,7 +404,7 @@ class IndexMapping:
                     positions = [coord for coord in _coordinates(shape) if _get(entry, coord)]
                     for column in range(len(shape)):
                         values = {(i,): coord[column] for i, coord in enumerate(positions)}
-                        self.arrays[axis] = _ArrayIndex((len(positions),), values)
+                        array_specs[axis] = ((len(positions),), values)
                         entries.append(("arr", axis))
                         axis += 1
                 else:
@@ -412,8 +414,8 @@ class IndexMapping:
                             value = integer_index(_get(entry, coordinate))
                         except TypeError:
                             raise IndexError("index arrays must contain integers") from None
-                        values[coordinate] = _resolve_int(value, self.source_shape[axis], axis)
-                    self.arrays[axis] = _ArrayIndex(shape, values)
+                        values[coordinate] = value
+                    array_specs[axis] = (shape, values)
                     entries.append(("arr", axis))
                     axis += 1
             else:
@@ -430,7 +432,7 @@ class IndexMapping:
         contiguous = not any(
             entry is None or entry is Ellipsis or isinstance(entry, slice) for entry in between
         )
-        shapes = [array.shape for array in self.arrays.values()]
+        shapes = [shape for shape, _ in array_specs.values()]
         try:
             self.broadcast_shape = broadcast_result_shape(shapes)
         except ValueError:
@@ -438,6 +440,15 @@ class IndexMapping:
                 f"index arrays could not be broadcast together: shapes "
                 f"{[format_shape(shape) for shape in shapes]}"
             ) from None
+        # An empty broadcast performs no gathers, so array bounds are irrelevant.
+        # Types and scalar indices were still validated above, as NumPy requires.
+        for source_axis, (shape, values) in array_specs.items():
+            if 0 not in self.broadcast_shape:
+                for coordinate, value in values.items():
+                    values[coordinate] = _resolve_int(
+                        value, self.source_shape[source_axis], source_axis
+                    )
+            self.arrays[source_axis] = _ArrayIndex(shape, values)
         basic_axes = []
         insertion = None
         for kind, source_axis in entries:
@@ -446,7 +457,9 @@ class IndexMapping:
             elif kind == "arr" and insertion is None:
                 insertion = len(basic_axes)
         self.broadcast_start = insertion if contiguous else 0
-        basic_shape = tuple(1 if axis is None else len(self.slices[axis]) for axis in basic_axes)
+        basic_shape = tuple(
+            1 if axis is None else _range_length(self.slices[axis]) for axis in basic_axes
+        )
         start = self.broadcast_start
         self.result_shape = basic_shape[:start] + self.broadcast_shape + basic_shape[start:]
         self.slice_outputs = {

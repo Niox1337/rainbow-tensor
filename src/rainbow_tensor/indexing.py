@@ -168,11 +168,25 @@ def expand_slice(sl, size):
     return list(range(*sl.indices(size)))
 
 
+def _range_length(positions):
+    """Count a range with Python integers, without the platform limit of ``len``.
+
+    Shape metadata can exceed ``sys.maxsize`` even when a later zero dimension
+    makes the whole tensor empty. No positions are enumerated to obtain the count.
+    """
+    distance = positions.stop - positions.start
+    if positions.step < 0:
+        distance = -distance
+    stride = abs(positions.step)
+    return max(0, (distance + stride - 1) // stride)
+
+
 def selected_coordinates(shape, index):
     """Compute every coordinate selected by ``index`` in row-major order.
 
     ``None`` entries insert a new axis in the result and select nothing in the
-    source tensor, so they are skipped here.
+    source tensor, so they are skipped here. Empty selections return before
+    expanding any axis, even when other dimensions are very large.
     """
     tokens = validate_index(index, shape)
     axes = []
@@ -183,9 +197,11 @@ def selected_coordinates(shape, index):
         size = shape[axis]
         axis += 1
         if isinstance(tok, int):
-            axes.append([tok])
+            axes.append(range(tok, tok + 1))
         else:
-            axes.append(expand_slice(tok, size))
+            axes.append(range(*tok.indices(size)))
+    if any(not axis for axis in axes):
+        return []
     return list(itertools.product(*axes))
 
 
@@ -206,7 +222,7 @@ def result_shape(shape, index):
         size = shape[axis]
         axis += 1
         if isinstance(tok, slice):
-            out.append(len(range(*tok.indices(size))))
+            out.append(_range_length(range(*tok.indices(size))))
     return tuple(out)
 
 
@@ -245,6 +261,8 @@ def _format_array(entry):
 
 def format_index(index):
     """Format an index tuple as a readable string such as ``0, :, 1``."""
+    if not index:
+        return "()"
     return ", ".join(format_token(entry) for entry in index)
 
 
