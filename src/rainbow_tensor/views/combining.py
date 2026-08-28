@@ -5,6 +5,8 @@ Public functions ``repeat``, ``take``, ``concatenate``, ``stack``, and
 stretches that produce the result stay visible.
 """
 
+from math import prod
+
 from ..explanations import t
 from ..ops import (
     broadcast_result_shape,
@@ -12,15 +14,17 @@ from ..ops import (
     broadcast_stretched_axes,
     concatenate_result_shape,
     concatenate_source,
+    repeat_result_shape,
     repeat_source_coord,
     repeat_source_positions,
     stack_result_shape,
     stack_source,
     take_axis_and_indices,
+    take_result_shape,
     take_source_coord,
 )
 from ..renderers import resolve_renderer
-from ..shape import _check_axis, extract_shape, format_shape
+from ..shape import _check_axis, _integer_or_sequence, extract_shape, format_shape
 from ..theme import resolve_theme
 from ..visual import (
     _operand_tint,
@@ -40,20 +44,26 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
     the adjacent run of copies it produces share one tint, so the result reads as
     materialised copies. This is the contrast with ``broadcast``, which stretches
     a size one axis virtually without copying any values.
+
+    A scalar is treated as one element on axis zero. Zero repeat counts produce
+    an empty result without evaluating result values.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    axis = _check_axis(axis, len(shape))
-    source_positions = repeat_source_positions(shape[axis], repeats)
-    result = shape[:axis] + (len(source_positions),) + shape[axis + 1:]
+    axis = _check_axis(axis, len(shape) or 1)
+    repeats = _integer_or_sequence(repeats, "repeats")
+    result = repeat_result_shape(shape, repeats, axis)
+    source_positions = (
+        repeat_source_positions((shape or (1,))[axis], repeats) if prod(result) else ()
+    )
     source_value = _source_value(array, shape)
 
     def result_value(coord):
-        return source_value(repeat_source_coord(coord, source_positions, axis))
+        return source_value(repeat_source_coord(coord, source_positions, axis, shape))
 
     def source_tint(coord):
-        return _operand_tint(theme, coord[axis])
+        return _operand_tint(theme, coord[axis] if shape else 0)
 
     def result_tint(coord):
         return _operand_tint(theme, source_positions[coord[axis]])
@@ -87,8 +97,9 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
 def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
     """Visualise gathering values along one axis with ``take``.
 
-    ``indices`` is a 1-D list of positions along ``axis``. The chosen axis is
-    replaced by the gathered positions, matching ``numpy.take`` with an axis.
+    ``indices`` is an integer or a 1-D list of positions along ``axis``. An integer
+    removes the axis. A list replaces it with the gathered positions, matching
+    ``numpy.take`` with an axis. A scalar input has one element on axis zero.
     Negative axes and negative indices both work. Each gathered source slice and
     the result slice it feeds share one tint, so repeated indices repeat a tint
     and reordered indices reorder them, making the gather visible.
@@ -96,27 +107,28 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    indices = tuple(indices)
+    indices = _integer_or_sequence(indices, "take indices")
     axis, resolved = take_axis_and_indices(shape, indices, axis)
-    result = shape[:axis] + (len(resolved),) + shape[axis + 1:]
+    result = take_result_shape(shape, indices, axis)
     source_value = _source_value(array, shape)
-    gathered = set(resolved)
+    scalar_index = isinstance(resolved, int)
+    gathered = {resolved} if scalar_index else set(resolved)
 
     def result_value(coord):
-        return source_value(take_source_coord(coord, resolved, axis))
+        return source_value(take_source_coord(coord, resolved, axis, shape))
 
     def source_tint(coord):
-        pos = coord[axis]
+        pos = coord[axis] if shape else 0
         if pos in gathered:
             return _operand_tint(theme, pos)
         return None
 
     def result_tint(coord):
-        return _operand_tint(theme, resolved[coord[axis]])
+        return _operand_tint(theme, resolved if scalar_index else resolved[coord[axis]])
 
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
-        t("take.taking", indices=list(indices), axis=axis),
+        t("take.taking", indices=indices if scalar_index else list(indices), axis=axis),
         t("common.result_shape", shape=format_shape(result)),
         t("take.copies"),
     ] + _preview_explanation([shape, result], theme)

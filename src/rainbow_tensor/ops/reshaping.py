@@ -13,6 +13,8 @@ from ..shape import _as_integer, _check_axis, _integer_or_sequence, flat_index
 
 def unflatten(flat, shape):
     """Return the coordinate at row major flat position ``flat`` in ``shape``."""
+    if 0 in shape:
+        raise ValueError("an empty shape has no flat positions")
     coord = []
     for dim in reversed(shape):
         coord.append(flat % dim)
@@ -29,13 +31,15 @@ def reshape_result_shape(old_shape, new_shape):
     One axis may be ``-1`` and is inferred from the remaining axes, matching
     the NumPy convention. Dimensions follow the integer index protocol, with
     booleans and floats rejected. The total number of elements must stay the same.
+    Scalars have one element and empty shapes have zero. A zero known product
+    makes an inferred dimension ambiguous, so targets such as ``(0, -1)`` fail.
     """
     new = tuple(_as_integer(dim, "reshape dimensions") for dim in new_shape)
     neg = [i for i, d in enumerate(new) if d == -1]
     if len(neg) > 1:
         raise ValueError("can only specify one unknown dimension with -1")
     for d in new:
-        if d < -1 or d == 0:
+        if d < -1:
             raise ValueError(f"invalid reshape dimension {d}")
     total = prod(old_shape)
     if neg:
@@ -157,6 +161,9 @@ def squeeze_axes(shape, axis=None):
     if axis is None:
         return tuple(i for i, size in enumerate(shape) if size == 1)
     axes = _integer_or_sequence(axis, "axis")
+    if ndim == 0 and isinstance(axes, int):
+        _check_axis(axes, 1)
+        return ()
     axes = (axes,) if isinstance(axes, int) else axes
     removed = []
     for a in axes:

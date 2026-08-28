@@ -6,9 +6,25 @@ these mappings into values to draw and the tests cross check every result
 against NumPy.
 """
 
-from ..shape import _as_integer, _check_axis, _integer_or_sequence
+from ..shape import _check_axis, _integer_or_sequence
 
 # Repeat -------------------------------------------------------------------
+
+
+def _repeat_spec(axis_size, repeats):
+    """Validate repeat counts without allocating a list for every source element."""
+    counts = _integer_or_sequence(repeats, "repeats")
+    if not isinstance(counts, int):
+        if len(counts) == 1:
+            counts = counts[0]
+        elif len(counts) != axis_size:
+            raise ValueError(
+                f"repeats has length {len(counts)} but axis has size {axis_size}"
+            )
+    for count in (counts,) if isinstance(counts, int) else counts:
+        if count < 0:
+            raise ValueError(f"repeats may not be negative, got {count}")
+    return counts
 
 
 def repeat_source_positions(axis_size, repeats):
@@ -20,36 +36,34 @@ def repeat_source_positions(axis_size, repeats):
     materialised copies in order. Counts follow the integer index protocol,
     so booleans and floats are rejected instead of silently coerced.
     """
-    repeats = _integer_or_sequence(repeats, "repeats")
-    if isinstance(repeats, int):
-        counts = [repeats] * axis_size
-    else:
-        counts = repeats
-        if len(counts) != axis_size:
-            raise ValueError(
-                f"repeats has length {len(counts)} but axis has size {axis_size}"
-            )
+    repeats = _repeat_spec(axis_size, repeats)
+    if repeats == 0:
+        return []
+    counts = (repeats for _ in range(axis_size)) if isinstance(repeats, int) else repeats
     positions = []
     for i, count in enumerate(counts):
-        if count < 0:
-            raise ValueError(f"repeats may not be negative, got {count}")
         positions.extend([i] * count)
     return positions
 
 
 def repeat_result_shape(shape, repeats, axis):
-    """Return the shape after repeating elements along ``axis``."""
+    """Return the repeat shape, treating a scalar as one element on axis zero."""
+    shape = shape or (1,)
     axis = _check_axis(axis, len(shape))
-    positions = repeat_source_positions(shape[axis], repeats)
-    return shape[:axis] + (len(positions),) + shape[axis + 1:]
+    counts = _repeat_spec(shape[axis], repeats)
+    size = counts * shape[axis] if isinstance(counts, int) else sum(counts)
+    return shape[:axis] + (size,) + shape[axis + 1:]
 
 
-def repeat_source_coord(result_coord, source_positions, axis):
+def repeat_source_coord(result_coord, source_positions, axis, shape=None):
     """Map a result coordinate back to the source element it copies.
 
     Along the repeated axis the result position picks its source index from the
     materialised copy list, and every other axis is copied straight through.
+    Passing the original scalar ``shape=()`` maps each copy to coordinate ``()``.
     """
+    if shape == ():
+        return ()
     source = source_positions[result_coord[axis]]
     return result_coord[:axis] + (source,) + result_coord[axis + 1:]
 
@@ -65,36 +79,47 @@ def take_axis_and_indices(shape, indices, axis):
     ``numpy.take``. Indices follow the integer index protocol, with booleans
     and floats rejected. An out of range index raises a clear error.
     """
+    shape = shape or (1,)
     axis = _check_axis(axis, len(shape))
     size = shape[axis]
+    indices = _integer_or_sequence(indices, "take indices")
+    scalar_index = isinstance(indices, int)
     resolved = []
-    for raw in indices:
-        i = _as_integer(raw, "take indices")
+    for i in (indices,) if scalar_index else indices:
         r = i + size if i < 0 else i
         if not 0 <= r < size:
             raise ValueError(
                 f"take index {i} is out of range for axis {axis} of size {size}"
             )
         resolved.append(r)
-    return axis, tuple(resolved)
+    return axis, resolved[0] if scalar_index else tuple(resolved)
 
 
 def take_result_shape(shape, indices, axis):
     """Return the shape after gathering ``indices`` along ``axis``.
 
-    The chosen axis is replaced by the number of indices, so the rank stays the
-    same and only the gathered axis changes length.
+    A scalar index removes the chosen axis. A sequence replaces it with the
+    number of indices. A scalar input is treated as one element on axis zero.
     """
     axis, resolved = take_axis_and_indices(shape, indices, axis)
+    shape = shape or (1,)
+    if isinstance(resolved, int):
+        return shape[:axis] + shape[axis + 1:]
     return shape[:axis] + (len(resolved),) + shape[axis + 1:]
 
 
-def take_source_coord(result_coord, resolved_indices, axis):
+def take_source_coord(result_coord, resolved_indices, axis, shape=None):
     """Map a result coordinate back to its source coordinate.
 
     Along the gathered axis the result position selects one source position from
     the resolved index list, and every other axis is copied straight through.
+    A scalar index inserts its source position at the removed axis. Passing
+    the original scalar ``shape=()`` returns the source coordinate ``()``.
     """
+    if shape == ():
+        return ()
+    if isinstance(resolved_indices, int):
+        return result_coord[:axis] + (resolved_indices,) + result_coord[axis:]
     source = resolved_indices[result_coord[axis]]
     return result_coord[:axis] + (source,) + result_coord[axis + 1:]
 
@@ -110,6 +135,8 @@ def concatenate_result_shape(shapes, axis):
     if not shapes:
         raise ValueError("need at least one tensor to concatenate")
     ndim = len(shapes[0])
+    if ndim == 0:
+        raise ValueError("zero-dimensional tensors cannot be concatenated")
     axis = _check_axis(axis, ndim)
     for s in shapes:
         if len(s) != ndim:

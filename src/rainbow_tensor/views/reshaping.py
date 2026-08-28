@@ -41,7 +41,8 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
     axis. The source and the result are drawn side by side. Reshape keeps the
     row major order, so the element at a flat position stays at that flat
     position, which the figure makes visible by carrying the same values into
-    the new layout.
+    the new layout. Scalars use ``()`` and empty targets may contain zero.
+    An inferred ``-1`` cannot be combined with an explicit zero dimension.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -200,11 +201,9 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
     result = squeeze_result_shape(shape, removed)
     source_value = _source_value(array, shape)
     surviving = [i for i in range(len(shape)) if i not in removed_set]
-    display_result = result or (1,)
 
     def result_value(coord):
-        sc = (0,) * len(shape) if not result else squeeze_source_coord(coord, removed)
-        return source_value(sc)
+        return source_value(squeeze_source_coord(coord, removed))
 
     if result:
         result_theme = theme.variant(
@@ -239,7 +238,7 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
         removed_line,
         t("common.result_shape", shape=format_shape(result)),
         t("squeeze.keep_colour"),
-    ] + _preview_explanation([shape, display_result], theme)
+    ] + _preview_explanation([shape, result], theme)
     panels = [
         {
             "shape": shape,
@@ -248,11 +247,11 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
             "caption_parts": _shape_caption_parts("source", shape, theme, color_for=source_color),
         },
         {
-            "shape": display_result,
+            "shape": result,
             "value_fn": result_value,
             "theme": result_theme,
             "caption_parts": _shape_caption_parts(
-                "squeeze", display_result, theme, color_for=result_color
+                "squeeze", result, theme, color_for=result_color
             ),
         },
     ]
