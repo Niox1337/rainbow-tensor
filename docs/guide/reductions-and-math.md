@@ -68,9 +68,8 @@ An empty axis tuple means that no axes are reduced. `rt.sum(x, axis=())` and
 has one source contribution, and the mean divisor is 1. This says nothing about
 preserving a backend's dtype, since previews use the numerical model below.
 
-`axis=()` does not mean an empty input. Sources still need at least one axis
-and a positive size on every axis. Scalar and zero-sized source arrays are not
-supported, although reducing all axes of a supported source gives a scalar result.
+`axis=()` describes the axes to reduce, not how many elements the source has.
+It preserves a scalar source as a scalar and an empty source as an empty result.
 
 Reduction details are available without parsing the explanation:
 
@@ -79,6 +78,43 @@ visual = rt.mean(x, axis=(-3, -1), keepdims=True)
 visual.metadata["reduction"]
 # {"axes": (0, 2), "keepdims": True, "term_count": 8}
 ```
+
+### Scalar sources and empty groups
+
+A scalar source has one value at coordinate `()`. Reducing all of its axes
+with `axis=None` keeps that value and the result shape `()`:
+
+```python
+display(rt.sum(np.array(7)))
+display(rt.mean(np.array(7), focus=()))
+```
+
+For an empty source, first ask whether the result has any elements. Reducing
+axis 1 of shape `(2, 0, 3)` leaves shape `(2, 3)`. There are six output cells,
+but each has zero contributing values. Their sums are 0 and their means are
+NaN, since an average of no observations is undefined:
+
+```python
+empty = np.empty((2, 0, 3))
+display(rt.sum(empty, axis=1))   # six zeros, shape (2, 3)
+display(rt.mean(empty, axis=1))  # six NaNs, shape (2, 3)
+```
+
+Reducing axis 2 of the same source leaves shape `(2, 0)`. This time there are
+no output cells at all. The figure shows an empty marker, `visual.trace` is
+`None`, and there is no valid output coordinate to focus:
+
+```python
+empty_result = rt.sum(empty, axis=2)
+assert empty_result.result_shape == (2, 0)
+assert empty_result.trace is None
+empty_result
+```
+
+Leave `focus=None` for an empty result. An explicit coordinate raises
+`IndexError`. A nonempty output with an empty contribution group still has a
+trace, with `term_count=0` and no source terms. Neither case reads nonexistent
+source values. Keeping reduced axes changes the result shape as usual.
 
 ## Matmul
 
@@ -95,6 +131,15 @@ b = np.arange(12).reshape(3, 4)
 rt.matmul(a, b)
 rt.matmul(np.arange(3), b)
 rt.matmul(np.ones((5, 2, 3)), np.ones((5, 3, 4)))
+```
+
+Both operands must have at least one axis. Scalar inputs are rejected, even
+though scalars are valid for shape views and reductions. A contracted axis may
+have length zero. For example, `(2, 0) @ (0, 3)` has shape `(2, 3)` with every
+output equal to the empty sum, 0:
+
+```python
+rt.matmul(np.empty((2, 0)), np.empty((0, 3)))
 ```
 
 ## Einsum
@@ -150,7 +195,8 @@ Reduction traces follow source row-major coordinate order, with the last reduced
 source axis changing fastest. Reordering the axis tuple does not reorder the
 trace. Here `(2, 0)`, `(0, 2)`, and `(-3, -1)` all describe the same groups.
 
-Every math visual exposes an immutable `OutputTrace`. Its `terms` contain
+Every math visual with at least one output exposes an immutable `OutputTrace`.
+An empty output has `trace=None`. A trace's `terms` contain
 `OperandRef` objects naming the operand number and source coordinate.
 Multiply references in each term, add the terms, then divide by `divisor`
 for a mean. The trace preserves repeated factors caused by broadcasting.
@@ -189,6 +235,8 @@ contributions or products to sum for each output cell, and
 For a multi-axis sum or mean, the per-output term count is the product of the
 reduced axis sizes. `keepdims` does not change that count. Reducing no axes
 with `axis=()` costs one term per output.
+An empty contribution group costs zero terms, and an empty output has no
+planned output cells. The same limits remain in force for all other groups.
 The layout is planned before reading values. If either limit is exceeded, every
 output value displays `?`. No partial arithmetic result is used, and changing
 the order in which cells are rendered cannot change the budget decision.
@@ -222,4 +270,5 @@ is separate from calculating outputs. The theme option `max_visible_cells`
 limits the number of displayed cells in each panel.
 
 For an executable walkthrough of axis choices and row normalization, open
-`examples/10_reduction_axes.ipynb` in Jupyter.
+`examples/10_reduction_axes.ipynb` in Jupyter. For scalar sources, empty groups,
+and empty results, continue with `examples/11_scalars_and_empty_tensors.ipynb`.

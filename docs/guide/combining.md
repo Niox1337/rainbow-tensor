@@ -29,6 +29,10 @@ rt.concatenate([a, b], 1)
 rt.stack([a, b], 0)
 ```
 
+Empty operands are allowed when their remaining dimensions match. Scalars
+can be stacked into a vector, but cannot be concatenated because they have no
+existing axis.
+
 ## Broadcast
 
 `broadcast` stretches a smaller operand to match a larger one. Each operand is
@@ -41,6 +45,9 @@ them must be `1`.
 rt.broadcast((3, 1), (1, 4))
 rt.broadcast((2, 3, 4), (4,))
 ```
+
+A scalar broadcasts to any compatible shape. A dimension of length one can
+broadcast to length zero, producing an empty result rather than one element.
 
 ## Repeat
 
@@ -56,9 +63,12 @@ rt.repeat(x, 2, axis=0)
 rt.repeat(x, [1, 2, 0, 1], axis=1)
 ```
 
+Zero counts can make the result empty. A scalar input acts as one element on
+axis zero, so `rt.repeat(np.array(7), 3)` produces shape `(3,)`.
+
 ## Take
 
-`take` gathers values along one axis from a list of indices, matching
+`take` gathers values along one axis from an integer or a list of indices, matching
 `numpy.take`. Each gathered source slice and the result slice it feeds share one
 tint, so a repeated index repeats a tint and a reordered index reorders them.
 Negative axes and negative indices both work.
@@ -67,3 +77,9 @@ Negative axes and negative indices both work.
 rt.take(x, [0, 2, 2, 1], axis=1)
 rt.take(x, [2, 0], axis=0)
 ```
+
+An integer index removes the selected axis. A list preserves that axis with
+the list's length, including zero for an empty list. For a scalar input,
+`rt.take(np.array(7), 0)` returns a scalar and `rt.take(np.array(7), [0])`
+returns shape `(1,)`. Both `take` and `repeat` default to axis zero rather than
+flattening the input.

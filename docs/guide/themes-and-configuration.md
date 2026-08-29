@@ -107,3 +107,9 @@ rt.shape((2, 3), renderer="text")
 
 Use `set_default_renderer` to choose a renderer for later calls, or pass
 `renderer=` on one call for a local override.
+
+Panel shapes are logical shapes. A scalar panel has shape `()` and its one
+value is read with `value_fn(())`. Older versions used a `(1,)` display panel
+for some scalar results, so custom renderers should remove that workaround.
+If any dimension is zero, there are no cell coordinates and the renderer must
+not call `value_fn`. A math view with an empty result has `visual.trace=None`.

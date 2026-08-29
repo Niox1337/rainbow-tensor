@@ -52,6 +52,32 @@ Both focus on the same row. Its sum is `3 + 4 + 5 = 12`, while its mean is
 including its trailing comma. Negative coordinates count from the end.
 A scalar output uses `focus=()`.
 
+## Count elements before interpreting an empty result
+
+Compare these three shapes first: `()` holds one scalar, `(1,)` holds one
+vector element, and `(0,)` holds no elements. A zero anywhere in a shape makes
+the tensor empty. The diagram labels its shape and shows **No elements**.
+
+```python
+display(rt.shape(np.array(7)))
+display(rt.shape(np.array([7])))
+display(rt.shape(np.empty((0,))))
+```
+
+Now use an empty source with shape `(2, 0, 3)`. Predict the output shape before
+looking at the figures:
+
+```python
+empty = np.empty((2, 0, 3))
+display(rt.sum(empty, axis=1))   # shape (2, 3), six empty sums equal to 0
+display(rt.mean(empty, axis=1))  # shape (2, 3), six undefined means shown as NaN
+display(rt.sum(empty, axis=2))   # shape (2, 0), no output values
+```
+
+The last figure has `trace=None` because there is no output coordinate.
+The first two have output cells with zero source contributions. That distinction
+also explains why an empty output disables the interactive focus controls.
+
 ## Keep an axis to normalize each row
 
 Suppose each row contains three scores. To turn them into fractions of that
@@ -125,5 +151,6 @@ rt.sum((2, 100_000), axis=1)  # show the relation without the long sum
 rt.sum(a, axis=1, max_terms=None, max_total_terms=None)  # remove both limits
 ```
 
-For runnable walkthroughs, open `examples/07_explaining_outputs.ipynb` and
-`examples/10_reduction_axes.ipynb` in Jupyter.
+For runnable walkthroughs, open `examples/07_explaining_outputs.ipynb`,
+`examples/10_reduction_axes.ipynb`, and
+`examples/11_scalars_and_empty_tensors.ipynb` in Jupyter.

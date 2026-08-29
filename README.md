@@ -75,6 +75,13 @@ to reduce every axis, or pass `axis=()` to preserve every element. The
 and [`10_reduction_axes.ipynb`](examples/10_reduction_axes.ipynb) works through
 row normalisation with `keepdims` and broadcasting.
 
+Scalars and empty tensors keep their actual shapes. `rt.shape(np.array(7))`
+shows one cell at `()`, while `rt.shape((2, 0, 3))` shows **No elements**.
+Reducing the zero-length axis gives six zeros for `sum` or six NaNs for `mean`.
+Reducing a different axis can leave an empty output with no focus coordinate.
+Try [`11_scalars_and_empty_tensors.ipynb`](examples/11_scalars_and_empty_tensors.ipynb)
+to compare these cases step by step.
+
 ```python
 rt.einsum("ij,jk->ik", np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4))
 ```

@@ -54,6 +54,29 @@ With `axis=None`, the default, all axes reduce to a scalar unless they are kept.
 With `axis=()`, no axes are reduced and the fields follow the original shape.
 Call `reduction_explorer.close()` when finished with this example.
 
+## Scalar outputs and empty outputs
+
+A scalar output has one addressable value at `()`. An empty output has none.
+For example, the source below has shape `(2, 0, 3)`, so reducing its last axis
+leaves an empty result of shape `(2, 0)`:
+
+```python
+empty_source = np.empty((2, 0, 3))
+empty_explorer = rt.explore(rt.sum, empty_source, axis=2)
+assert empty_explorer.focus is None
+assert empty_explorer.visual.trace is None
+empty_explorer
+```
+
+There are no coordinate fields, and **Update focus** is disabled. Calling
+`set_focus` raises `IndexError` because no coordinate exists. The empty figure
+is still available through `empty_explorer.visual` and can be saved as SVG.
+Close the controls with `empty_explorer.close()` when finished.
+
+Reducing axis 1 instead gives shape `(2, 3)`. Those six outputs can be selected
+normally, even though each combines zero source values. They contain 0 for
+`sum` and NaN for `mean`.
+
 ## Keep a static result
 
 The latest successful result is a normal `TensorVisual`:

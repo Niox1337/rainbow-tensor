@@ -117,8 +117,11 @@ cost depends on the supplied mask. The lower-level `advanced_index` helper still
 materializes its source-coordinate list for compatibility.
 
 Ragged nested index lists and floating-point indices are rejected. Empty boolean
-masks retain their boolean type and dimensionality. Boolean scalar indices and
-scalar or zero-sized source arrays remain unsupported.
+masks retain their boolean type and dimensionality. Boolean scalar indices
+remain unsupported. Scalar sources use coordinate `()`, so `rt.index(np.array(7),
+(), show_result=True)` selects their one value. Empty sources and empty index
+results show **No elements** without reading values. Scalar integer indices into a
+zero-length axis raise `IndexError`.
 
 ## Clear errors
 

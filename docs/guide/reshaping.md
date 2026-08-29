@@ -25,6 +25,11 @@ rt.reshape(x, (2, 6))
 rt.reshape(np.arange(24).reshape(2, 3, 4), (-1, 4))
 ```
 
+Scalars have one element, while any zero-length dimension makes the element
+count zero. Reshape preserves that count. `rt.reshape(np.array(7), (1,))` is
+valid, as is `rt.reshape((0, 3), (-1, 3))`, which infers `(0, 3)`. Combining
+an explicit zero with `-1` is ambiguous and raises `ValueError`.
+
 ## Transpose and swapaxes
 
 `transpose` reverses or permutes the axes, colouring each result axis by the
