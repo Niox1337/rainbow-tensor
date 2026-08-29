@@ -101,16 +101,21 @@ def iter_matmul_source_terms(out_coord, a_shape, b_shape):
 # Axis reductions ----------------------------------------------------------
 
 
-def normalize_reduction_axes(axis, ndim):
+def normalize_reduction_axes(axis, ndim, *, allow_scalar_axis=False):
     """Return distinct reduction axes in ascending source-axis order.
 
     ``None`` selects every axis. An integer follows Python's index protocol,
     and a tuple selects zero or more axes. Negative axes count from the end.
     Booleans, floats and non-tuple containers are rejected. Sorting makes
     source-term order independent of the order in which axes were supplied.
+    ``allow_scalar_axis`` permits integer 0 and -1 for a scalar sum, matching
+    NumPy. Scalar means and tuple axes retain the normal rank checks.
     """
     if axis is None:
         return tuple(range(ndim))
+    if allow_scalar_axis and ndim == 0 and not isinstance(axis, tuple):
+        _check_axis(axis, 1)
+        return ()
     axes = axis if isinstance(axis, tuple) else (axis,)
     resolved = tuple(_check_axis(value, ndim) for value in axes)
     if len(set(resolved)) != len(resolved):

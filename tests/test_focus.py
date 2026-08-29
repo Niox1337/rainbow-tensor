@@ -102,8 +102,8 @@ def test_matmul_focus_matches_numpy_including_vector_and_batch_rules(a_shape, b_
     assert trace.operation == "matmul"
     assert trace.term_count == a_shape[-1]
     assert trace_value(trace, [a, b]) == expected
-    assert panels[-1]["selected"] == [trace.output_coord or (0,)]
-    assert panels[-1]["value_fn"](trace.output_coord or (0,)) == expected
+    assert panels[-1]["selected"] == [trace.output_coord]
+    assert panels[-1]["value_fn"](trace.output_coord) == expected
     for operand in range(2):
         assert set(panels[operand]["selected"]) == {
             term[operand].coordinate for term in trace.terms
@@ -131,8 +131,8 @@ def test_einsum_focus_tracks_ordered_terms_and_highlights_sources(subscripts, sh
 
     assert trace.operation == "einsum"
     assert trace_value(trace, arrays) == expected
-    assert panels[-1]["selected"] == [trace.output_coord or (0,)]
-    assert panels[-1]["value_fn"](trace.output_coord or (0,)) == expected
+    assert panels[-1]["selected"] == [trace.output_coord]
+    assert panels[-1]["value_fn"](trace.output_coord) == expected
     for operand in range(len(arrays)):
         expected_sources = {term[operand].coordinate for term in trace.terms}
         assert set(panels[operand]["selected"]) == expected_sources

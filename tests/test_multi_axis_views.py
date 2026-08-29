@@ -70,7 +70,7 @@ def test_omitting_axis_reduces_the_entire_array(operation):
     renderer = RecordingRenderer()
     visual = operation(array, renderer=renderer)
     assert visual.result_shape == ()
-    assert renderer.values[-1] == {(0,): getattr(np, operation.__name__)(array)}
+    assert renderer.values[-1] == {(): getattr(np, operation.__name__)(array)}
     assert "".join(text for text, _ in renderer.panels[-1]["caption_parts"]) == (
         f"{operation.__name__} ()"
     )

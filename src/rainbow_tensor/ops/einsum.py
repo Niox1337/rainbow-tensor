@@ -234,7 +234,9 @@ def einsum_selected_coords(input_axes, output_axes, shapes, output_coord=None):
     selection is enumerated independently, avoiding the full Cartesian product
     of contracted labels that never occur in that operand.
     """
-    einsum_index_sizes(input_axes, shapes)
+    sizes = einsum_index_sizes(input_axes, shapes)
+    if 0 in sizes.values():
+        return [[] for _ in shapes]
     contracted = einsum_contracted_labels(input_axes, output_axes)
     if output_coord is None:
         output_coord = (0,) * len(output_axes)

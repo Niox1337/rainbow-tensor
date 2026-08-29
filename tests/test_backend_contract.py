@@ -163,7 +163,7 @@ def test_cpu_backend_multi_axis_reduction_cells(backend, operation, keepdims, ax
     assert visual.shape == reference.shape
     assert visual.result_shape == expected.shape
     assert visual.trace.output_coord == focus
-    assert renderer.panels[-1].shape == (expected.shape or (1,))
+    assert renderer.panels[-1].shape == expected.shape
     np.testing.assert_array_equal(renderer.panels[0], reference)
     actual = renderer.panels[-1].reshape(expected.shape)
     np.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
@@ -181,3 +181,33 @@ def test_cpu_backend_transposed_tuple_reduction_cells(backend, operation):
     assert renderer.panels[-1].shape == expected.shape
     np.testing.assert_array_equal(renderer.panels[0], reference)
     np.testing.assert_allclose(renderer.panels[-1], expected, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("shape, operation, args", [
+    ((), "shape", ()),
+    ((), "sum", ()),
+    ((), "mean", ()),
+    ((), "reshape", ((1,),)),
+    ((), "take", (0,)),
+    ((0,), "shape", ()),
+    ((2, 0, 3), "sum", (1,)),
+    ((2, 0, 3), "mean", (1,)),
+    ((2, 0, 3), "sum", (2,)),
+    ((2, 0, 3), "reshape", ((0, 6),)),
+])
+def test_cpu_backend_scalar_and_empty_cells(backend, shape, operation, args):
+    """Real backend arrays preserve scalar reads and never expose fictitious empty cells."""
+    import warnings
+
+    reference = np.ones(shape, dtype="float32")
+    array = backend.array(reference)
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(array, *args, renderer=renderer)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        expected = reference if operation == "shape" else getattr(np, operation)(reference, *args)
+    assert visual.shape == shape
+    if operation != "shape":
+        assert visual.result_shape == expected.shape
+    assert renderer.panels[-1].shape == expected.shape
+    np.testing.assert_allclose(renderer.panels[-1], expected, equal_nan=True)

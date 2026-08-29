@@ -182,19 +182,21 @@ def einsum(
     focused = _normalize_focus(focus, result)
     term_count = einsum_term_count(input_axes, output_axes, shapes)
     semantics = numeric_semantics(arrays)
-    display_result = result or (1,)
+    display_result = result
     label_colors = _einsum_label_colors(input_axes, output_axes)
     result_theme = _einsum_theme(output_axes, theme, label_colors)
     evaluation = evaluation_plan(
         term_count, max_terms, max_total_terms, display_result,
-        [focused or (0,)] if focus is not None else None, result_theme,
+        [focused] if focus is not None else None, result_theme,
     )
     source_values = [_source_value(array, shape) for array, shape in zip(arrays, shapes)]
     trace = _build_trace(
         "einsum", focused, term_count,
         einsum_source_terms(input_axes, output_axes, shapes, focused),
-    )
-    if evaluation["status"] == "skipped":
+    ) if focused is not None else None
+    if trace is None:
+        selected = [[] for _ in arrays]
+    elif evaluation["status"] == "skipped":
         selected = [
             sorted({term[operand].coordinate for term in trace.terms})
             for operand in range(len(arrays))
@@ -234,7 +236,7 @@ def einsum(
         }
     )
     if focus is not None or evaluation["status"] == "skipped":
-        panels[-1]["selected"] = [focused or (0,)]
+        panels[-1]["selected"] = [] if focused is None else [focused]
     connectors = ["*"] * (len(arrays) - 1) + ["->"]
     input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
     output_text = "".join(output_axes) or "scalar"
@@ -248,8 +250,12 @@ def einsum(
         contracted_line,
         t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([*shapes, display_result], theme)
-    explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
+    explanation.extend(evaluation_explanation(evaluation, len(trace.terms) if trace else 0))
     explanation.extend(numeric_explanation(semantics))
+    if trace is None:
+        explanation.extend(_trace_explanation(None))
+    elif term_count == 0:
+        explanation.append("The contraction has no terms, so each output is 0.")
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     content = renderer.render_panels(

@@ -26,6 +26,8 @@ class OutputTrace:
     Sum and mean have one factor per term. Mean uses its reduction length as
     the divisor, while the other operations use one. Reused broadcast factors
     remain present in every term that uses them.
+    An empty mean has zero terms and divisor zero, representing an undefined
+    value (NaN), rather than an instruction to perform division by zero.
 
     ``term_count`` counts the full expression. Views store its first eight terms
     at most, so ``complete`` is false when later terms have been omitted. The
@@ -43,6 +45,10 @@ class OutputTrace:
 
 def _normalize_focus(focus, result_shape):
     """Validate an optional output coordinate before any backend value reads."""
+    if 0 in result_shape:
+        if focus is not None:
+            raise IndexError("cannot focus an empty output")
+        return None
     if focus is None:
         return (0,) * len(result_shape)
     if not isinstance(focus, tuple):
@@ -79,6 +85,8 @@ def _build_trace(operation, output_coord, term_count, terms, *, divisor=1):
 
 def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
+    if trace is None:
+        return ["The result is empty and has no output coordinate to focus."]
     plural = "s" if trace.term_count != 1 else ""
     heading = f"Focus: output {trace.output_coord} uses {trace.term_count} term{plural}."
     if not trace.complete:
@@ -94,6 +102,10 @@ def _trace_explanation(trace):
         if trace.operation in ("sum", "mean"):
             return "source"
         return f"operand {operand}"
+
+    if trace.term_count == 0:
+        value = "NaN (the mean of an empty group is undefined)" if trace.divisor == 0 else "0"
+        return [heading, f"output[{subscript(trace.output_coord)}] = {value}"]
 
     expression = " + ".join(
         " * ".join(

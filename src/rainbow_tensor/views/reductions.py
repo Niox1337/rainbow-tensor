@@ -85,8 +85,8 @@ def matmul(
     result = matmul_result_shape(a_shape, b_shape)
     focused = _normalize_focus(focus, result)
     semantics = numeric_semantics((a, b))
-    display_result = result or (1,)
-    result_selected = [focused or (0,)]
+    display_result = result
+    result_selected = [] if focused is None else [focused]
     evaluation = evaluation_plan(
         a_shape[-1], max_terms, max_total_terms, display_result, result_selected, theme
     )
@@ -101,8 +101,10 @@ def matmul(
 
     trace = _build_trace(
         "matmul", focused, a_shape[-1], iter_matmul_source_terms(focused, a_shape, b_shape)
-    )
-    if evaluation["status"] == "skipped":
+    ) if focused is not None else None
+    if trace is None:
+        terms0 = []
+    elif evaluation["status"] == "skipped":
         terms0 = [tuple(ref.coordinate for ref in term) for term in trace.terms]
     else:
         terms0 = list(iter_matmul_source_terms(focused, a_shape, b_shape))
@@ -133,12 +135,17 @@ def matmul(
         t("matmul.operands", a=format_shape(a_shape), b=format_shape(b_shape)),
         t("matmul.dims", rows=rows, cols=cols, inner=inner),
         t("common.result_shape", shape=format_shape(result)),
-        t("matmul.combine") if focus is None else (
-            "The highlighted row and column combine into the focused output element."
-        ),
     ] + _preview_explanation([a_shape, b_shape, display_result], theme)
-    explanation.extend(evaluation_explanation(evaluation, len(trace.terms)))
+    if trace is not None and trace.term_count:
+        explanation.insert(3, t("matmul.combine") if focus is None else (
+            "The highlighted row and column combine into the focused output element."
+        ))
+    explanation.extend(evaluation_explanation(evaluation, len(trace.terms) if trace else 0))
     explanation.extend(numeric_explanation(semantics))
+    if trace is None:
+        explanation.extend(_trace_explanation(None))
+    elif a_shape[-1] == 0:
+        explanation.append("The contraction has no terms, so each output is 0.")
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -191,7 +198,7 @@ def _reduce(
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
-    axes = normalize_reduction_axes(axis, len(shape))
+    axes = normalize_reduction_axes(axis, len(shape), allow_scalar_axis=op_name == "sum")
     keepdims = validate_keepdims(keepdims)
     result = reduce_result_shape(shape, axes, keepdims=keepdims)
     focused = _normalize_focus(focus, result)
@@ -203,14 +210,16 @@ def _reduce(
     # Mark the source elements that collapse into the focused result element, and
     # tint every other group so values that fold into the same result share one
     # background while the focused group stays clearly highlighted.
-    source_index = reduce_source_index(focused, shape, axes, keepdims=keepdims)
-    selected = BasicSelection(shape, source_index)
-    focused_group = flat_index(focused, result) if result else 0
+    selected = (
+        BasicSelection(shape, reduce_source_index(focused, shape, axes, keepdims=keepdims))
+        if focused is not None else []
+    )
+    focused_group = flat_index(focused, result) if focused is not None else None
     trace = _build_trace(
         op_name, focused, term_count,
         ((coord,) for coord in reduce_source_coords(focused, shape, axes, keepdims=keepdims)),
         divisor=term_count if op_name == "mean" else 1,
-    )
+    ) if focused is not None else None
 
     def source_tint(coord):
         rc = (
@@ -222,7 +231,7 @@ def _reduce(
             return None  # this group is shown through the selected highlight
         return _operand_tint(theme, group - 1)
 
-    disp = result or (1,)
+    disp = result
 
     # The surviving axes keep their original source colours instead of being
     # recoloured by their new position, so reducing a non-last axis does not
@@ -254,7 +263,7 @@ def _reduce(
             return None
         return _operand_tint(theme, group - 1)
 
-    selected_result = [focused or (0,)]
+    selected_result = [] if focused is None else [focused]
     evaluation = evaluation_plan(
         term_count, max_terms, max_total_terms, disp, selected_result, result_theme
     )
@@ -266,7 +275,9 @@ def _reduce(
         total = _py_sum(
             source_value(sc) for sc in reduce_source_coords(rc, shape, axes, keepdims=keepdims)
         )
-        return total / term_count if op_name == "mean" else total
+        if op_name == "mean":
+            return total / term_count if term_count else float("nan")
+        return total
 
     if len(axes) == 1:
         reducing = t("reduce.reducing", axis=axes[0], op=op_name)
@@ -275,18 +286,22 @@ def _reduce(
         reducing = f"Reducing axes {axes} with {op_name}."
         combines = f"Each result element combines {term_count} values from axes {axes}."
     else:
-        reducing = "No axes are reduced because axis=()."
+        reducing = (
+            "The scalar has no axes to reduce." if not shape
+            else "No axes are reduced because axis=()."
+        )
         combines = "Each result element uses the source value at the same coordinate."
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
         reducing,
         t("common.result_shape", shape=format_shape(result)),
         combines,
-        t("reduce.share_background") if focus is None else (
+    ] + _preview_explanation([shape, disp], theme)
+    if trace is not None and term_count:
+        explanation.insert(4, t("reduce.share_background") if focus is None else (
             "Values that fold into the same result share its background, "
             "and the focused group is highlighted."
-        ),
-    ] + _preview_explanation([shape, disp], theme)
+        ))
     if keepdims and axes:
         explanation.append(
             f"keepdims=True retains axes {axes} at length 1 for broadcasting. "
@@ -294,6 +309,13 @@ def _reduce(
         )
     explanation.extend(evaluation_explanation(evaluation))
     explanation.extend(numeric_explanation(semantics))
+    if trace is None:
+        explanation.extend(_trace_explanation(None))
+    elif term_count == 0:
+        explanation.append(
+            "The mean of an empty group is undefined and displayed as NaN."
+            if op_name == "mean" else "An empty group contributes no values, so its sum is 0."
+        )
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -343,6 +365,9 @@ def sum(
     ``axis=()`` leaves each value in its original position. Boolean and
     floating-point axes are rejected rather than coerced.
 
+    A scalar source has shape ``()`` and also accepts integer axis 0 or -1.
+    An empty reduction group sums to 0. An empty output has no focus or trace.
+
     ``keepdims=True`` retains every reduced axis at length one so the result
     can broadcast against the source. Those dimensions use the highlight
     colour. The default removes reduced axes, preserving surviving colours.
@@ -377,6 +402,10 @@ def mean(
     max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
 ):
     """Visualise a mean over all axes, one axis, or a tuple of distinct axes.
+
+    Scalar sources accept ``axis=None`` or ``axis=()``. An empty group has
+    mean NaN and a zero-divisor trace that explains the undefined value.
+    An empty output has no focus or trace, and no values are evaluated.
 
     The source panel marks the elements that collapse into the first result
     element. ``axis=None`` reduces every axis, an integer reduces one axis,

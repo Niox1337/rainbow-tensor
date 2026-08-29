@@ -238,7 +238,7 @@ def test_scalar_output_can_hit_the_total_budget_exactly(operation):
     else:
         visual = rt.einsum("i,i->", *arrays, **options)
     assert visual.result_shape == ()
-    assert renderer.panels[-1] == {(0,): 1 if operation == "mean" else 3}
+    assert renderer.panels[-1] == {(): 1 if operation == "mean" else 3}
     assert visual.metadata["value_evaluation"]["output_count"] == 1
     assert "were not computed" not in visual.text
 
@@ -333,7 +333,7 @@ def test_scalar_outputs_obey_the_same_budget_without_losing_their_trace(operatio
         visual = rt.einsum("i,i->", left, right, **options)
 
     assert visual.result_shape == ()
-    assert renderer.panels[-1] == {(0,): "?"}
+    assert renderer.panels[-1] == {(): "?"}
     assert visual.trace.output_coord == ()
     assert visual.trace.term_count == 3
     assert visual.trace.complete

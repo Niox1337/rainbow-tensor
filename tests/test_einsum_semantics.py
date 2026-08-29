@@ -60,7 +60,7 @@ def test_einsum_broadcast_shape_and_rendered_values_match_numpy(subscripts, shap
     assert einsum_result_shape(subscripts, shapes) == expected.shape
     assert visual.result_shape == expected.shape
     expected_cells = {
-        coord if expected.shape else (0,): expected[coord]
+        coord: expected[coord]
         for coord in np.ndindex(expected.shape)
     }
     assert renderer.values == expected_cells

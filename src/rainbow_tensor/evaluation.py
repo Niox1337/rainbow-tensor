@@ -44,7 +44,7 @@ def evaluation_plan(term_count, max_terms, max_total_terms, shape, selected, the
     coordinates = frozenset(cell.coord for cell in layout.cells if not cell.ellipsis)
     total_terms = term_count * len(coordinates)
     reason = None
-    if limit is not None and term_count > limit:
+    if coordinates and limit is not None and term_count > limit:
         reason = "max_terms"
     elif total_limit is not None and total_terms > total_limit:
         reason = "max_total_terms"
