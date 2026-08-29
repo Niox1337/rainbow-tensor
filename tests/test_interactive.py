@@ -246,3 +246,47 @@ def test_kept_reduction_focus_preserves_both_budgets(explorers, operation, limit
     assert evaluation["output_count"] == 3
     assert evaluation["total_terms"] == 24
     assert explorer.visual.trace.output_coord == (0, 2, 0)
+
+
+@pytest.mark.parametrize("operation, args, kwargs", [
+    (rt.sum, ((0, 3),), {"axis": 1}),
+    (rt.mean, ((2, 0, 3),), {"axis": 2, "keepdims": True}),
+    (rt.matmul, ((0, 2), (2, 3)), {}),
+    (rt.einsum, ("ij,jk->ik", (0, 2), (2, 3)), {}),
+])
+def test_empty_results_have_no_focus_or_active_controls(explorers, operation, args, kwargs):
+    explorer = explorers(operation, *args, **kwargs)
+    before = explorer.visual
+    assert explorer.focus is None
+    assert explorer.coordinates == ()
+    assert explorer.update_button.disabled
+    assert explorer.visual.trace is None
+    assert "Empty result" in explorer.status.value
+    explorer.update_button.click()
+    assert explorer.visual is before
+    with pytest.raises(IndexError, match="empty"):
+        explorer.set_focus(())
+    assert explorer.visual is before
+
+
+@pytest.mark.parametrize("operation", [rt.sum, rt.mean])
+def test_empty_groups_still_allow_focusing_real_output_cells(explorers, operation):
+    explorer = explorers(operation, (2, 0, 3), axis=1)
+    assert not explorer.update_button.disabled
+    assert tuple(control.max for control in explorer.coordinates) == (1, 2)
+    visual = explorer.set_focus((1, 2))
+    assert visual.trace.output_coord == (1, 2)
+    assert visual.trace.term_count == 0
+
+
+def test_scalar_source_can_refresh_its_single_value(explorers):
+    array = np.array(3)
+    explorer = explorers(rt.sum, array)
+    before = explorer.visual.svg
+    assert explorer.focus == ()
+    assert explorer.coordinates == ()
+    assert not explorer.update_button.disabled
+    array[...] = 9
+    explorer.update_button.click()
+    assert explorer.visual.svg != before
+    assert explorer.visual.trace.terms[0][0].coordinate == ()

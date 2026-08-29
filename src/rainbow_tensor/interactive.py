@@ -27,15 +27,17 @@ class FocusExplorer:
         self.visual = operation(*args, **options)
         if self.visual.mime_type != "image/svg+xml":
             raise ValueError("explore requires an SVG renderer")
-        self.focus = self.visual.trace.output_coord
+        self.focus = self.visual.trace.output_coord if self.visual.trace is not None else None
         self.result_shape = self.visual.result_shape
         self.coordinates = tuple(
             widgets.BoundedIntText(
                 value=value, min=0, max=size - 1, description=f"Axis {axis}",
             )
-            for axis, (value, size) in enumerate(zip(self.focus, self.result_shape))
+            for axis, (value, size) in enumerate(zip(self.focus or (), self.result_shape))
         )
-        self.update_button = widgets.Button(description="Update focus", icon="refresh")
+        self.update_button = widgets.Button(
+            description="Update focus", icon="refresh", disabled=self.focus is None,
+        )
         self.status = widgets.Label()
         self.figure = widgets.HTML()
         self.explanation = widgets.HTML()
@@ -59,22 +61,28 @@ class FocusExplorer:
         """Refresh the widgets from the last successful static visual."""
         self.figure.value = self.visual.svg
         lines = list(self.visual.explanation)
-        if not any(line.startswith("Focus:") for line in lines):
+        if self.visual.trace is not None and not any(line.startswith("Focus:") for line in lines):
             lines.extend(_trace_explanation(self.visual.trace))
         self.explanation.value = (
             '<pre style="white-space:pre-wrap">' + escape("\n".join(lines)) + "</pre>"
         )
-        self.status.value = f"Showing output {self.focus}."
+        self.status.value = (
+            "Empty result: no output coordinate to focus."
+            if self.focus is None else f"Showing output {self.focus}."
+        )
 
     def set_focus(self, coordinate):
         """Redraw one output and return its visual, preserving state on failure.
 
         ``coordinate`` follows the same tuple, rank, and bounds rules as the
         operation's ``focus`` argument. A scalar output uses ``()``. The original
-        theme, renderer, precision, and ``max_terms`` options remain in effect.
+        theme, renderer, precision, and both calculation budgets remain in effect.
+        Empty results have no addressable output and reject focus updates.
         """
         if self._closed:
             raise RuntimeError("this explorer is closed")
+        if self.focus is None:
+            raise IndexError("cannot focus an empty result")
         normalized = _normalize_focus(coordinate, self.result_shape)
         options = {**self._options, "focus": normalized}
         visual = self._operation(*self._args, **options)
@@ -91,6 +99,8 @@ class FocusExplorer:
 
     def _on_update(self, button):
         """Show an actionable error without discarding the previous figure."""
+        if self.focus is None:
+            return
         try:
             self.set_focus(tuple(control.value for control in self.coordinates))
         except (TypeError, ValueError, IndexError, RuntimeError) as exc:
@@ -119,6 +129,8 @@ def explore(operation, *args, **kwargs):
     changed with the keyboard, then applied with the update button. Scalar
     results expose only that button. The calculation budget is never increased
     by interaction, and the latest static result stays available as ``visual``.
+    Empty results have ``focus=None``, no coordinate fields, and a disabled
+    update button. Their empty figure remains available for static export.
 
     Requires the optional ``rainbow-tensor[interactive]`` dependencies. They are
     imported only here, so static rendering does not require notebook widgets.
