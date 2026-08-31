@@ -48,6 +48,19 @@ assert [visual.result_shape for visual in visuals[1:]] == [
 ]
 assert visuals[-1].trace.output_coord == (0, 2, 0)
 assert visuals[-1].trace.term_count == 8
+scalar = rt.sum(np.array(7))
+empty = rt.sum(np.empty((2, 0, 3)), axis=2)
+empty_sum = rt.sum(np.empty((2, 0, 3)), axis=1)
+empty_mean = rt.mean(np.empty((2, 0, 3)), axis=1)
+assert scalar.result_shape == scalar.trace.output_coord == ()
+assert scalar.trace.terms[0][0].coordinate == ()
+assert empty.result_shape == (2, 0) and empty.trace is None
+assert "No elements" in empty.svg
+assert empty.metadata["value_evaluation"]["total_terms"] == 0
+assert empty_sum.trace.term_count == 0 and empty_sum.trace.divisor == 1
+assert empty_mean.trace.term_count == empty_mean.trace.divisor == 0
+assert "NaN" in empty_mean.text and "/ 0" not in empty_mean.text
+visuals.extend([rt.shape(()), rt.shape((0,)), scalar, empty, empty_sum, empty_mean])
 for visual in visuals:
     assert ElementTree.fromstring(visual.svg).tag.endswith("svg")
     assert visual.mime_type == "image/svg+xml"
@@ -69,6 +82,14 @@ if sys.argv[2] == "interactive":
         ).svg
     finally:
         explorer.close()
+    empty_explorer = rt.explore(rt.sum, (2, 0, 3), axis=2)
+    try:
+        assert empty_explorer.focus is None
+        assert empty_explorer.coordinates == ()
+        assert empty_explorer.update_button.disabled
+        assert empty_explorer.visual.trace is None
+    finally:
+        empty_explorer.close()
 print(f"Installed package smoke passed: {package_path}")
 """
 

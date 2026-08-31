@@ -4,6 +4,10 @@
 
 ### Added
 
+- Scalar sources with shape `()` and empty sources with zero-length dimensions work across shape views, indexing, transforms, arithmetic previews, and memory inspection
+- Empty sums and contractions produce zero, empty means show NaN, and empty outputs have no trace or focus controls
+- Scalar `take` indices remove an axis, and scalar inputs support `repeat`, `take`, stacking, and broadcasting
+- A scalar and empty tensor notebook compares one value, zero values, empty contribution groups, and empty results
 - `sum` and `mean` accept an omitted axis or `axis=None` for all axes, a tuple of axes, negative axes, and an empty tuple for an unchanged shape
 - Keyword-only `keepdims=True` retains reduced axes at length one for broadcasting, with those result dimensions marked in the highlight colour
 - Multi-axis focus identifies the full source group, reports the product of reduced dimensions as the mean divisor, and traces terms in source row-major order regardless of axis tuple order
@@ -12,6 +16,8 @@
 
 ### Changed
 
+- Custom renderers receive scalar panel shapes and coordinates as `()` instead of the former `(1,)` display surrogate
+- Empty previews avoid element reads and large coordinate or repeat allocations
 - Multi-axis source selections and traces stay compact, including when the contributing group is too large to evaluate within the preview budgets
 - CPU backend, interactive, and installed-distribution checks cover all-axis, multi-axis, and empty-axis reductions with and without retained dimensions
 
