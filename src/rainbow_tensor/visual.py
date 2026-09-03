@@ -13,6 +13,15 @@ from .backends import value_at_coordinate
 from .explanations import t
 from .layout import axis_visible_limits
 from .shape import flat_index, format_shape
+from .theme import (
+    _AUTO_OPERAND_TINTS,
+)
+from .theme import (
+    _DARK_OPERAND_TINTS as _DARK_TINTS,
+)
+from .theme import (
+    _LIGHT_OPERAND_TINTS as _LIGHT_TINTS,
+)
 
 
 class TensorVisual:
@@ -189,23 +198,10 @@ def _shape_caption_parts(name, shape, theme, color_for=None):
 # Soft operand tints, keyed by operand index, so a combined result can colour
 # each cell by where it came from. The first entry is the fill, the second the
 # matching border.
-_LIGHT_TINTS = [
-    ("#dbeafe", "#93c5fd"),  # blue
-    ("#fef3c7", "#fcd34d"),  # amber
-    ("#dcfce7", "#86efac"),  # green
-    ("#fce7f3", "#f9a8d4"),  # pink
-    ("#ede9fe", "#c4b5fd"),  # violet
-]
-_DARK_TINTS = [
-    ("#1e3a5f", "#3b82f6"),
-    ("#3f2d10", "#d97706"),
-    ("#14352a", "#22c55e"),
-    ("#3b1d2e", "#db2777"),
-    ("#2a2150", "#7c3aed"),
-]
-
-
 def _operand_tint(theme, i):
     """Return the ``(fill, border)`` tint for operand ``i`` under ``theme``."""
-    ramp = _DARK_TINTS if theme.name == "dark" else _LIGHT_TINTS
+    if theme.adaptive:
+        ramp = _AUTO_OPERAND_TINTS
+    else:
+        ramp = _DARK_TINTS if theme.name == "dark" else _LIGHT_TINTS
     return ramp[i % len(ramp)]

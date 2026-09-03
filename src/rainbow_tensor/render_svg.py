@@ -14,11 +14,14 @@ carries an optional hover title with its coordinate and flat index.
 """
 
 import math
+import unicodedata
 
+from .explanations import get_resolved_language
+from .explanations import t as translate
 from .index_mapping import CompactSelection
 from .layout import build_layout
 from .shape import format_shape_label
-from .theme import LIGHT, resolve_theme
+from .theme import _AUTO_FALLBACKS, LIGHT, _auto_stylesheet, resolve_theme
 
 # Back-compatible colour constants, sourced from the light preset so existing
 # imports and the notebook layer keep working.
@@ -55,26 +58,53 @@ def escape(text):
     )
 
 
-def svg_document(content, width, height, theme=None, aria_label="Tensor visualisation"):
+def _paint_attributes(**colors):
+    """Keep light presentation attributes when adaptive CSS is unavailable.
+
+    Each adaptive paint also receives an inline CSS declaration. A browser
+    resolves its semantic token when the preferred scheme changes, while SVG
+    readers without CSS custom properties retain the literal light colour.
+    Custom colour strings pass through without palette substitution.
+    """
+    attributes = []
+    styles = []
+    for name, color in colors.items():
+        fallback = _AUTO_FALLBACKS.get(color, color)
+        attributes.append(f'{name}="{escape(fallback)}"')
+        if color in _AUTO_FALLBACKS:
+            styles.append(f"{name}:{color}")
+    if styles:
+        attributes.append(f'style="{escape(";".join(styles))}"')
+    return " ".join(attributes)
+
+
+def svg_document(content, width, height, theme=None, aria_label=None):
     """Wrap rendered elements in a complete SVG document.
 
     A background rectangle in the theme colour fills the whole canvas so the
     dark preset reads as dark even on a transparent host page.
+    Adaptive palettes include scoped CSS in the exported SVG itself.
     """
     t = theme or LIGHT
-    accessible_name = aria_label or "Tensor visualisation"
+    accessible_name = aria_label or translate("svg.visualisation")
+    language = get_resolved_language()
+    language_attribute = f'lang="{escape(language)}" ' if language != "en" else ""
     background = (
         f'<rect x="0" y="0" width="{width:.0f}" height="{height:.0f}" '
-        f'rx="14" fill="{escape(t.background)}" stroke="{escape(t.card_border)}"/>'
+        f'rx="14" {_paint_attributes(fill=t.background, stroke=t.card_border)}/>'
     )
+    adaptive_attribute = 'data-rt-theme="auto" ' if t.adaptive else ""
+    stylesheet = _auto_stylesheet() if t.adaptive else ""
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'{adaptive_attribute}'
+        f'{language_attribute}'
         f'role="img" aria-label="{escape(accessible_name)}" '
         f'width="{width:.0f}" height="{height:.0f}" '
         f'viewBox="0 0 {width:.0f} {height:.0f}" '
         f'style="max-width:100%;height:auto" '
         f'font-family="{t.sans_family}">'
-        f"{background}{content}"
+        f"{stylesheet}{background}{content}"
         f"</svg>"
     )
 
@@ -116,7 +146,16 @@ def _frame_color(frame, has_selection, theme):
 
 
 def _text_width(char_count, font_size, ratio):
-    """Estimate the rendered width of a string."""
+    """Estimate width using full glyph cells for CJK and zero for combining marks.
+
+    Numeric character counts remain supported for existing renderer callers.
+    """
+    if isinstance(char_count, str):
+        char_count = sum(
+            0 if unicodedata.combining(char) else
+            2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+            for char in char_count
+        )
     return char_count * font_size * ratio
 
 
@@ -149,7 +188,7 @@ def _legend_items(shape, theme, has_selection):
     items = []
     for axis, size in enumerate(shape):
         color = theme.axis_color(axis) if axis < ndim - 1 else leaf_color
-        items.append((color, f"axis {axis}", f"· {size}"))
+        items.append((color, translate("svg.axis", axis=axis), f"· {size}"))
     return items
 
 
@@ -158,7 +197,7 @@ def _legend_width(items):
     total = TEXT_MARGIN
     for _, name, size in items:
         label = f"{name} {size}"
-        total += SWATCH + 7 + _text_width(len(label), LEGEND_FONT_SIZE, SANS_CHAR_RATIO)
+        total += SWATCH + 7 + _text_width(label, LEGEND_FONT_SIZE, SANS_CHAR_RATIO)
         total += LEGEND_GAP
     return total - LEGEND_GAP + TEXT_MARGIN
 
@@ -172,17 +211,17 @@ def _render_legend(items, x, y, theme):
     for color, name, size in items:
         parts.append(
             f'<rect x="{cursor:.0f}" y="{sy:.0f}" width="{SWATCH}" height="{SWATCH}" '
-            f'rx="3" fill="{escape(color)}"/>'
+            f'rx="3" {_paint_attributes(fill=color)}/>'
         )
         cursor += SWATCH + 7
         label = f"{name} {size}"
         parts.append(
             f'<text x="{cursor:.0f}" y="{ty:.0f}" font-size="{LEGEND_FONT_SIZE}" '
-            f'fill="{escape(theme.text_muted)}">'
-            f'<tspan fill="{escape(color)}" font-weight="600">{escape(name)}</tspan>'
+            f'{_paint_attributes(fill=theme.text_muted)}>'
+            f'<tspan {_paint_attributes(fill=color)} font-weight="600">{escape(name)}</tspan>'
             f" {escape(size)}</text>"
         )
-        cursor += _text_width(len(label), LEGEND_FONT_SIZE, SANS_CHAR_RATIO) + LEGEND_GAP
+        cursor += _text_width(label, LEGEND_FONT_SIZE, SANS_CHAR_RATIO) + LEGEND_GAP
     return "".join(parts)
 
 
@@ -198,7 +237,7 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
         return (
             f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
             f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
-            f'font-family="{theme.mono_family}" fill="{escape(theme.text_muted)}">'
+            f'font-family="{theme.mono_family}" {_paint_attributes(fill=theme.text_muted)}>'
             f"{escape(cell.value)}</text>"
         )
 
@@ -237,19 +276,19 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
     rect = (
         f'<rect x="{cell.x:.0f}" y="{cell.y:.0f}" '
         f'width="{cell.width:.0f}" height="{cell.height:.0f}" '
-        f'rx="{theme.cell_radius:.0f}" fill="{escape(fill)}" '
-        f'stroke="{escape(border)}" stroke-width="1"/>'
+        f'rx="{theme.cell_radius:.0f}" {_paint_attributes(fill=fill, stroke=border)} '
+        f'stroke-width="1"/>'
     )
     text = (
         f'<text x="{tx:.0f}" y="{ty:.0f}" text-anchor="{anchor}" '
         f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
         f'font-family="{theme.mono_family}" font-weight="{weight}" '
-        f'fill="{escape(text_color)}">{escape(display)}</text>'
+        f'{_paint_attributes(fill=text_color)}>{escape(display)}</text>'
     )
 
     if hover and cell.coord is not None:
         coord = ", ".join(str(c) for c in cell.coord)
-        title = f"[{coord}]  value {display}  ·  flat {cell.flat}"
+        title = translate("svg.cell", coord=coord, value=display, flat=cell.flat)
         detail = escape(title)
         return (
             f'<g aria-label="{detail}" style="cursor:help">'
@@ -261,7 +300,7 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
 def _label_element(x, y, parts):
     """Build a label text element from coloured parts."""
     spans = "".join(
-        f'<tspan fill="{escape(color)}">{escape(text)}</tspan>' for text, color in parts
+        f'<tspan {_paint_attributes(fill=color)}>{escape(text)}</tspan>' for text, color in parts
     )
     return (
         f'<text x="{x:.0f}" y="{y:.0f}" font-size="{LABEL_FONT_SIZE}" '
@@ -302,7 +341,7 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
         parts.append(
             f'<rect x="{frame.x:.0f}" y="{frame.y:.0f}" '
             f'width="{frame.width:.0f}" height="{frame.height:.0f}" '
-            f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{color}" '
+            f'rx="{theme.frame_radius:.0f}" fill="none" {_paint_attributes(stroke=color)} '
             f'stroke-width="{theme.frame_width}"/>'
         )
     for cell in layout.cells:
@@ -315,15 +354,18 @@ def _render_empty_body(layout, theme):
     """Render a zero-element layout without inventing a value or coordinate."""
     padding = theme.padding
     width, height = layout.width, layout.height
+    marker = translate("svg.empty")
+    width = max(width, _text_width(marker, VALUE_FONT_SIZE, SANS_CHAR_RATIO) + 2 * padding)
+    description = translate("svg.empty_description", shape=layout.shape)
     body = (
-        f'<g role="note" aria-label="Empty tensor shape {escape(layout.shape)}, no elements">'
+        f'<g role="note" aria-label="{escape(description)}">'
         f'<rect x="{padding:.0f}" y="{padding:.0f}" '
         f'width="{width - 2 * padding:.0f}" height="{height - 2 * padding:.0f}" '
-        f'rx="{theme.frame_radius:.0f}" fill="none" stroke="{theme.neutral}" '
+        f'rx="{theme.frame_radius:.0f}" fill="none" {_paint_attributes(stroke=theme.neutral)} '
         f'stroke-width="{theme.frame_width}" stroke-dasharray="4 4"/>'
         f'<text x="{width / 2:.0f}" y="{height / 2:.0f}" text-anchor="middle" '
         f'dominant-baseline="central" font-size="{VALUE_FONT_SIZE}" '
-        f'fill="{theme.text_muted}">No elements</text></g>'
+        f'{_paint_attributes(fill=theme.text_muted)}>{escape(marker)}</text></g>'
     )
     return body, width, height, theme
 
@@ -369,7 +411,7 @@ def render_svg(
         label_text = "".join(str(text) for text, _ in label_parts)
     else:
         label_text = str(label)
-    label_len = len(label_text)
+    label_len = label_text
 
     legend_items = _legend_items(shape, theme, has_selection) if legend else []
 
@@ -386,7 +428,7 @@ def render_svg(
     elif label:
         parts.append(
             f'<text x="{TEXT_MARGIN}" y="{y:.0f}" font-size="{LABEL_FONT_SIZE}" '
-            f'font-weight="700" fill="{escape(theme.heading)}">{escape(label)}</text>'
+            f'font-weight="700" {_paint_attributes(fill=theme.heading)}>{escape(label)}</text>'
         )
         y += LINE_HEIGHT
 
@@ -396,7 +438,7 @@ def render_svg(
         y += 6
 
     height = y + 18
-    aria_label = label_text or f"Tensor shape {tuple(shape)}"
+    aria_label = label_text or translate("svg.tensor_shape", shape=tuple(shape))
     return svg_document(
         "".join(parts), width, height, theme=theme, aria_label=aria_label
     )
@@ -411,7 +453,7 @@ CAPTION_HEIGHT = 26
 def _centered_parts(cx, y, parts, font_size, weight="700"):
     """Render coloured ``parts`` centred on ``cx`` at baseline ``y``."""
     spans = "".join(
-        f'<tspan fill="{escape(color)}">{escape(text)}</tspan>' for text, color in parts
+        f'<tspan {_paint_attributes(fill=color)}>{escape(text)}</tspan>' for text, color in parts
     )
     return (
         f'<text x="{cx:.0f}" y="{y:.0f}" text-anchor="middle" '
@@ -435,14 +477,19 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
 
     Scalar panels keep shape ``()`` and pass that coordinate to ``value_fn``.
     Empty panels show their shape and an empty marker without value callbacks.
+    A panel with its own background paints behind both its body and caption,
+    so fixed and adaptive palettes remain readable in the same document.
     """
     theme = resolve_theme(theme)
     connectors = connectors or []
+    adaptive = theme.adaptive
 
     bodies = []
+    panel_themes = []
     panel_labels = []
     for panel in panels:
         ptheme = panel.get("theme") or theme
+        adaptive = adaptive or ptheme.adaptive
         body, w, h, ptheme = _render_body(
             panel["shape"],
             [] if 0 in panel["shape"] else _selection_for_render(panel.get("selected")),
@@ -455,9 +502,12 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
         caption = panel.get("caption_parts")
         if not panel["shape"] or 0 in panel["shape"]:
             if not caption:
-                caption = [(f"Shape {format_shape_label(panel['shape'])}", ptheme.heading)]
+                caption = [(
+                    translate("svg.shape", shape=format_shape_label(panel['shape'])), ptheme.heading
+                )]
                 panel = dict(panel, caption_parts=caption)
-            caption_length = sum(len(str(text)) for text, _ in caption)
+        if caption:
+            caption_length = "".join(str(text) for text, _ in caption)
             caption_width = (
                 _text_width(caption_length, CAPTION_FONT_SIZE, SANS_CHAR_RATIO)
                 + 2 * TEXT_MARGIN
@@ -466,18 +516,28 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
                 body = f'<g transform="translate({(caption_width - w) / 2:.0f}, 0)">{body}</g>'
                 w = caption_width
         bodies.append((body, w, h, panel))
+        panel_themes.append(ptheme)
         if caption:
             panel_labels.append("".join(str(text) for text, _ in caption))
         else:
-            panel_labels.append(f"Tensor shape {tuple(panel['shape'])}")
+            panel_labels.append(translate("svg.tensor_shape", shape=tuple(panel['shape'])))
 
     row_height = max(h for _, _, h, _ in bodies)
     has_caption = any(p.get("caption_parts") for _, _, _, p in bodies)
+    height = row_height + 18
+    if has_caption:
+        height += CAPTION_HEIGHT - 2
 
     parts = []
     centers = []
     cursor = 0.0
     for i, (body, w, h, _) in enumerate(bodies):
+        ptheme = panel_themes[i]
+        if ptheme.background != theme.background:
+            parts.append(
+                f'<rect x="{cursor:.0f}" y="0" width="{w:.0f}" height="{height:.0f}" '
+                f'rx="14" {_paint_attributes(fill=ptheme.background)}/>'
+            )
         dy = (row_height - h) / 2
         parts.append(f'<g transform="translate({cursor:.0f}, {dy:.0f})">{body}</g>')
         centers.append(cursor + w / 2)
@@ -488,7 +548,7 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
             parts.append(
                 f'<text x="{cx:.0f}" y="{row_height / 2:.0f}" text-anchor="middle" '
                 f'dominant-baseline="central" font-size="{CONNECTOR_FONT_SIZE}" '
-                f'fill="{escape(theme.text_muted)}">{escape(glyph)}</text>'
+                f'{_paint_attributes(fill=theme.text_muted)}>{escape(glyph)}</text>'
             )
             cursor += PANEL_GAP
 
@@ -511,12 +571,12 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
         if i < len(panel_labels) - 1:
             connector = connectors[i] if i < len(connectors) else "->"
             accessible_parts.append(str(connector))
-    aria_label = " ".join(accessible_parts) or "Tensor panels"
+    aria_label = " ".join(accessible_parts) or translate("svg.visualisation")
 
     return svg_document(
         "".join(parts),
         content_width,
-        y + 18,
-        theme=theme,
+        height,
+        theme=theme.variant(adaptive=True) if adaptive and not theme.adaptive else theme,
         aria_label=aria_label,
     )

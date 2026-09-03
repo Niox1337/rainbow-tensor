@@ -2,9 +2,9 @@
 
 A :class:`Theme` bundles every visual choice the renderer needs into one
 immutable value: colours, fonts, cell geometry, stroke width, corner radius,
-and the truncation limit. Two presets ship with the package, a clean
-``LIGHT`` theme and a high contrast ``DARK`` theme. A module level default is
-used when a call does not pass its own theme, and either preset can be looked
+and the truncation limit. ``AUTO`` follows the browser's colour preference,
+while ``LIGHT`` and ``DARK`` select fixed palettes. A module level default is
+used when a call does not pass its own theme, and each preset can be looked
 up by name through :func:`resolve_theme`.
 
 The axis colours form a rainbow ramp keyed by axis depth, which is where the
@@ -100,6 +100,9 @@ class Theme:
     max_cells: int = 12
     max_visible_cells: int = 240
 
+    # Adaptive colours are resolved by SVG CSS, without another Python render.
+    adaptive: bool = False
+
     def axis_color(self, axis):
         """Return the ramp colour for ``axis``, wrapping if the ramp runs out."""
         ramp = self.axis_colors
@@ -144,9 +147,87 @@ DARK = Theme(
     card_border="#1e293b",
 )
 
-_PRESETS = {LIGHT.name: LIGHT, DARK.name: DARK}
-# The mutable default theme and axis ramp live in ``config``; ``None`` there
-# means use ``LIGHT`` and each theme's own ramp.
+_LIGHT_OPERAND_TINTS = (
+    ("#dbeafe", "#93c5fd"),
+    ("#fef3c7", "#fcd34d"),
+    ("#dcfce7", "#86efac"),
+    ("#fce7f3", "#f9a8d4"),
+    ("#ede9fe", "#c4b5fd"),
+)
+_DARK_OPERAND_TINTS = (
+    ("#1e3a5f", "#3b82f6"),
+    ("#3f2d10", "#d97706"),
+    ("#14352a", "#22c55e"),
+    ("#3b1d2e", "#db2777"),
+    ("#2a2150", "#7c3aed"),
+)
+_LIGHT_EINSUM_RAMPS = {
+    "free": ("#2563eb", "#0891b2", "#4f46e5", "#0d9488", "#0284c7"),
+    "shared": ("#db2777", "#9333ea", "#c026d3", "#e11d48"),
+    "contracted": ("#ea580c", "#ca8a04", "#dc2626", "#b45309"),
+}
+_DARK_EINSUM_RAMPS = {
+    "free": ("#60a5fa", "#22d3ee", "#a5b4fc", "#2dd4bf", "#38bdf8"),
+    "shared": ("#f472b6", "#c084fc", "#e879f9", "#fb7185"),
+    "contracted": ("#fb923c", "#facc15", "#f87171", "#fbbf24"),
+}
+
+# Tokens distinguish semantic roles even when their light colours are equal.
+_COLOR_FIELDS = (
+    "background", "surface", "surface_muted", "surface_selected", "text",
+    "text_muted", "text_selected", "heading", "neutral", "cell_border",
+    "selected_border", "card_border",
+)
+_AUTO_PALETTE = {
+    name.replace("_", "-"): (getattr(LIGHT, name), getattr(DARK, name))
+    for name in _COLOR_FIELDS
+}
+_AUTO_PALETTE.update({
+    f"axis-{i}": colors for i, colors in enumerate(zip(LIGHT_AXIS_RAMP, DARK_AXIS_RAMP))
+})
+for _i, (_light_pair, _dark_pair) in enumerate(zip(_LIGHT_OPERAND_TINTS, _DARK_OPERAND_TINTS)):
+    for _kind, _light, _dark in zip(("fill", "border"), _light_pair, _dark_pair):
+        _AUTO_PALETTE[f"operand-{_i}-{_kind}"] = (_light, _dark)
+for _role, _ramp in _LIGHT_EINSUM_RAMPS.items():
+    for _i, _colors in enumerate(zip(_ramp, _DARK_EINSUM_RAMPS[_role])):
+        _AUTO_PALETTE[f"einsum-{_role}-{_i}"] = _colors
+
+
+def _auto_color(name):
+    """Return a semantic SVG colour with a readable light fallback."""
+    return f"var(--rt-{name}, {_AUTO_PALETTE[name][0]})"
+
+
+_AUTO_FALLBACKS = {_auto_color(name): colors[0] for name, colors in _AUTO_PALETTE.items()}
+_AUTO_OPERAND_TINTS = tuple(
+    (_auto_color(f"operand-{i}-fill"), _auto_color(f"operand-{i}-border"))
+    for i in range(len(_LIGHT_OPERAND_TINTS))
+)
+_AUTO_EINSUM_RAMPS = {
+    role: tuple(_auto_color(f"einsum-{role}-{i}") for i in range(len(ramp)))
+    for role, ramp in _LIGHT_EINSUM_RAMPS.items()
+}
+
+AUTO = LIGHT.variant(
+    name="auto",
+    adaptive=True,
+    axis_colors=tuple(_auto_color(f"axis-{i}") for i in range(len(LIGHT_AXIS_RAMP))),
+    **{name: _auto_color(name.replace("_", "-")) for name in _COLOR_FIELDS},
+)
+
+
+def _auto_stylesheet():
+    """Scope dark overrides to adaptive SVGs, leaving fixed figures unchanged."""
+    declarations = ";".join(f"--rt-{name}:{dark}" for name, (_, dark) in _AUTO_PALETTE.items())
+    return (
+        '<style>@media (prefers-color-scheme: dark){svg[data-rt-theme="auto"]{'
+        + declarations + "}}</style>"
+    )
+
+
+_PRESETS = {theme.name: theme for theme in (AUTO, LIGHT, DARK)}
+# The mutable default theme and axis ramp live in ``config``. ``None`` there
+# means use ``AUTO`` and each theme's own ramp.
 
 
 def register_theme(theme):
@@ -164,7 +245,7 @@ def resolve_theme(theme):
     the registered presets. A :class:`Theme` is returned unchanged.
     """
     if theme is None:
-        base = config.default_theme if config.default_theme is not None else LIGHT
+        base = config.default_theme if config.default_theme is not None else AUTO
         if config.default_axis_colors is not None:
             return base.variant(axis_colors=config.default_axis_colors)
         return base
@@ -185,7 +266,7 @@ def resolve_theme(theme):
 
 def get_default_theme():
     """Return the current module default theme."""
-    return config.default_theme if config.default_theme is not None else LIGHT
+    return config.default_theme if config.default_theme is not None else AUTO
 
 
 def set_default_theme(theme):

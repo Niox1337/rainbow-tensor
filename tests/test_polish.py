@@ -5,6 +5,7 @@ precision, right aligned numbers, and the save helper.
 """
 
 import re
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -174,7 +175,11 @@ def _first_cell_width(svg):
 
 
 def _cell_values(svg):
-    return re.findall(r'monospace"[^>]*fill="#0f172a">([^<]+)</text>', svg)
+    """Read value text without depending on paint attribute order or theme."""
+    return [
+        node.text for node in ET.fromstring(svg).iter()
+        if node.tag.endswith("text") and "monospace" in node.attrib.get("font-family", "")
+    ]
 
 
 def test_high_precision_value_fits_inside_cell():

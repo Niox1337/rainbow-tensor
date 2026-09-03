@@ -220,13 +220,13 @@ def test_squeeze_source_frames_mark_removed_axes():
     # caption numbers, instead of falling back to the default axis ramp.
     from rainbow_tensor.theme import resolve_theme
 
-    theme = resolve_theme(None)
-    root = ET.fromstring(rt.squeeze(np.ones((1, 3, 1))).svg)
+    theme = resolve_theme("light")
+    root = ET.fromstring(rt.squeeze(np.ones((1, 3, 1)), theme=theme).svg)
     svg_ns = "{http://www.w3.org/2000/svg}"
     source_panel = root.findall(f"{svg_ns}g")[0]
     strokes = {
         rect.attrib["stroke"]
-        for rect in source_panel.findall(f"{svg_ns}rect")
+        for rect in source_panel.iter(f"{svg_ns}rect")
         if rect.attrib.get("fill") == "none"
     }
     assert theme.surface_selected in strokes  # removed axis 0 frame is the accent

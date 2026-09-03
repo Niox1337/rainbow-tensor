@@ -71,7 +71,7 @@ def test_index_highlights_selected_values():
 
 
 def test_index_label_colours_tokens_by_axis():
-    visual = index((2, 2, 2), (0, slice(None), 1))
+    visual = index((2, 2, 2), (0, slice(None), 1), theme="light")
     # red axis 0 token, orange axis 1 token, green leaf token, all as tspans
     assert f'<tspan fill="{LIGHT.axis_color(0)}">0</tspan>' in visual.svg
     assert f'<tspan fill="{LIGHT.axis_color(1)}">:</tspan>' in visual.svg

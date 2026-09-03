@@ -33,6 +33,7 @@ from .renderers import (
     set_default_renderer,
 )
 from .theme import (
+    AUTO,
     DARK,
     LIGHT,
     Theme,
@@ -97,6 +98,7 @@ __all__ = [
     "register_renderer",
     "resolve_renderer",
     "Theme",
+    "AUTO",
     "LIGHT",
     "DARK",
     "get_default_theme",

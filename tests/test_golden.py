@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 import rainbow_tensor as rt
+from rainbow_tensor import config
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 
@@ -68,7 +69,8 @@ def _render(name):
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
-def test_render_matches_golden(name):
+def test_render_matches_golden(name, monkeypatch):
+    monkeypatch.setattr(config, "default_theme", rt.LIGHT)
     rendered = _render(name)
     path = GOLDEN_DIR / f"{name}.svg"
 

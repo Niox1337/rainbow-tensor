@@ -25,15 +25,15 @@ from ..ops import (
 from ..ops.einsum import einsum_source_terms, einsum_term_count
 from ..renderers import resolve_renderer
 from ..shape import extract_shape, format_shape
-from ..theme import resolve_theme
+from ..theme import _AUTO_EINSUM_RAMPS, _LIGHT_EINSUM_RAMPS, resolve_theme
 from ..tracing import _build_trace, _normalize_focus, _trace_explanation
 from ..visual import _preview_explanation, _source_value, _value_fn_for, _visual
 
 # Role colour families, chosen so free, shared, and contracted labels read as
 # three distinct groups while every label keeps one colour everywhere it appears.
-_EINSUM_FREE = ("#2563eb", "#0891b2", "#4f46e5", "#0d9488", "#0284c7")
-_EINSUM_SHARED = ("#db2777", "#9333ea", "#c026d3", "#e11d48")
-_EINSUM_CONTRACTED = ("#ea580c", "#ca8a04", "#dc2626", "#b45309")
+_EINSUM_FREE = _LIGHT_EINSUM_RAMPS["free"]
+_EINSUM_SHARED = _LIGHT_EINSUM_RAMPS["shared"]
+_EINSUM_CONTRACTED = _LIGHT_EINSUM_RAMPS["contracted"]
 
 
 def _einsum_roles(input_axes, output_axes):
@@ -62,7 +62,7 @@ def _einsum_roles(input_axes, output_axes):
     return roles
 
 
-def _einsum_label_colors(input_axes, output_axes):
+def _einsum_label_colors(input_axes, output_axes, theme=None):
     """Map every einsum label to one colour drawn from its role family.
 
     The colour is stable across every operand and the output, so a label keeps
@@ -70,7 +70,7 @@ def _einsum_label_colors(input_axes, output_axes):
     distinct.
     """
     roles = _einsum_roles(input_axes, output_axes)
-    ramps = {"free": _EINSUM_FREE, "shared": _EINSUM_SHARED, "contracted": _EINSUM_CONTRACTED}
+    ramps = _AUTO_EINSUM_RAMPS if theme is not None and theme.adaptive else _LIGHT_EINSUM_RAMPS
     counters = {"free": 0, "shared": 0, "contracted": 0}
     colors = {}
     for labels in (*input_axes, output_axes):
@@ -113,7 +113,7 @@ def _einsum_caption_parts(name, labels, shape, theme, label_colors):
         for label in labels:
             parts.append((label, label_colors[label]))
     else:
-        parts.append(("scalar", theme.text_muted))
+        parts.append((t("label.scalar"), theme.text_muted))
     parts.append((" (", neutral))
     for axis, dim in enumerate(shape):
         color = label_colors[labels[axis]] if labels else theme.text_muted
@@ -183,7 +183,7 @@ def einsum(
     term_count = einsum_term_count(input_axes, output_axes, shapes)
     semantics = numeric_semantics(arrays)
     display_result = result
-    label_colors = _einsum_label_colors(input_axes, output_axes)
+    label_colors = _einsum_label_colors(input_axes, output_axes, theme)
     result_theme = _einsum_theme(output_axes, theme, label_colors)
     evaluation = evaluation_plan(
         term_count, max_terms, max_total_terms, display_result,
@@ -217,7 +217,7 @@ def einsum(
                 "theme": _einsum_theme(labels, theme, label_colors),
                 "cell_tint": _einsum_leaf_tint(labels, theme, label_colors),
                 "caption_parts": _einsum_caption_parts(
-                    f"operand {i}", labels, shape, theme, label_colors
+                    t("label.operand", i=i), labels, shape, theme, label_colors
                 ),
             }
         )
@@ -231,15 +231,15 @@ def einsum(
             "theme": result_theme,
             "cell_tint": _einsum_leaf_tint(output_axes, theme, label_colors),
             "caption_parts": _einsum_caption_parts(
-                "output", output_axes, display_result, theme, label_colors
+                t("label.output"), output_axes, display_result, theme, label_colors
             ),
         }
     )
     if focus is not None or evaluation["status"] == "skipped":
         panels[-1]["selected"] = [] if focused is None else [focused]
     connectors = ["*"] * (len(arrays) - 1) + ["->"]
-    input_text = ", ".join("".join(labels) or "scalar" for labels in input_axes)
-    output_text = "".join(output_axes) or "scalar"
+    input_text = ", ".join("".join(labels) or t("label.scalar") for labels in input_axes)
+    output_text = "".join(output_axes) or t("label.scalar")
     if contracted:
         contracted_line = t("einsum.contracted", labels=", ".join(contracted))
     else:
@@ -255,7 +255,7 @@ def einsum(
     if trace is None:
         explanation.extend(_trace_explanation(None))
     elif term_count == 0:
-        explanation.append("The contraction has no terms, so each output is 0.")
+        explanation.append(t("math.empty_contraction"))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     content = renderer.render_panels(
@@ -269,6 +269,7 @@ def einsum(
         content, shapes[0], renderer, selected=selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["trace_in_explanation"] = focus is not None and trace is not None
     visual.metadata["value_evaluation"] = evaluation
     visual.metadata["numeric_semantics"] = semantics
     return visual
