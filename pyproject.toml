@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rainbow-tensor"
-version = "1.2.0"
+version = "1.3.0.dev0"
 description = "Visualise tensor shape, indexing, and slicing as SVG in Jupyter notebooks"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,6 +37,10 @@ interactive = ["ipywidgets>=8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+
+[tool.setuptools.package-data]
+rainbow_tensor = ["locales/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

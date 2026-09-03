@@ -15,7 +15,13 @@ Public API:
     rt.set_default_theme("dark")
 """
 
-from .explanations import get_language, set_language
+from .explanations import (
+    available_languages,
+    get_language,
+    get_resolved_language,
+    load_translations,
+    set_language,
+)
 from .interactive import FocusExplorer, explore
 from .memory import memory
 from .renderers import (
@@ -59,7 +65,7 @@ from .views import (
 )
 from .visual import TensorVisual
 
-__version__ = "1.2.0"
+__version__ = "1.3.0.dev0"
 __all__ = [
     "shape",
     "memory",
@@ -101,5 +107,8 @@ __all__ = [
     "resolve_theme",
     "set_language",
     "get_language",
+    "get_resolved_language",
+    "available_languages",
+    "load_translations",
     "__version__",
 ]

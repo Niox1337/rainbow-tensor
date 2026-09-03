@@ -7,11 +7,11 @@ whole configuration. The object defaults start as ``None`` sentinels meaning
 can never cause an import cycle.
 """
 
-# None -> theme.LIGHT
+# None -> theme.AUTO
 default_theme = None
 # None -> each theme's own axis colour ramp
 default_axis_colors = None
 # None -> renderers.SVG
 default_renderer = None
-# explanation language; "en" is always the fallback
-language = "en"
+# Display language follows system preferences, with English as the fallback.
+language = "auto"
