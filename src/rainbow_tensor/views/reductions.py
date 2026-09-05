@@ -129,23 +129,21 @@ def matmul(
     )
 
     inner = a_shape[a_inner]
-    rows = "n/a" if len(a_shape) == 1 else a_shape[-2]
-    cols = "n/a" if len(b_shape) == 1 else b_shape[-1]
+    rows = t("label.not_applicable") if len(a_shape) == 1 else a_shape[-2]
+    cols = t("label.not_applicable") if len(b_shape) == 1 else b_shape[-1]
     explanation = [
         t("matmul.operands", a=format_shape(a_shape), b=format_shape(b_shape)),
         t("matmul.dims", rows=rows, cols=cols, inner=inner),
         t("common.result_shape", shape=format_shape(result)),
     ] + _preview_explanation([a_shape, b_shape, display_result], theme)
     if trace is not None and trace.term_count:
-        explanation.insert(3, t("matmul.combine") if focus is None else (
-            "The highlighted row and column combine into the focused output element."
-        ))
+        explanation.insert(3, t("matmul.combine" if focus is None else "matmul.focused"))
     explanation.extend(evaluation_explanation(evaluation, len(trace.terms) if trace else 0))
     explanation.extend(numeric_explanation(semantics))
     if trace is None:
         explanation.extend(_trace_explanation(None))
     elif a_shape[-1] == 0:
-        explanation.append("The contraction has no terms, so each output is 0.")
+        explanation.append(t("math.empty_contraction"))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -180,6 +178,7 @@ def matmul(
         content, a_shape, renderer, selected=a_selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["trace_in_explanation"] = focus is not None and trace is not None
     visual.metadata["value_evaluation"] = evaluation
     visual.metadata["numeric_semantics"] = semantics
     return visual
@@ -283,14 +282,11 @@ def _reduce(
         reducing = t("reduce.reducing", axis=axes[0], op=op_name)
         combines = t("reduce.combines", count=term_count, axis=axes[0])
     elif axes:
-        reducing = f"Reducing axes {axes} with {op_name}."
-        combines = f"Each result element combines {term_count} values from axes {axes}."
+        reducing = t("reduce.axes", axes=axes, op=op_name)
+        combines = t("reduce.axes_combines", count=term_count, axes=axes)
     else:
-        reducing = (
-            "The scalar has no axes to reduce." if not shape
-            else "No axes are reduced because axis=()."
-        )
-        combines = "Each result element uses the source value at the same coordinate."
+        reducing = t("reduce.scalar" if not shape else "reduce.no_axes")
+        combines = t("reduce.same_coordinate")
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
         reducing,
@@ -298,24 +294,15 @@ def _reduce(
         combines,
     ] + _preview_explanation([shape, disp], theme)
     if trace is not None and term_count:
-        explanation.insert(4, t("reduce.share_background") if focus is None else (
-            "Values that fold into the same result share its background, "
-            "and the focused group is highlighted."
-        ))
+        explanation.insert(4, t("reduce.share_background" if focus is None else "reduce.focused"))
     if keepdims and axes:
-        explanation.append(
-            f"keepdims=True retains axes {axes} at length 1 for broadcasting. "
-            "Their result dimensions use the highlight colour."
-        )
+        explanation.append(t("reduce.keepdims", axes=axes))
     explanation.extend(evaluation_explanation(evaluation))
     explanation.extend(numeric_explanation(semantics))
     if trace is None:
         explanation.extend(_trace_explanation(None))
     elif term_count == 0:
-        explanation.append(
-            "The mean of an empty group is undefined and displayed as NaN."
-            if op_name == "mean" else "An empty group contributes no values, so its sum is 0."
-        )
+        explanation.append(t("reduce.empty_mean" if op_name == "mean" else "reduce.empty_sum"))
     if focus is not None:
         explanation.extend(_trace_explanation(trace))
     panels = [
@@ -324,7 +311,7 @@ def _reduce(
             "value_fn": _value_fn_for(array),
             "selected": selected,
             "cell_tint": source_tint,
-            "caption_parts": _shape_caption_parts("source", shape, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), shape, theme),
         },
         {
             "shape": disp,
@@ -344,6 +331,7 @@ def _reduce(
         content, shape, renderer, selected=selected, result=result, explanation=explanation
     )
     visual.trace = trace
+    visual.metadata["trace_in_explanation"] = focus is not None and trace is not None
     visual.metadata["value_evaluation"] = evaluation
     visual.metadata["numeric_semantics"] = semantics
     visual.metadata["reduction"] = {

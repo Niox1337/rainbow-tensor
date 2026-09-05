@@ -5,6 +5,7 @@ a small object that renders as SVG in a notebook and stays inspectable in plain
 Python, so the package is testable outside a notebook.
 """
 
+from ..explanations import t
 from ..index_mapping import IndexMapping
 from ..indexing import format_index, format_token
 from ..renderers import resolve_renderer
@@ -28,7 +29,7 @@ def _shape_label_parts(shape, theme):
     """
     ndim = len(shape)
     neutral = theme.heading
-    parts = [("Shape (", neutral)]
+    parts = [(t("label.shape") + " (", neutral)]
     for axis, dim in enumerate(shape):
         if axis < ndim - 1:
             color = theme.axis_color(axis)
@@ -50,7 +51,7 @@ def _index_label_parts(index, theme):
     """
     ndim = len(index)
     neutral = theme.heading
-    parts = [("Index (", neutral)]
+    parts = [(t("label.index") + " (", neutral)]
     for axis, entry in enumerate(index):
         token = format_token(entry)
         if axis < ndim - 1:
@@ -141,24 +142,27 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
             {
                 "shape": normalized,
                 "value_fn": value_fn,
-                "caption_parts": _shape_caption_parts("source", normalized, theme),
+                "caption_parts": _shape_caption_parts(t("label.source"), normalized, theme),
             },
             {
                 "shape": result,
                 "value_fn": result_value,
                 "selected": BasicSelection(result, (Ellipsis,)),
-                "caption_parts": _shape_caption_parts("result", result, theme),
+                "caption_parts": _shape_caption_parts(t("label.result"), result, theme),
             },
         ]
-        explanation.append("The result preserves the index order, including repeated elements.")
+        explanation.append(t("index.result_order"))
         if mapping.result_count == 0:
-            explanation.append("The index selects no elements. The result is empty.")
+            explanation.append(t("index.empty_result"))
         content = renderer.render_panels(
             panels=panels, connectors=["->"], explanation=explanation,
             theme=theme, precision=precision,
         )
     elif mapping.is_advanced:
-        label = "mask" if not isinstance(index, tuple) else f"Index ({format_index(index)})"
+        label = (
+            t("label.mask") if not isinstance(index, tuple)
+            else t("label.index_expression", index=format_index(index))
+        )
         content = renderer.render_tensor(
             shape=normalized,
             selected=selected,

@@ -79,7 +79,7 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
             "shape": shape,
             "value_fn": _value_fn_for(array),
             "cell_tint": source_tint,
-            "caption_parts": _shape_caption_parts("source", shape, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), shape, theme),
         },
         {
             "shape": result,
@@ -137,7 +137,7 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
             "shape": shape,
             "value_fn": _value_fn_for(array),
             "cell_tint": source_tint,
-            "caption_parts": _shape_caption_parts("source", shape, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), shape, theme),
         },
         {
             "shape": result,
@@ -181,7 +181,7 @@ def _combine(
                 "shape": s,
                 "value_fn": _value_fn_for(a),
                 "theme": theme.variant(surface=fill, cell_border=border),
-                "caption_parts": _shape_caption_parts(f"operand {i}", s, theme),
+                "caption_parts": _shape_caption_parts(t("label.operand", i=i), s, theme),
             }
         )
     panels.append(
@@ -293,7 +293,7 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
             {
                 "shape": s,
                 "value_fn": _value_fn_for(arr),
-                "caption_parts": _shape_caption_parts(f"operand {i}", s, theme),
+                "caption_parts": _shape_caption_parts(t("label.operand", i=i), s, theme),
             }
         )
         panels.append(
@@ -302,7 +302,7 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
                 "value_fn": stretched_value,
                 "theme": stretched_theme,
                 "caption_parts": _shape_caption_parts(
-                    "stretched", result, theme, color_for=color_for
+                    t("label.stretched"), result, theme, color_for=color_for
                 ),
             }
         )

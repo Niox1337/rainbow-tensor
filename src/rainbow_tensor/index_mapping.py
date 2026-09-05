@@ -345,7 +345,7 @@ class IndexMapping:
         self.explanation = [
             t("common.original_shape", shape=format_shape(self.source_shape)),
             t("index.mask"),
-            t("index.mask_keeps", count=count, plural="s" if count != 1 else ""),
+            t("index.mask_keeps", count=count),
             t("common.result_shape", shape=format_shape(self.result_shape)),
         ]
 
@@ -473,7 +473,7 @@ class IndexMapping:
             t("index.arrays"),
             t(
                 "index.gather", axes=", ".join(str(axis) for axis in self.arrays),
-                count=count, plural="s" if count != 1 else "",
+                count=count,
                 shape=format_shape(self.broadcast_shape),
             ),
         ]

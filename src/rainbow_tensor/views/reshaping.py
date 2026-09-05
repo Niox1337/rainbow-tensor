@@ -62,7 +62,7 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
         {
             "shape": old,
             "value_fn": _value_fn_for(array),
-            "caption_parts": _shape_caption_parts("source", old, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), old, theme),
         },
         {
             "shape": new,
@@ -111,7 +111,7 @@ def _permute_view(array, perm, name, prefix_lines, keep_colour, theme, precision
         {
             "shape": shape,
             "value_fn": _value_fn_for(array),
-            "caption_parts": _shape_caption_parts("source", shape, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), shape, theme),
         },
         {
             "shape": result,
@@ -244,7 +244,9 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
             "shape": shape,
             "value_fn": _value_fn_for(array),
             "theme": source_theme,
-            "caption_parts": _shape_caption_parts("source", shape, theme, color_for=source_color),
+            "caption_parts": _shape_caption_parts(
+                t("label.source"), shape, theme, color_for=source_color
+            ),
         },
         {
             "shape": result,
@@ -307,7 +309,7 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
         {
             "shape": shape,
             "value_fn": _value_fn_for(array),
-            "caption_parts": _shape_caption_parts("source", shape, theme),
+            "caption_parts": _shape_caption_parts(t("label.source"), shape, theme),
         },
         {
             "shape": result,
