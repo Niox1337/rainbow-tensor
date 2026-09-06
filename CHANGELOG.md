@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0 (unreleased)
+
+### Added
+
+- Automatic themes follow the SVG viewer's light or dark preference, including saved SVG files and operand colours
+- Automatic language selection follows the Python process environment and system locale, with explicit overrides
+- English and Simplified Chinese catalogs cover visual labels, hover text, explanations, accessibility descriptions, and notebook controls
+- New languages are discovered from UTF-8 JSON catalogs without adding a Python registry entry, and external catalogs can be loaded from a file or directory
+- Regional language fallback, English fallback for missing messages, and validation of translation keys and placeholders
+- A settings notebook and translation contribution guide
+
+### Changed
+
+- The default theme and language are now `auto`, while explicit settings remain available
+- Panel widths account for long captions and full-width characters
+
 ## 1.2.0 (2026-09-22)
 
 ### Added

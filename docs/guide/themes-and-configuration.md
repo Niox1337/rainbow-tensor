@@ -5,8 +5,13 @@ the look and the input source are both flexible.
 
 ## Themes
 
-Pass `theme="light"` or `theme="dark"` to any call, or set a module default that
-every later call follows.
+The default theme is `rt.AUTO`, also available as `theme="auto"`. Its SVG follows
+the browser's `prefers-color-scheme` setting, including changes while the figure
+is open. A saved SVG keeps this behaviour in viewers that support it. Other SVG
+viewers receive literal light colours as a fallback.
+
+Pass `theme="light"` or `theme="dark"` for a fixed palette, or set a default for
+later calls. A theme passed to one call takes priority over that default.
 
 ```python
 import numpy as np
@@ -17,6 +22,8 @@ rt.shape(x, theme="dark")
 
 rt.set_default_theme("dark")
 rt.index(x, (0, slice(None), 1))
+rt.shape(x, theme="light")  # override the default for this figure
+rt.set_default_theme("auto")
 ```
 
 A theme bundles the colours, fonts, cell size, stroke width, the per axis
@@ -24,9 +31,14 @@ truncation limit, and the total visible cell budget. Derive a tweaked copy with
 `variant` and pass it directly.
 
 ```python
-roomy = rt.LIGHT.variant(cell_w=64, max_cells=8, max_visible_cells=160)
+roomy = rt.AUTO.variant(cell_w=64, max_cells=8, max_visible_cells=160)
 rt.shape(np.arange(8).reshape(2, 4), theme=roomy)
 ```
+
+Starting from `rt.AUTO` keeps its adaptive palette. Start from `rt.LIGHT` or
+`rt.DARK` to keep a custom theme fixed. Explicit colour values in a variant stay
+as supplied, so choose colours that work against both backgrounds when changing
+an adaptive theme.
 
 ## Global axis colours
 
@@ -46,20 +58,38 @@ rt.set_default_axis_colors(None)    # clear it and fall back to the theme ramp
 
 ## Explanation language
 
-Every caption line under a visual comes from a keyed template in
-`rainbow_tensor.explanations`. The active language is global. Set it once with
-`set_language`, and `get_language` returns the current one.
+The default language setting is `"auto"`. It reads preferences from the Python
+kernel's environment and operating system. Theme detection happens in the
+browser, so a remote notebook can have a local dark theme and a language chosen
+by the remote kernel.
+
+Set a language explicitly to override automatic detection for later visuals.
+English (`"en"`) and Simplified Chinese (`"zh"`) are bundled.
 
 ```python
-rt.set_language("de")   # affects every later visual
-rt.get_language()       # -> "de"
-rt.set_language("en")   # back to the default
+rt.set_language("zh-CN")
+rt.get_language()           # -> "zh-CN", the requested setting
+rt.get_resolved_language()  # -> "zh", the available catalog
+rt.available_languages()   # -> ("en", "zh") before loading other catalogs
+rt.set_language("en")      # fixed English
+rt.set_language("auto")    # return to automatic selection
 ```
 
-Only English (`"en"`) ships today. A translation adds one table to
-`MESSAGES` keyed by its language code, reusing the English keys. English is the
-fallback at two levels, so an unknown language or a key a translation has not
-filled yet still renders the English line rather than failing.
+Automatic selection checks `LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, and `LANG` in
+that order. It then tries the Windows UI language on Windows, or Python's
+current locale when the UI language is unavailable, and finally English.
+Colon-separated preferences are tried in order. Regional tags try their parent
+tags, and `C` or `POSIX` selects English. An explicit `set_language(...)` setting
+skips these environment and system preferences.
+
+`get_language()` returns the requested setting, including `"auto"`.
+`get_resolved_language()` returns the catalog selected for the current
+environment. Missing messages fall back through parent catalogs to English.
+This selection does not change Python's process locale. Existing visual objects
+keep the text created with them, so create a new visual to see a language change.
+
+API operation names and validation exceptions remain in English. See
+[Translations](translations) to add a language or load a custom catalog.
 
 ## Backend arrays
 

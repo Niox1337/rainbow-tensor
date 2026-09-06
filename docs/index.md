@@ -60,7 +60,9 @@ notebooks in the `examples` folder.
 - [Combining tensors](guide/combining) covers concatenate, stack, broadcast,
   repeat, and take
 - [Themes and configuration](guide/themes-and-configuration) covers themes,
-  global axis colours, backend arrays, and renderers
+  automatic language selection, global axis colours, backend arrays, and renderers
+- [Translations](guide/translations) explains catalog files, language fallback,
+  and how to add or load a translation
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
 - [Interactive focus](guide/interactive) adds optional keyboard controls and
@@ -78,6 +80,7 @@ guide/reshaping
 guide/reductions-and-math
 guide/combining
 guide/themes-and-configuration
+guide/translations
 guide/memory
 guide/interactive
 ```

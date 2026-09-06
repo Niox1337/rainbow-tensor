@@ -72,3 +72,12 @@ Themes
 .. autofunction:: set_default_axis_colors
 .. autofunction:: register_theme
 .. autofunction:: resolve_theme
+
+Language and translations
+-------------------------
+
+.. autofunction:: get_language
+.. autofunction:: set_language
+.. autofunction:: get_resolved_language
+.. autofunction:: available_languages
+.. autofunction:: load_translations

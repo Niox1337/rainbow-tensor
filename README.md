@@ -135,14 +135,27 @@ Numerical previews use Python scalar arithmetic. Accumulation dtype, rounding,
 and overflow can differ from a framework's native kernels. Each math view
 explains that model and identifies any generated placeholder operands.
 
-## Themes
+## Theme and language
 
-Pass `theme="dark"` to any call, or set a module default that every later call follows. A theme is a plain object you can tweak with `variant`, and a global axis ramp can be set once with `set_default_axis_colors`.
+The default `auto` theme follows the viewer's light or dark preference, including
+saved SVG files. Language selection follows the Python environment and system
+locale. English and Simplified Chinese are included. Both settings can be
+overridden for reproducible examples.
 
 ```python
-rt.shape(x, theme="dark")
-rt.set_default_theme("dark")
+rt.shape(x, theme="dark")         # override this figure
+rt.set_default_theme("auto")     # follow the viewer again
+rt.set_language("zh-CN")         # use the Chinese catalog
+rt.get_resolved_language()        # "zh"
+rt.set_language("auto")          # follow the kernel's system settings
 ```
+
+A new language needs only a JSON catalog with translated messages. Missing
+entries fall back to English, and `rt.load_translations("translations")` loads
+additional catalogs from a directory. See the [translation guide](docs/guide/translations.md)
+and [`12_theme_and_language.ipynb`](examples/12_theme_and_language.ipynb).
+Explicit light and dark themes, custom `Theme.variant` settings, and
+`set_default_axis_colors` remain available.
 
 ## Documentation
 
