@@ -2,6 +2,7 @@
 
 from html import escape
 
+from .explanations import t
 from .tracing import _normalize_focus, _trace_explanation
 from .views import einsum, matmul, mean, sum
 
@@ -31,12 +32,12 @@ class FocusExplorer:
         self.result_shape = self.visual.result_shape
         self.coordinates = tuple(
             widgets.BoundedIntText(
-                value=value, min=0, max=size - 1, description=f"Axis {axis}",
+                value=value, min=0, max=size - 1, description=t("interactive.axis", axis=axis),
             )
             for axis, (value, size) in enumerate(zip(self.focus or (), self.result_shape))
         )
         self.update_button = widgets.Button(
-            description="Update focus", icon="refresh", disabled=self.focus is None,
+            description=t("interactive.update"), icon="refresh", disabled=self.focus is None,
         )
         self.status = widgets.Label()
         self.figure = widgets.HTML()
@@ -59,16 +60,22 @@ class FocusExplorer:
 
     def _show(self):
         """Refresh the widgets from the last successful static visual."""
+        for axis, control in enumerate(self.coordinates):
+            control.description = t("interactive.axis", axis=axis)
+        self.update_button.description = t("interactive.update")
         self.figure.value = self.visual.svg
         lines = list(self.visual.explanation)
-        if self.visual.trace is not None and not any(line.startswith("Focus:") for line in lines):
+        if (
+            self.visual.trace is not None
+            and not self.visual.metadata.get("trace_in_explanation", False)
+        ):
             lines.extend(_trace_explanation(self.visual.trace))
         self.explanation.value = (
             '<pre style="white-space:pre-wrap">' + escape("\n".join(lines)) + "</pre>"
         )
         self.status.value = (
-            "Empty result: no output coordinate to focus."
-            if self.focus is None else f"Showing output {self.focus}."
+            t("interactive.empty")
+            if self.focus is None else t("interactive.showing", coordinate=self.focus)
         )
 
     def set_focus(self, coordinate):
@@ -104,7 +111,7 @@ class FocusExplorer:
         try:
             self.set_focus(tuple(control.value for control in self.coordinates))
         except (TypeError, ValueError, IndexError, RuntimeError) as exc:
-            self.status.value = f"Could not update focus: {exc}"
+            self.status.value = t("interactive.error", error=exc)
 
     def _ipython_display_(self):
         from IPython.display import display

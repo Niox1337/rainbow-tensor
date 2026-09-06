@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from itertools import islice
 from operator import index as integer_index
 
+from .explanations import t
+
 
 @dataclass(frozen=True, slots=True)
 class OperandRef:
@@ -86,12 +88,12 @@ def _build_trace(operation, output_coord, term_count, terms, *, divisor=1):
 def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
     if trace is None:
-        return ["The result is empty and has no output coordinate to focus."]
-    plural = "s" if trace.term_count != 1 else ""
-    heading = f"Focus: output {trace.output_coord} uses {trace.term_count} term{plural}."
+        return [t("trace.empty")]
+    key = "trace.heading_one" if trace.term_count == 1 else "trace.heading_many"
+    heading = t(key, coordinate=trace.output_coord, count=trace.term_count)
     if not trace.complete:
         omitted = trace.term_count - len(trace.terms)
-        heading += f" Showing the first {len(trace.terms)} ({omitted} omitted)."
+        heading += " " + t("trace.omitted", shown=len(trace.terms), omitted=omitted)
 
     def subscript(coordinate):
         return ", ".join(map(str, coordinate)) if coordinate else "()"
@@ -100,12 +102,15 @@ def _trace_explanation(trace):
         if trace.operation == "matmul":
             return ("A", "B")[operand]
         if trace.operation in ("sum", "mean"):
-            return "source"
-        return f"operand {operand}"
+            return t("trace.source")
+        return t("trace.operand", operand=operand)
 
     if trace.term_count == 0:
-        value = "NaN (the mean of an empty group is undefined)" if trace.divisor == 0 else "0"
-        return [heading, f"output[{subscript(trace.output_coord)}] = {value}"]
+        value = t("trace.empty_mean") if trace.divisor == 0 else "0"
+        return [
+            heading,
+            t("trace.equation", coordinate=subscript(trace.output_coord), expression=value),
+        ]
 
     expression = " + ".join(
         " * ".join(
@@ -117,4 +122,7 @@ def _trace_explanation(trace):
         expression += " + ..."
     if trace.divisor != 1:
         expression = f"({expression}) / {trace.divisor}"
-    return [heading, f"output[{subscript(trace.output_coord)}] = {expression}"]
+    return [
+        heading,
+        t("trace.equation", coordinate=subscript(trace.output_coord), expression=expression),
+    ]

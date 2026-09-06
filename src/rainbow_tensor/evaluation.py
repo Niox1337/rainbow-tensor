@@ -3,6 +3,7 @@
 from functools import wraps
 from operator import index as integer_index
 
+from .explanations import t
 from .layout import build_layout
 
 DEFAULT_MAX_TERMS = 10_000
@@ -95,23 +96,12 @@ def evaluation_explanation(evaluation, highlighted_terms=None):
     count = evaluation["term_count"]
     if evaluation["reason"] == "max_terms":
         limit = evaluation["max_terms"]
-        lines = [
-            f"Each output cell requires {count:,} terms, exceeding max_terms={limit:,}. "
-            "Output values are shown as '?' and were not computed. "
-            "Set max_terms=None to remove the per-output limit."
-        ]
+        lines = [t("evaluation.per_output_limit", count=count, limit=limit)]
     else:
         outputs = evaluation["output_count"]
         total = evaluation["total_terms"]
         limit = evaluation["max_total_terms"]
-        lines = [
-            f"The {outputs:,} visible output cells require {total:,} terms in total, "
-            f"exceeding max_total_terms={limit:,}. "
-            "Output values are shown as '?' and were not computed. "
-            "Set max_total_terms=None to remove the total limit."
-        ]
+        lines = [t("evaluation.total_limit", outputs=outputs, total=total, limit=limit)]
     if highlighted_terms is not None and highlighted_terms < count:
-        lines.append(
-            f"Source highlights sample {highlighted_terms} of {count:,} contribution terms."
-        )
+        lines.append(t("evaluation.sampled_highlights", shown=highlighted_terms, count=count))
     return lines

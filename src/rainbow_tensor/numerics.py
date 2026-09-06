@@ -1,5 +1,7 @@
 """Describe the existing scalar arithmetic used by numerical previews."""
 
+from .explanations import t
+
 
 def numeric_semantics(arrays):
     """Describe operand sources without importing or evaluating a backend.
@@ -19,15 +21,11 @@ def numeric_semantics(arrays):
 
 def numeric_explanation(semantics):
     """Explain scalar arithmetic and identify generated placeholder operands."""
-    lines = ["Numerical model: Python scalar arithmetic."]
+    lines = [t("numeric.model")]
     sources = semantics["operand_sources"]
     if "array_values" in sources:
-        lines.append(
-            "Accumulation dtype, rounding, and overflow may differ from the input array backend."
-        )
+        lines.append(t("numeric.backend_difference"))
     for operand, source in enumerate(sources):
         if source == "generated_values":
-            lines.append(
-                f"Operand {operand} uses generated row-major placeholder values from its shape."
-            )
+            lines.append(t("numeric.generated", operand=operand))
     return lines

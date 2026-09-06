@@ -3,6 +3,7 @@
 from math import prod
 from operator import index
 
+from .explanations import t
 from .views.shapes import shape
 
 _MISSING = object()
@@ -83,7 +84,7 @@ def _metadata(array, normalized):
 
 
 def _yes_no(value):
-    return "unknown" if value is None else ("yes" if value else "no")
+    return t("memory.unknown" if value is None else ("memory.yes" if value else "memory.no"))
 
 
 def memory(array, theme=None, precision=2, renderer=None):
@@ -97,7 +98,7 @@ def memory(array, theme=None, precision=2, renderer=None):
     ``theme``, ``precision``, and ``renderer`` behave as in :func:`shape`.
 
     Returns a :class:`~rainbow_tensor.visual.TensorVisual` containing the
-    logical shape drawing, English explanations, and a ``metadata`` dictionary.
+    logical shape drawing, localized explanations, and a ``metadata`` dictionary.
     Its keys are ``shape``, ``dtype``, ``itemsize``, ``strides``,
     ``c_contiguous``, ``f_contiguous``, ``owns_data``, and ``has_base``.
     Unavailable fields are ``None``, including storage fields for shape tuples.
@@ -110,35 +111,37 @@ def memory(array, theme=None, precision=2, renderer=None):
     """
     visual = shape(array, theme=theme, precision=precision, renderer=renderer)
     metadata = _metadata(array, visual.shape)
-    lines = ["Memory layout metadata. The figure shows logical indices, not physical addresses."]
+    lines = [t("memory.header")]
     dtype = metadata["dtype"]
-    lines.append(f"Dtype: {dtype if dtype is not None else 'unknown'}.")
+    lines.append(t("memory.dtype", dtype=dtype if dtype is not None else t("memory.unknown")))
     itemsize = metadata["itemsize"]
-    lines.append(f"Item size: {f'{itemsize} bytes' if itemsize is not None else 'unknown'}.")
+    lines.append(t(
+        "memory.itemsize",
+        itemsize=t("memory.bytes", count=itemsize) if itemsize is not None else t("memory.unknown"),
+    ))
     strides = metadata["strides"]
     if strides is None:
-        lines.append("Byte strides: unknown.")
+        lines.append(t("memory.strides", strides=t("memory.unknown")))
     else:
-        lines.append(f"Byte strides: {strides}.")
+        lines.append(t("memory.strides", strides=strides))
         for axis, stride in enumerate(strides):
-            lines.append(f"Axis {axis}: a one-index step changes the byte offset by {stride}.")
+            lines.append(t("memory.axis_stride", axis=axis, stride=stride))
         if any(stride < 0 for stride in strides):
-            lines.append("A negative stride walks backwards through storage along that axis.")
+            lines.append(t("memory.negative_stride"))
         if prod(visual.shape) == 0:
-            lines.append("Empty tensors have no element addresses to traverse.")
+            lines.append(t("memory.empty"))
         elif any(stride == 0 for stride in strides):
-            lines.append("A zero stride reuses the same storage along that axis.")
-    lines.append(
-        f"C-contiguous: {_yes_no(metadata['c_contiguous'])}. "
-        f"F-contiguous: {_yes_no(metadata['f_contiguous'])}."
-    )
-    lines.append(
-        f"Owns data: {_yes_no(metadata['owns_data'])}. "
-        f"Base object present: {_yes_no(metadata['has_base'])}."
-    )
+            lines.append(t("memory.zero_stride"))
+    lines.append(t(
+        "memory.contiguity",
+        c=_yes_no(metadata["c_contiguous"]), f=_yes_no(metadata["f_contiguous"]),
+    ))
+    lines.append(t(
+        "memory.ownership", owns=_yes_no(metadata["owns_data"]), base=_yes_no(metadata["has_base"]),
+    ))
     if metadata["owns_data"] is False and metadata["has_base"] is True:
-        lines.append("The reported flags and base describe a view backed by another object.")
-    lines.append("These attributes do not identify which earlier operation made a view or copy.")
+        lines.append(t("memory.view"))
+    lines.append(t("memory.limitations"))
     visual.metadata = metadata
     visual.explanation = visual.explanation + lines
     visual.text = "\n".join(visual.explanation)
