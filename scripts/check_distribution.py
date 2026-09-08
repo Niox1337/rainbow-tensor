@@ -31,6 +31,14 @@ assert package_path.is_relative_to(Path(sys.prefix).resolve()), package_path
 assert importlib.metadata.version("rainbow-tensor") == sys.argv[1]
 assert rt.__version__ == sys.argv[1]
 assert "ipywidgets" not in sys.modules
+assert rt.get_language() == "auto"
+assert rt.get_default_theme().name == "auto"
+assert {"en", "zh"} <= set(rt.available_languages())
+rt.set_language("zh-CN")
+assert rt.get_resolved_language() == "zh"
+assert 'lang="zh"' in rt.shape((2, 0)).svg
+assert rt.shape((2, 0)).svg != rt.shape((2, 0), theme="light").svg
+rt.set_language("en")
 array = np.arange(6).reshape(2, 3)
 cube = np.arange(24).reshape(2, 3, 4)
 visuals = [
