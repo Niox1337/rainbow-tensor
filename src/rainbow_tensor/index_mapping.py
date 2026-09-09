@@ -87,6 +87,11 @@ class _ArrayIndex:
 def _positions_compatible(constraints, broadcast_rank):
     """Join candidate positions through their shared, non-singleton axes.
 
+    Equally shaped arrays share the same coordinate space, so their candidate
+    sets can be intersected directly. Start with the smallest set and stop at
+    the first empty intersection. This avoids rebuilding projection indexes
+    for the common case of several equally shaped gather arrays.
+
     Each candidate list is scanned at most once per query to index projections
     by the axes already bound by earlier arrays. Coordinates on private axes
     cannot constrain another array and are dropped, along with duplicate
@@ -100,6 +105,15 @@ def _positions_compatible(constraints, broadcast_rank):
     """
     if len(constraints) < 2:
         return True
+    shape = constraints[0][0].shape
+    if all(array.shape == shape for array, _ in constraints[1:]):
+        ordered = sorted((matches for _, matches in constraints), key=len)
+        common = set(map(tuple, ordered[0]))
+        for matches in ordered[1:-1]:
+            common.intersection_update(map(tuple, matches))
+            if not common:
+                return False
+        return not common.isdisjoint(map(tuple, ordered[-1]))
     aligned = [
         (
             {
