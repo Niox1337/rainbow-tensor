@@ -44,27 +44,22 @@ def test_reduce_rejects_bad_axis():
 
 
 def test_reduction_colours_groups_with_matching_backgrounds():
-    import re
     from collections import Counter
 
-    from rainbow_tensor.visual import _LIGHT_TINTS
-
-    tint_fills = {fill for fill, _ in _LIGHT_TINTS}
-    # Reducing axis 0 of (2, 3) leaves result (3,), so three column groups, each
-    # with two source values plus the one result element they fold into.
+    # Eight groups exceed the former five-colour cycle. Each contains two
+    # source cells and one output cell with exactly the same background.
     for op in (rt.sum, rt.mean):
-        visual = op((2, 3), 0)
-        assert visual.result_shape == (3,)
-        cell_fills = Counter(re.findall(r'<rect[^>]*fill="(#[0-9a-fA-F]+)"', visual.svg))
-        # The first group is shown through the selected highlight, and the other
-        # groups each take their own tint background.
+        visual = op((2, 8), 0, theme="light")
+        assert visual.result_shape == (8,)
+        root = ET.fromstring(visual.svg)
+        ns = "{http://www.w3.org/2000/svg}"
+        cell_fills = Counter(
+            group.find(f"{ns}rect").get("fill") for group in root.iter(f"{ns}g")
+            if group.find(f"{ns}title") is not None
+        )
         assert rt.LIGHT.surface_selected in cell_fills
-        assert len(set(cell_fills) & tint_fills) >= 2
-        # Every group colours its two source cells and its one result cell the
-        # same, so a result element shares the background of its source group.
-        for fill, count in cell_fills.items():
-            if fill in tint_fills or fill == rt.LIGHT.surface_selected:
-                assert count == 3
+        assert len(cell_fills) == 8
+        assert set(cell_fills.values()) == {3}
 
 
 def test_reduce_to_scalar_renders():

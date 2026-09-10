@@ -2,6 +2,7 @@
 
 import unicodedata
 
+from ..colors import AdaptivePaint
 from ..explanations import get_resolved_language
 from ..explanations import t as translate
 from ..theme import _AUTO_FALLBACKS, LIGHT, _auto_stylesheet
@@ -42,6 +43,10 @@ def _paint_attributes(**colors):
     attributes = []
     styles = []
     for name, color in colors.items():
+        if isinstance(color, AdaptivePaint):
+            attributes.append(f'{name}="{escape(color.light)}" data-rt-{name}=""')
+            styles.append(f"--rt-{name}-dark:{color.dark}")
+            continue
         fallback = _AUTO_FALLBACKS.get(color, color)
         attributes.append(f'{name}="{escape(fallback)}"')
         if color in _AUTO_FALLBACKS:

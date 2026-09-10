@@ -10,18 +10,10 @@ object rather than beside any one caller.
 from math import prod
 
 from .backends import value_at_coordinate
+from .colors import group_tint
 from .explanations import t
 from .layout import axis_visible_limits
 from .shape import flat_index, format_shape
-from .theme import (
-    _AUTO_OPERAND_TINTS,
-)
-from .theme import (
-    _DARK_OPERAND_TINTS as _DARK_TINTS,
-)
-from .theme import (
-    _LIGHT_OPERAND_TINTS as _LIGHT_TINTS,
-)
 
 
 class TensorVisual:
@@ -195,13 +187,6 @@ def _shape_caption_parts(name, shape, theme, color_for=None):
     return parts
 
 
-# Soft operand tints, keyed by operand index, so a combined result can colour
-# each cell by where it came from. The first entry is the fill, the second the
-# matching border.
 def _operand_tint(theme, i):
-    """Return the ``(fill, border)`` tint for operand ``i`` under ``theme``."""
-    if theme.adaptive:
-        ramp = _AUTO_OPERAND_TINTS
-    else:
-        ramp = _DARK_TINTS if theme.name == "dark" else _LIGHT_TINTS
-    return ramp[i % len(ramp)]
+    """Generate the fill and border for one operand without cycling a palette."""
+    return group_tint(theme, i)

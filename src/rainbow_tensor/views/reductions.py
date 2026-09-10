@@ -228,7 +228,7 @@ def _reduce(
         group = flat_index(rc, result) if result else 0
         if group == focused_group:
             return None  # this group is shown through the selected highlight
-        return _operand_tint(theme, group - 1)
+        return _operand_tint(theme, group)
 
     disp = result
 
@@ -260,7 +260,7 @@ def _reduce(
         group = flat_index(coord, disp)
         if group == focused_group:
             return None
-        return _operand_tint(theme, group - 1)
+        return _operand_tint(theme, group)
 
     selected_result = [] if focused is None else [focused]
     evaluation = evaluation_plan(

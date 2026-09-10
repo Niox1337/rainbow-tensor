@@ -147,20 +147,6 @@ DARK = Theme(
     card_border="#1e293b",
 )
 
-_LIGHT_OPERAND_TINTS = (
-    ("#dbeafe", "#93c5fd"),
-    ("#fef3c7", "#fcd34d"),
-    ("#dcfce7", "#86efac"),
-    ("#fce7f3", "#f9a8d4"),
-    ("#ede9fe", "#c4b5fd"),
-)
-_DARK_OPERAND_TINTS = (
-    ("#1e3a5f", "#3b82f6"),
-    ("#3f2d10", "#d97706"),
-    ("#14352a", "#22c55e"),
-    ("#3b1d2e", "#db2777"),
-    ("#2a2150", "#7c3aed"),
-)
 _LIGHT_EINSUM_RAMPS = {
     "free": ("#2563eb", "#0891b2", "#4f46e5", "#0d9488", "#0284c7"),
     "shared": ("#db2777", "#9333ea", "#c026d3", "#e11d48"),
@@ -185,9 +171,6 @@ _AUTO_PALETTE = {
 _AUTO_PALETTE.update({
     f"axis-{i}": colors for i, colors in enumerate(zip(LIGHT_AXIS_RAMP, DARK_AXIS_RAMP))
 })
-for _i, (_light_pair, _dark_pair) in enumerate(zip(_LIGHT_OPERAND_TINTS, _DARK_OPERAND_TINTS)):
-    for _kind, _light, _dark in zip(("fill", "border"), _light_pair, _dark_pair):
-        _AUTO_PALETTE[f"operand-{_i}-{_kind}"] = (_light, _dark)
 for _role, _ramp in _LIGHT_EINSUM_RAMPS.items():
     for _i, _colors in enumerate(zip(_ramp, _DARK_EINSUM_RAMPS[_role])):
         _AUTO_PALETTE[f"einsum-{_role}-{_i}"] = _colors
@@ -199,10 +182,6 @@ def _auto_color(name):
 
 
 _AUTO_FALLBACKS = {_auto_color(name): colors[0] for name, colors in _AUTO_PALETTE.items()}
-_AUTO_OPERAND_TINTS = tuple(
-    (_auto_color(f"operand-{i}-fill"), _auto_color(f"operand-{i}-border"))
-    for i in range(len(_LIGHT_OPERAND_TINTS))
-)
 _AUTO_EINSUM_RAMPS = {
     role: tuple(_auto_color(f"einsum-{role}-{i}") for i in range(len(ramp)))
     for role, ramp in _LIGHT_EINSUM_RAMPS.items()
@@ -221,7 +200,10 @@ def _auto_stylesheet():
     declarations = ";".join(f"--rt-{name}:{dark}" for name, (_, dark) in _AUTO_PALETTE.items())
     return (
         '<style>@media (prefers-color-scheme: dark){svg[data-rt-theme="auto"]{'
-        + declarations + "}}</style>"
+        + declarations + "}"
+        'svg[data-rt-theme="auto"] [data-rt-fill]{fill:var(--rt-fill-dark)}'
+        'svg[data-rt-theme="auto"] [data-rt-stroke]{stroke:var(--rt-stroke-dark)}'
+        "}</style>"
     )
 
 

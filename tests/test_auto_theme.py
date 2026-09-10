@@ -141,16 +141,24 @@ def test_auto_preserves_scalar_and_empty_read_contracts(shape, count):
         assert any(element.get("role") == "note" for element in root.iter())
 
 
-def test_operand_tints_adapt_without_changing_fixed_colours():
+def test_operand_tints_adapt_with_literal_fallbacks():
     visual = rt.concatenate([(2,), (2,)], 0, theme="auto")
     root = _root(visual.svg)
-    for operand in range(2):
-        assert _painted(root, f"var(--rt-operand-{operand}-fill,")
-        assert _painted(root, f"var(--rt-operand-{operand}-border,")
-    assert "#1e3a5f" in root.find(f"{SVG}style").text
-    fixed = rt.concatenate([(2,), (2,)], 0, theme="dark")
-    assert 'fill="#1e3a5f"' in fixed.svg
-    assert "--rt-operand-" not in fixed.svg
+    light = _root(rt.concatenate([(2,), (2,)], 0, theme="light").svg)
+    dark = _root(rt.concatenate([(2,), (2,)], 0, theme="dark").svg)
+
+    def cells(document):
+        return [
+            group.find(f"{SVG}rect") for group in document.iter(f"{SVG}g")
+            if group.find(f"{SVG}title") is not None
+        ]
+
+    for automatic, fixed_light, fixed_dark in zip(cells(root), cells(light), cells(dark)):
+        assert automatic.get("fill") == fixed_light.get("fill")
+        assert f'--rt-fill-dark:{fixed_dark.get("fill")}' in automatic.get("style")
+        assert automatic.get("data-rt-fill") == ""
+    assert '[data-rt-fill]{fill:var(--rt-fill-dark)}' in root.find(f"{SVG}style").text
+    assert all(element.get("data-rt-fill") is None for element in dark.iter())
 
 
 def test_einsum_role_colours_adapt_in_cells_frames_and_captions():
