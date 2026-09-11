@@ -10,11 +10,15 @@
 - New languages are discovered from UTF-8 JSON catalogs without adding a Python registry entry, and external catalogs can be loaded from a file or directory
 - Regional language fallback, English fallback for missing messages, and validation of translation keys and placeholders
 - A settings notebook and translation contribution guide
+- A group colour notebook and architecture guide with reproducible index-query benchmarks
 
 ### Changed
 
 - The default theme and language are now `auto`, while explicit settings remain available
 - Panel widths account for long captions and full-width characters
+- Reduction groups and combining operands use colours generated from their logical IDs, with stable focus behaviour and paired light and dark paints
+- SVG text and paint primitives, tensor drawing, and panel composition have separate modules while existing renderer imports remain available
+- Equally shaped advanced-index arrays use direct candidate-set intersection, improving duplicate-gather previews without adding a native dependency
 
 ## 1.2.0 (2026-09-22)
 

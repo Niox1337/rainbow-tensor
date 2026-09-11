@@ -26,6 +26,9 @@ display(rt.sum(x))  # scalar result, shape ()
 
 The source values that fold into one result element share its background colour.
 The focused group stays highlighted, and surviving axes keep their source colours.
+Group colours are generated from result coordinates, so moving focus keeps the
+other groups stable and large outputs do not restart a short palette. The
+[group colour guide](group-colours) shows this with twelve output columns.
 `mean` divides each group by the number of contributing values. Reducing axes
 `(0, 2)` of `x` uses `2 * 4 = 8` values per output, so its divisor is 8.
 

@@ -63,6 +63,8 @@ notebooks in the `examples` folder.
   automatic language selection, global axis colours, backend arrays, and renderers
 - [Translations](guide/translations) explains catalog files, language fallback,
   and how to add or load a translation
+- [Group colours](guide/group-colours) follows reduction contributions across
+  focus changes and light or dark figures
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
 - [Interactive focus](guide/interactive) adds optional keyboard controls and
@@ -81,6 +83,7 @@ guide/reductions-and-math
 guide/combining
 guide/themes-and-configuration
 guide/translations
+guide/group-colours
 guide/memory
 guide/interactive
 ```
@@ -91,4 +94,5 @@ guide/interactive
 :hidden:
 
 api
+guide/architecture
 ```

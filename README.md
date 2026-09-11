@@ -62,6 +62,11 @@ rt.sum(np.arange(12).reshape(3, 4), 0)
 
 ![Sum over axis 0](examples/images/sum_axis0.svg)
 
+Reduction groups receive generated colours instead of cycling through a short
+palette. Matching source and result cells keep the same colour when focus moves,
+with paired paints for light and dark themes. Try the
+[group colour notebook](examples/13_group_colours.ipynb) with twelve outputs.
+
 Reduce several axes together and keep their positions for later broadcasting:
 
 ```python
