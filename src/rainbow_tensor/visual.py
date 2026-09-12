@@ -25,8 +25,8 @@ class TensorVisual:
     stay available for inspection and testing. ``metadata`` holds optional
     operation details, such as the storage attributes reported by `memory`.
     Unknown metadata is explicit rather than inferred from a shape.
-    Math views also attach a bounded, immutable ``trace`` describing one output.
-    Other views leave ``trace`` as ``None``.
+    Math views and focused index views attach a bounded, immutable ``trace``
+    describing one output. Other views leave ``trace`` as ``None``.
     Index views attach an ``index_mapping`` for ordered output-to-source lookup.
     """
 

@@ -115,5 +115,6 @@
   "interactive.update": "更新聚焦",
   "interactive.empty": "结果为空：没有可聚焦的输出坐标。",
   "interactive.showing": "当前显示输出 {coordinate}。",
-  "interactive.error": "无法更新聚焦：{error}"
+  "interactive.error": "无法更新聚焦：{error}",
+  "trace.index_mapping": "输出 {output} 读取源位置 {source}。"
 }
