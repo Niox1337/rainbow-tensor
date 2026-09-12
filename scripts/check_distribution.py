@@ -56,6 +56,11 @@ assert [visual.result_shape for visual in visuals[1:]] == [
 ]
 assert visuals[-1].trace.output_coord == (0, 2, 0)
 assert visuals[-1].trace.term_count == 8
+indexed = rt.index(array, ([1, 0, 1], slice(None, None, -1)), focus=(2, 1))
+assert indexed.trace.output_coord == (2, 1)
+assert indexed.trace.terms[0][0].coordinate == (1, 1)
+assert "Output (2, 1) reads source (1, 1)." in indexed.text
+visuals.append(indexed)
 scalar = rt.sum(np.array(7))
 empty = rt.sum(np.empty((2, 0, 3)), axis=2)
 empty_sum = rt.sum(np.empty((2, 0, 3)), axis=1)
@@ -90,6 +95,18 @@ if sys.argv[2] == "interactive":
         ).svg
     finally:
         explorer.close()
+    indexed_explorer = rt.explore(rt.index, array, ([1, 0, 1], slice(None, None, -1)))
+    try:
+        assert indexed_explorer.focus == (0, 0)
+        indexed_explorer.coordinates[0].value = 2
+        indexed_explorer.update_button.click()
+        assert indexed_explorer.focus == (2, 0)
+        assert indexed_explorer.visual.trace.terms[0][0].coordinate == (1, 2)
+        assert indexed_explorer.visual.svg == rt.index(
+            array, ([1, 0, 1], slice(None, None, -1)), focus=(2, 0),
+        ).svg
+    finally:
+        indexed_explorer.close()
     empty_explorer = rt.explore(rt.sum, (2, 0, 3), axis=2)
     try:
         assert empty_explorer.focus is None
