@@ -67,8 +67,8 @@ notebooks in the `examples` folder.
   focus changes and light or dark figures
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
-- [Interactive focus](guide/interactive) adds optional keyboard controls and
-  keeps the latest result available for static export
+- [Interactive focus](guide/interactive) follows indexed results to their source
+  elements and explores mathematical outputs with optional keyboard controls
 
 ```{toctree}
 :maxdepth: 2

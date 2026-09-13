@@ -11,6 +11,9 @@
 - Regional language fallback, English fallback for missing messages, and validation of translation keys and placeholders
 - A settings notebook and translation contribution guide
 - A group colour notebook and architecture guide with reproducible index-query benchmarks
+- Index result exploration with `explore(index, ...)`, preserving distinct repeated positions and reverse-slice order while highlighting the corresponding source element
+- Static `index(..., focus=...)` comparisons with a one-source coordinate trace, bounded previews, and translated provenance text
+- An index explorer notebook covering repeated gathers, reversed slices, scalar outputs, and empty results
 
 ### Changed
 

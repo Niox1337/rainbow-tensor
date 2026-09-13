@@ -124,8 +124,20 @@ stay repeated, and reverse slices retain their order. See the
 [indexing guide](docs/guide/indexing.md) for output-to-source coordinate lookup.
 
 For optional notebook controls, install `rainbow-tensor[interactive]` and use
-`rt.explore(rt.matmul, a, b, focus=(1, 2))`. The
-[interactive guide](docs/guide/interactive.md) covers coordinate updates and export.
+the same index with `explore`:
+
+```python
+explorer = rt.explore(rt.index, x, ([2, 0, 2],))
+explorer
+```
+
+Choose a result position and press **Update focus** to highlight its source.
+Results `(0,)` and `(2,)` both read source `(2,)`, while remaining separate
+output positions. `rt.index(x, ([2, 0, 2],), focus=(2,))` produces a static
+focused comparison without widgets. The
+[index explorer notebook](examples/14_index_explorer.ipynb) adds reverse slices,
+and the [interactive guide](docs/guide/interactive.md) covers updates and export.
+`rt.explore` also supports sums, means, matmul, and einsum.
 
 ## Keep previews small
 
