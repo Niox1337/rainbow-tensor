@@ -30,8 +30,10 @@ class OutputTrace:
     remain present in every term that uses them.
     An empty mean has zero terms and divisor zero, representing an undefined
     value (NaN), rather than an instruction to perform division by zero.
-    Indexing has one term containing its single source reference. This records
-    an identity mapping without evaluating values or changing their dtype.
+    Indexing, reshaping, and combining have one term containing their single
+    source reference. This records an identity mapping without evaluating
+    values or changing their dtype. Its operand number identifies the actual
+    input even when the term contains only one factor.
 
     ``term_count`` counts the full expression. Views store its first eight terms
     at most, so ``complete`` is false when later terms have been omitted. The
@@ -58,9 +60,7 @@ def _normalize_focus(focus, result_shape):
     if not isinstance(focus, tuple):
         raise TypeError("focus must be a tuple of integer output coordinates")
     if len(focus) != len(result_shape):
-        raise ValueError(
-            f"focus has {len(focus)} coordinates for output rank {len(result_shape)}"
-        )
+        raise ValueError(f"focus has {len(focus)} coordinates for output rank {len(result_shape)}")
     resolved = []
     for axis, (value, size) in enumerate(zip(focus, result_shape)):
         if isinstance(value, bool) or type(value).__name__.startswith("bool"):
@@ -91,12 +91,35 @@ def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
     if trace is None:
         return [t("trace.empty")]
-    if trace.operation == "index":
+    if trace.operation == "index" and trace.terms:
         return [
             t(
                 "trace.index_mapping",
                 output=trace.output_coord,
                 source=trace.terms[0][0].coordinate,
+            )
+        ]
+    if trace.terms and trace.operation in {
+        "reshape",
+        "transpose",
+        "swapaxes",
+        "moveaxis",
+        "squeeze",
+        "expand_dims",
+        "repeat",
+        "take",
+        "concatenate",
+        "stack",
+        "broadcast",
+    }:
+        reference = trace.terms[0][0]
+        return [
+            t(
+                "trace.mapping",
+                operation=trace.operation,
+                output=trace.output_coord,
+                operand=reference.operand,
+                source=reference.coordinate,
             )
         ]
     key = "trace.heading_one" if trace.term_count == 1 else "trace.heading_many"
@@ -123,13 +146,11 @@ def _trace_explanation(trace):
         ]
 
     expression = " + ".join(
-        " * ".join(
-            f"{operand_name(ref.operand)}[{subscript(ref.coordinate)}]" for ref in term
-        )
+        " * ".join(f"{operand_name(ref.operand)}[{subscript(ref.coordinate)}]" for ref in term)
         for term in trace.terms
     )
     if not trace.complete:
-        expression += " + ..."
+        expression = expression + " + ..." if expression else "..."
     if trace.divisor != 1:
         expression = f"({expression}) / {trace.divisor}"
     return [

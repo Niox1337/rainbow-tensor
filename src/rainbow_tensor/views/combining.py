@@ -5,7 +5,7 @@ Public functions ``repeat``, ``take``, ``concatenate``, ``stack``, and
 stretches that produce the result stay visible.
 """
 
-from math import prod
+from operator import index as integer_index
 
 from ..explanations import t
 from ..ops import (
@@ -16,7 +16,7 @@ from ..ops import (
     concatenate_source,
     repeat_result_shape,
     repeat_source_coord,
-    repeat_source_positions,
+    repeat_source_lookup,
     stack_result_shape,
     stack_source,
     take_axis_and_indices,
@@ -32,11 +32,11 @@ from ..visual import (
     _shape_caption_parts,
     _source_value,
     _value_fn_for,
-    _visual,
 )
+from ._focus import mapped_trace, render_mapped
 
 
-def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
+def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise repeating elements along one axis with ``repeat``.
 
     ``repeats`` is a single count applied to every element, or one count per
@@ -47,6 +47,11 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
 
     A scalar is treated as one element on axis zero. Zero repeat counts produce
     an empty result without evaluating result values.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -54,8 +59,12 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
     axis = _check_axis(axis, len(shape) or 1)
     repeats = _integer_or_sequence(repeats, "repeats")
     result = repeat_result_shape(shape, repeats, axis)
-    source_positions = (
-        repeat_source_positions((shape or (1,))[axis], repeats) if prod(result) else ()
+    source_positions = repeat_source_lookup((shape or (1,))[axis], repeats)
+    trace = mapped_trace(
+        "repeat",
+        focus,
+        result,
+        lambda coord: (0, repeat_source_coord(coord, source_positions, axis, shape)),
     )
     source_value = _source_value(array, shape)
 
@@ -88,13 +97,20 @@ def repeat(array, repeats, axis=0, theme=None, precision=2, renderer=None):
             "caption_parts": _shape_caption_parts("repeat", result, theme),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shape,
+        result,
+        trace,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
-def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
+def take(array, indices, axis=0, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise gathering values along one axis with ``take``.
 
     ``indices`` is an integer or a 1-D list of positions along ``axis``. An integer
@@ -103,6 +119,11 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
     Negative axes and negative indices both work. Each gathered source slice and
     the result slice it feeds share one tint, so repeated indices repeat a tint
     and reordered indices reorder them, making the gather visible.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -110,6 +131,9 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
     indices = _integer_or_sequence(indices, "take indices")
     axis, resolved = take_axis_and_indices(shape, indices, axis)
     result = take_result_shape(shape, indices, axis)
+    trace = mapped_trace(
+        "take", focus, result, lambda coord: (0, take_source_coord(coord, resolved, axis, shape))
+    )
     source_value = _source_value(array, shape)
     scalar_index = isinstance(resolved, int)
     gathered = {resolved} if scalar_index else set(resolved)
@@ -146,14 +170,21 @@ def take(array, indices, axis=0, theme=None, precision=2, renderer=None):
             "caption_parts": _shape_caption_parts("take", result, theme),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shape,
+        result,
+        trace,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
 def _combine(
-    arrays, shapes, result, origin_fn, name, explanation, theme, precision, renderer
+    arrays, shapes, result, origin_fn, name, explanation, theme, precision, renderer, *, focus=None
 ):
     """Render several operands and their combined result in one figure.
 
@@ -163,6 +194,7 @@ def _combine(
     the seam between operands stays clear.
     """
     renderer = resolve_renderer(renderer)
+    trace = mapped_trace(name, focus, result, origin_fn)
     source_values = [_source_value(a, s) for a, s in zip(arrays, shapes)]
 
     def result_value(coord):
@@ -194,22 +226,30 @@ def _combine(
     )
     connectors = ["+"] * (len(arrays) - 1) + ["->"]
     explanation = explanation + _preview_explanation([*shapes, result], theme)
-    content = renderer.render_panels(
-        panels=panels,
-        connectors=connectors,
-        explanation=explanation,
-        theme=theme,
-        precision=precision,
+    return render_mapped(
+        panels,
+        connectors,
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shapes[0],
+        result,
+        trace,
     )
-    return _visual(content, shapes[0], renderer, result=result, explanation=explanation)
 
 
-def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None):
+def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise concatenating several tensors along an existing axis.
 
     ``arrays`` is a sequence of array-likes or shape tuples. They must match on
     every axis except ``axis``. Each operand is tinted and the result colours
     each cell by its operand, so the seam along the joined axis is clear.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     shapes = [extract_shape(a) for a in arrays]
@@ -227,16 +267,30 @@ def concatenate(arrays, axis=0, theme=None, precision=2, renderer=None):
         t("concatenate.seam"),
     ]
     return _combine(
-        arrays, shapes, result, origin_fn, "concatenate", explanation, theme, precision, renderer
+        arrays,
+        shapes,
+        result,
+        origin_fn,
+        "concatenate",
+        explanation,
+        theme,
+        precision,
+        renderer,
+        focus=focus,
     )
 
 
-def stack(arrays, axis=0, theme=None, precision=2, renderer=None):
+def stack(arrays, axis=0, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise stacking several tensors onto a brand new axis.
 
     ``arrays`` is a sequence of array-likes or shape tuples that all share the
     same shape. The new axis of length ``len(arrays)`` is inserted at ``axis``,
     and each operand is tinted so the added dimension is visible.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     shapes = [extract_shape(a) for a in arrays]
@@ -254,23 +308,52 @@ def stack(arrays, axis=0, theme=None, precision=2, renderer=None):
         t("stack.new_axis"),
     ]
     return _combine(
-        arrays, shapes, result, origin_fn, "stack", explanation, theme, precision, renderer
+        arrays,
+        shapes,
+        result,
+        origin_fn,
+        "stack",
+        explanation,
+        theme,
+        precision,
+        renderer,
+        focus=focus,
     )
 
 
-def broadcast(a, b, theme=None, precision=2, renderer=None):
+def broadcast(a, b, theme=None, precision=2, renderer=None, *, focus=None, focus_operand=0):
     """Visualise broadcasting two tensors to a common shape.
 
     Each operand is drawn in its own shape and again stretched to the broadcast
     shape, so the repeated values along a stretched axis are visible. Every
     stretched axis is marked in the accent colour in the stretched caption and
     on its frame when it is non-leaf.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
+    ``focus_operand`` chooses the stretched output for operand 0 or 1.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     arrays = [a, b]
     shapes = [extract_shape(x) for x in arrays]
     result = broadcast_result_shape(shapes)
+    if isinstance(focus_operand, bool) or type(focus_operand).__name__.startswith("bool"):
+        raise TypeError("focus_operand must be an integer operand index")
+    try:
+        focus_operand = integer_index(focus_operand)
+    except TypeError:
+        raise TypeError("focus_operand must be an integer operand index") from None
+    if focus_operand not in (0, 1):
+        raise ValueError("focus_operand must select operand 0 or 1")
+    trace = mapped_trace(
+        "broadcast",
+        focus,
+        result,
+        lambda coord: (focus_operand, broadcast_source_coord(coord, shapes[focus_operand])),
+    )
 
     panels = []
     for i, (arr, s) in enumerate(zip(arrays, shapes)):
@@ -320,11 +403,17 @@ def broadcast(a, b, theme=None, precision=2, renderer=None):
         t("common.result_shape", shape=format_shape(result)),
         t("broadcast.fill"),
     ] + _preview_explanation([*shapes, result], theme)
-    content = renderer.render_panels(
-        panels=panels,
-        connectors=["->", "&", "->"],
-        explanation=explanation,
-        theme=theme,
-        precision=precision,
+    return render_mapped(
+        panels,
+        ["->", "&", "->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shapes[0],
+        result,
+        trace,
+        source_panels=(0, 2),
+        output_panels=(1, 3),
+        focus_operand=focus_operand,
     )
-    return _visual(content, shapes[0], renderer, result=result, explanation=explanation)

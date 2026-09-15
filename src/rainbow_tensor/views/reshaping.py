@@ -24,16 +24,11 @@ from ..ops import (
 from ..renderers import resolve_renderer
 from ..shape import _check_axis, extract_shape, format_shape
 from ..theme import resolve_theme
-from ..visual import (
-    _preview_explanation,
-    _shape_caption_parts,
-    _source_value,
-    _value_fn_for,
-    _visual,
-)
+from ..visual import _preview_explanation, _shape_caption_parts, _source_value, _value_fn_for
+from ._focus import mapped_trace, render_mapped
 
 
-def reshape(array, new_shape, theme=None, precision=2, renderer=None):
+def reshape(array, new_shape, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise a reshape from the source layout into a new one.
 
     ``array`` is an array-like with a ``.shape`` attribute or a shape tuple.
@@ -43,11 +38,19 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
     position, which the figure makes visible by carrying the same values into
     the new layout. Scalars use ``()`` and empty targets may contain zero.
     An inferred ``-1`` cannot be combined with an explicit zero dimension.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
     old = extract_shape(array)
     new = reshape_result_shape(old, new_shape)
+    trace = mapped_trace(
+        "reshape", focus, new, lambda coord: (0, reshape_source_coord(coord, old, new))
+    )
     source_value = _source_value(array, old)
 
     def result_value(coord):
@@ -70,13 +73,22 @@ def reshape(array, new_shape, theme=None, precision=2, renderer=None):
             "caption_parts": _shape_caption_parts("reshape", new, theme),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        old,
+        new,
+        trace,
     )
-    return _visual(content, old, renderer, result=new, explanation=explanation)
 
 
-def _permute_view(array, perm, name, prefix_lines, keep_colour, theme, precision, renderer):
+def _permute_view(
+    array, perm, name, prefix_lines, keep_colour, theme, precision, renderer, *, focus=None
+):
     """Shared body for transpose, swapaxes, and moveaxis.
 
     ``perm`` is the resolved axis order. The result panel colours each axis by
@@ -88,6 +100,9 @@ def _permute_view(array, perm, name, prefix_lines, keep_colour, theme, precision
     renderer = resolve_renderer(renderer)
     shape = extract_shape(array)
     result = transpose_result_shape(shape, perm)
+    trace = mapped_trace(
+        name, focus, result, lambda coord: (0, transpose_source_coord(coord, perm))
+    )
     source_value = _source_value(array, shape)
 
     def result_value(coord):
@@ -120,31 +135,56 @@ def _permute_view(array, perm, name, prefix_lines, keep_colour, theme, precision
             "caption_parts": _shape_caption_parts(name, result, theme, color_for=result_color),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shape,
+        result,
+        trace,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
-def transpose(array, axes=None, theme=None, precision=2, renderer=None):
+def transpose(array, axes=None, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise a transpose or permute, with axis colours following the move.
 
     ``axes`` is a permutation of the source axes, or ``None`` to reverse them
     like ``numpy.transpose``. The result panel colours each axis by the source
     axis it came from, so a colour can be traced across the swap.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     perm = transpose_axes(len(extract_shape(array)), axes)
     return _permute_view(
-        array, perm, "transpose", [], t("transpose.keep_colour"), theme, precision, renderer
+        array,
+        perm,
+        "transpose",
+        [],
+        t("transpose.keep_colour"),
+        theme,
+        precision,
+        renderer,
+        focus=focus,
     )
 
 
-def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
+def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise swapping two axes of a tensor.
 
     ``swapaxes`` is the small two axis form of transpose. The source and result
     are drawn side by side, and the two moved axes keep their colours so the
     swap is traceable.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     ndim = len(extract_shape(array))
     axis1_r = _check_axis(axis1, ndim)
@@ -159,10 +199,11 @@ def swapaxes(array, axis1, axis2, theme=None, precision=2, renderer=None):
         theme,
         precision,
         renderer,
+        focus=focus,
     )
 
 
-def moveaxis(array, source, destination, theme=None, precision=2, renderer=None):
+def moveaxis(array, source, destination, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise moving one or more axes to new positions.
 
     ``source`` and ``destination`` are an axis or a sequence of axes of equal
@@ -171,6 +212,11 @@ def moveaxis(array, source, destination, theme=None, precision=2, renderer=None)
     their order. The source and result are drawn side by side, and each result
     axis keeps the colour of the source axis it came from, so the move is
     traceable.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     order = moveaxis_axes(len(extract_shape(array)), source, destination)
     return _permute_view(
@@ -182,16 +228,22 @@ def moveaxis(array, source, destination, theme=None, precision=2, renderer=None)
         theme,
         precision,
         renderer,
+        focus=focus,
     )
 
 
-def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
+def squeeze(array, axis=None, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise squeezing size one axes out of a tensor.
 
     ``axis`` is ``None`` to remove every size one axis, or an axis or tuple of
     axes to remove only those, which must each have size one, matching
     ``numpy.squeeze``. The source panel marks the removed size one axes in the
     accent colour, and each surviving axis keeps its source colour in the result.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -199,6 +251,9 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
     removed = squeeze_axes(shape, axis)
     removed_set = set(removed)
     result = squeeze_result_shape(shape, removed)
+    trace = mapped_trace(
+        "squeeze", focus, result, lambda coord: (0, squeeze_source_coord(coord, removed))
+    )
     source_value = _source_value(array, shape)
     surviving = [i for i in range(len(shape)) if i not in removed_set]
 
@@ -230,9 +285,7 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
         )
     )
 
-    removed_line = (
-        t("squeeze.removing", axes=list(removed)) if removed else t("squeeze.none")
-    )
+    removed_line = t("squeeze.removing", axes=list(removed)) if removed else t("squeeze.none")
     explanation = [
         t("common.original_shape", shape=format_shape(shape)),
         removed_line,
@@ -252,24 +305,34 @@ def squeeze(array, axis=None, theme=None, precision=2, renderer=None):
             "shape": result,
             "value_fn": result_value,
             "theme": result_theme,
-            "caption_parts": _shape_caption_parts(
-                "squeeze", result, theme, color_for=result_color
-            ),
+            "caption_parts": _shape_caption_parts("squeeze", result, theme, color_for=result_color),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shape,
+        result,
+        trace,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
 
 
-def expand_dims(array, axis, theme=None, precision=2, renderer=None):
+def expand_dims(array, axis, theme=None, precision=2, renderer=None, *, focus=None):
     """Visualise inserting size one axes into a tensor.
 
     ``axis`` is a position or tuple of positions in the result where a new size
     one axis is inserted, with negative positions counting from the end, matching
     ``numpy.expand_dims``. Each existing axis keeps its source colour, and the
     inserted size one axes are marked in the accent colour.
+
+
+    ``focus`` is an optional result coordinate. Negative positions are accepted.
+    It highlights the result and its source and records an immutable identity
+    trace. Leave it as ``None`` to keep the full static operation display.
     """
     theme = resolve_theme(theme)
     renderer = resolve_renderer(renderer)
@@ -277,6 +340,9 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
     inserted = expand_dims_axes(len(shape), axis)
     inserted_set = set(inserted)
     result = expand_dims_result_shape(shape, inserted)
+    trace = mapped_trace(
+        "expand_dims", focus, result, lambda coord: (0, expand_dims_source_coord(coord, inserted))
+    )
     source_value = _source_value(array, shape)
 
     def result_value(coord):
@@ -320,7 +386,14 @@ def expand_dims(array, axis, theme=None, precision=2, renderer=None):
             ),
         },
     ]
-    content = renderer.render_panels(
-        panels=panels, connectors=["->"], explanation=explanation, theme=theme, precision=precision
+    return render_mapped(
+        panels,
+        ["->"],
+        explanation,
+        theme,
+        precision,
+        renderer,
+        shape,
+        result,
+        trace,
     )
-    return _visual(content, shape, renderer, result=result, explanation=explanation)
