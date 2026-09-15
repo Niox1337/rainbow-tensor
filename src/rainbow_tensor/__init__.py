@@ -24,6 +24,7 @@ from .explanations import (
 )
 from .interactive import FocusExplorer, explore
 from .memory import memory
+from .provenance import Flow, TrackedTensor, ValueBudgetExceeded
 from .renderers import (
     SVG,
     SvgRenderer,
@@ -87,6 +88,9 @@ __all__ = [
     "broadcast",
     "einsum",
     "TensorVisual",
+    "Flow",
+    "TrackedTensor",
+    "ValueBudgetExceeded",
     "OperandRef",
     "OutputTrace",
     "explore",
