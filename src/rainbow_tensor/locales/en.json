@@ -116,5 +116,15 @@
   "interactive.empty": "Empty result: no output coordinate to focus.",
   "interactive.showing": "Showing output {coordinate}.",
   "interactive.error": "Could not update focus: {error}",
-  "trace.index_mapping": "Output {output} reads source {source}."
+  "trace.index_mapping": "Output {output} reads source {source}.",
+  "trace.mapping": "{operation} maps output {output} to operand {operand} at {source}.",
+  "flow.heading": "Follow the elements that produce {name}.",
+  "flow.equation": "{output} = {expression}  ({operation})",
+  "flow.truncated": "This trace stops at {limits}. Hidden steps and sources have not been expanded.",
+  "flow.roots": "Input occurrences in the full expression. Counts describe paths, not coefficients:",
+  "flow.roots_partial": "Input occurrences reached in this partial trace. Hidden paths are not counted:",
+  "flow.root_count": "{source}: {count} occurrence(s)",
+  "flow.panels_omitted": "{count} earlier tensor panel(s) are omitted. Their reached elements remain in the equations.",
+  "flow.values_skipped": "The shared value budget stopped at {limit} before any array values were read. Values are shown as question marks.",
+  "flow.generated": "This flow includes generated row-major placeholder values from shape-only inputs."
 }
