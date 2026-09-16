@@ -20,6 +20,7 @@ from .elements import (
     escape,
     format_value,
 )
+from .interaction import capturing_cells, record_panel
 
 
 def _frame_color(frame, has_selection, theme):
@@ -191,7 +192,9 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     """
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
     if layout.empty:
-        return _render_empty_body(layout, theme)
+        rendered = _render_empty_body(layout, theme)
+        record_panel(rendered[0], ())
+        return rendered
     has_selection = bool(selected_list)
 
     # Grow the cells if any value is wider than the default, then lay out again
@@ -210,10 +213,17 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
             f'rx="{theme.frame_radius:.0f}" fill="none" {_paint_attributes(stroke=color)} '
             f'stroke-width="{theme.frame_width}"/>'
         )
+    captured = [] if capturing_cells() else None
     for cell in layout.cells:
         tint = cell_tint(cell.coord) if cell_tint and cell.coord is not None else None
-        parts.append(_render_cell(cell, has_selection, theme, precision, hover, tint))
-    return "".join(parts), layout.width, layout.height, theme
+        fragment = _render_cell(cell, has_selection, theme, precision, hover, tint)
+        parts.append(fragment)
+        if captured is not None and not cell.ellipsis and cell.coord is not None:
+            captured.append((fragment, cell.coord))
+    body = "".join(parts)
+    if captured is not None:
+        record_panel(body, captured)
+    return body, layout.width, layout.height, theme
 
 
 def _render_empty_body(layout, theme):

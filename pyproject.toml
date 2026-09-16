@@ -33,14 +33,14 @@ dev = [
     "ruff>=0.1",
     "build>=1.0",
 ]
-interactive = ["ipywidgets>=8"]
+interactive = ["ipywidgets>=8", "anywidget>=0.9"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 
 [tool.setuptools.package-data]
-rainbow_tensor = ["locales/*.json"]
+rainbow_tensor = ["locales/*.json", "_widgets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
