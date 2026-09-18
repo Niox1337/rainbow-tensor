@@ -49,6 +49,29 @@ Notebook controls
 .. autoclass:: FocusExplorer
    :members:
 
+Recorded operation flows
+------------------------
+
+.. autoclass:: Flow
+   :members:
+
+.. autoclass:: TrackedTensor
+   :members:
+
+.. autoclass:: ValueBudgetExceeded
+
+.. autoclass:: rainbow_tensor.provenance.ElementRef
+   :members:
+
+.. autoclass:: rainbow_tensor.provenance.ProvenanceTrace
+   :members:
+
+.. autoclass:: rainbow_tensor.provenance.TraceStep
+   :members:
+
+.. autoclass:: rainbow_tensor.provenance.RootContribution
+   :members:
+
 Renderers
 ---------
 
