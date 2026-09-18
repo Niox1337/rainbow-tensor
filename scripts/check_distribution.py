@@ -19,6 +19,7 @@ from zipfile import ZipFile
 
 SMOKE = """
 import importlib.metadata
+from importlib.resources import files
 import sys
 from pathlib import Path
 from xml.etree import ElementTree
@@ -31,6 +32,10 @@ assert package_path.is_relative_to(Path(sys.prefix).resolve()), package_path
 assert importlib.metadata.version("rainbow-tensor") == sys.argv[1]
 assert rt.__version__ == sys.argv[1]
 assert "ipywidgets" not in sys.modules
+assert "anywidget" not in sys.modules
+assert "export default { render }" in files("rainbow_tensor").joinpath(
+    "_widgets/explorer.js"
+).read_text(encoding="utf-8")
 assert rt.get_language() == "auto"
 assert rt.get_default_theme().name == "auto"
 assert {"en", "zh"} <= set(rt.available_languages())
@@ -61,6 +66,18 @@ assert indexed.trace.output_coord == (2, 1)
 assert indexed.trace.terms[0][0].coordinate == (1, 1)
 assert "Output (2, 1) reads source (1, 1)." in indexed.text
 visuals.append(indexed)
+flow = rt.Flow()
+source = flow.input(array + 1, name="X")
+sampled = flow.index(source, ([1, 0, 1], slice(None, None, -1)), name="A")
+turned = flow.transpose(sampled, name="B")
+result = flow.sum(turned, axis=1, name="Y")
+chained = result.visualize(focus=(0,))
+assert result.value((0,)) == 15
+assert chained.provenance.complete
+assert {root.reference.coordinate: root.count for root in chained.provenance.roots} == {
+    (1, 2): 2, (0, 2): 1,
+}
+visuals.append(chained)
 scalar = rt.sum(np.array(7))
 empty = rt.sum(np.empty((2, 0, 3)), axis=2)
 empty_sum = rt.sum(np.empty((2, 0, 3)), axis=1)
@@ -82,6 +99,18 @@ path = Path("smoke.svg")
 visuals[-1].save(path)
 assert path.read_text(encoding="utf-8") == visuals[-1].svg
 if sys.argv[2] == "interactive":
+    flow_explorer = rt.explore(result)
+    try:
+        assert "data-rt-coordinate" in flow_explorer.figure.value
+        assert "data-rt-coordinate" not in flow_explorer.visual.svg
+        flow_explorer.figure._handle_custom_msg({
+            "type": "focus", "revision": flow_explorer.figure.revision, "coordinate": "[2]",
+        }, [])
+        assert flow_explorer.focus == (2,)
+        roots = flow_explorer.visual.provenance.roots
+        assert {root.reference.coordinate: root.count for root in roots} == {(1, 0): 2, (0, 0): 1}
+    finally:
+        flow_explorer.close()
     explorer = rt.explore(rt.mean, cube, axis=(-1, 0), keepdims=True)
     try:
         assert tuple(control.max for control in explorer.coordinates) == (0, 2, 0)
