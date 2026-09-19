@@ -16,6 +16,9 @@ job.
 | [Basic selection](../../src/rainbow_tensor/selection.py) | Represent basic indexing with ranges, including reverse slices and very large dimensions. Enumerating the selection is an explicit choice. |
 | [Layout](../../src/rainbow_tensor/layout.py) | Choose visible positions and place cells and frames within the preview limits. Scalars have one real cell at coordinate `()`. Empty shapes have an empty marker and no value reads. |
 | [Evaluation planning](../../src/rainbow_tensor/evaluation.py) | Check per-output and total-preview term budgets before numerical value callbacks run. Cache completed outputs and bound additional requests from custom renderers. |
+| [Recorded flows](../../src/rainbow_tensor/provenance/flow.py) | Capture explicit operation recipes and assign stable input, operation and output-port identities without materialising intermediate arrays. |
+| [Provenance queries](../../src/rainbow_tensor/provenance/query.py) | Traverse a bounded occurrence tree and plan shared recursive value work before reading an input. Preserve repeated paths and each operation's arithmetic grouping. |
+| [Flow presentation](../../src/rainbow_tensor/provenance/view.py) | Render reached tensors, local equations and input contribution counts as a regular result object. |
 | [SVG elements](../../src/rainbow_tensor/_svg/elements.py) | Escape text, format values, measure text, produce paint attributes and wrap a complete SVG document. Adaptive colours carry literal light fallbacks. |
 | [Tensor drawing](../../src/rainbow_tensor/_svg/tensor.py) | Draw one tensor body, its frames, cells, empty marker and legend from the layout. |
 | [SVG facade](../../src/rainbow_tensor/render_svg.py) | Compose single-tensor and multi-panel figures, captions and connectors. Historical rendering entry points and helper imports remain available here. |
@@ -30,6 +33,19 @@ The internal `_svg` package separates reusable paint and text rules from tensor
 drawing. Panel composition stays in `render_svg.py`, so callers do not need to
 follow the internal split. New operation semantics belong in `ops` and their
 teaching presentation belongs in `views`.
+
+The `provenance` package adds an explicit layer above coordinate operations.
+Its `model` contains immutable tracked tensors and element references, `flow`
+builds recipes, `query` handles structural and numerical requests, and `view`
+assembles teaching panels. A tracked tensor describes a logical result and has
+its own `shape`. Rendering it creates a separate `TensorVisual`, so operation
+history does not depend on a particular SVG or notebook widget.
+
+Every graph reference includes an operation ID, an output port and a coordinate.
+Broadcast outputs can therefore share one recorded operation while retaining
+their separate values. Traversal records occurrences rather than collapsing all
+repeated references into one branch. A repeated gather contributes twice even
+when its original source cell is drawn once.
 
 Group colours are generated on demand instead of cycling through a short fixed
 palette. Only requested IDs are calculated and the cache holds at most 1,024
@@ -60,6 +76,31 @@ arrays. In the benchmark below, four source cells produce about 483 KB of SVG
 because the two index arrays each contain 40,000 entries. Abbreviating these
 labels is a separate presentation change, not a reason to enlarge the value
 read budget.
+
+Repeat follows the same principle. Uniform counts use a constant-size quotient
+lookup. Per-element counts use cumulative boundaries and binary search, with
+storage proportional to the input counts rather than the repeated output.
+The lookup's `count` remains exact beyond Python's platform-sized length limit.
+
+## Recorded flow boundaries
+
+Structural queries have independent limits for depth, occurrence nodes and
+edges. Truncation is explicit, and input counts on an incomplete trace describe
+only reached paths. Panel limits control how many tensors are drawn without
+changing the structural trace.
+
+Numerical queries plan recursive dependencies before any input values are read.
+The total budget counts operation terms, factor references and input reads.
+Shared intermediate elements are evaluated once within that request. Each
+operation retains its own arithmetic, including division at each mean, so
+flattening a trace cannot silently change the result. A separate depth guard
+limits numerical recursion to 64 operation edges.
+
+Value caches last for one request. Updating an input array's values is reflected
+on the next request, while a changed input shape is rejected. Operation
+parameters, including copied index arrays, stay fixed after recording.
+Numerical work uses Python scalars and does not dispatch tensor backend kernels.
+See [the provenance guide](provenance.md) for the public contract and defaults.
 
 ## Reproducing the index workload
 
