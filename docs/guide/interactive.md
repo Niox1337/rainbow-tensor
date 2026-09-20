@@ -18,10 +18,24 @@ explorer = rt.explore(rt.matmul, a, b, focus=(1, 2))
 explorer
 ```
 
-Edit an output coordinate with the keyboard and press **Update focus**.
-The source highlights and coordinate formula follow that output. Coordinates
-start at zero. `sum`, `mean`, `einsum`, and `index` work the same way. A scalar output
-has no coordinate fields, only the update button.
+Click a visible output cell to update its source highlights and coordinate
+formula. A cell can also receive keyboard focus and be activated with Enter or
+Space. Coordinate fields and **Update focus** reach positions hidden by the
+preview. Coordinates start at zero. A scalar output has one clickable cell and
+no coordinate fields.
+
+`index`, `sum`, `mean`, `einsum`, shape transformations and combining operations
+use the same controls. For example:
+
+```python
+reshape_explorer = rt.explore(rt.reshape, a, (3, 2))
+repeat_explorer = rt.explore(rt.repeat, a, [1, 0, 2], axis=1)
+broadcast_explorer = rt.explore(rt.broadcast, (2, 1), (1, 3), focus_operand=1)
+```
+
+For broadcast, `focus_operand=0` or `1` chooses which stretched output can be
+selected. Shapes and memory views describe structure and storage without an
+output operation to trace, so they remain static.
 
 For mathematical operations, the controls reuse the numerical model and
 `max_terms` and `max_total_terms` budgets. Each update plans the new visible
@@ -42,8 +56,8 @@ index_explorer
 
 The result is `[[11, 9], [3, 1], [11, 9]]`. The explorer starts at output
 `(0, 0)`, which reads source `(2, 3)`. Output `(2, 0)` reads that same source
-element because row 2 was picked twice. Type either output coordinate into the
-fields and press **Update focus** to follow the connection.
+element because row 2 was picked twice. Click either result cell, or type its
+coordinate into the fields and press **Update focus**, to follow the connection.
 
 You can also change focus from Python:
 
@@ -137,3 +151,43 @@ Call `explorer.close()` when finished to release its widget communications.
 Static SVG export works without a running kernel. Live controls require an active
 kernel and a notebook host that supports Jupyter widgets. The optional dependency
 is imported only when `explore` is called.
+
+## Explore a recorded chain
+
+Pass a tracked tensor directly to keep its earlier operations available:
+
+```python
+flow = rt.Flow()
+source = flow.input(np.arange(1, 7).reshape(2, 3), name="X")
+selected = flow.index(source, ([1, 0, 1], slice(None, None, -1)), name="S")
+y = flow.sum(flow.transpose(selected, name="T"), axis=1, name="Y")
+chain_explorer = rt.explore(y, focus=(0,))
+chain_explorer
+```
+
+Click one of the final `Y` cells to follow it through the index, transpose and
+sum. `Y[0]` is `6 + 3 + 6 = 15`. The same original position participates twice.
+The figure keeps local operation equations and reports repeated input paths.
+
+```python
+chain_explorer.set_focus((1,))
+chain_explorer.visual.provenance.complete  # True for this small example
+chain_explorer.visual.save("operation-origins.svg")
+```
+
+The latest figure remains a `TensorVisual`. Its `trace` describes the final
+operation and its `provenance` describes the bounded chain. A static equivalent
+is `y.visualize(focus=(1,))`.
+
+Flow captures index and axis parameters when each step is recorded. Updating
+the explorer rereads input array values while keeping those recipes fixed.
+Record a new step to use changed selection parameters. This differs from
+`rt.explore(rt.index, array, selection)`, which rebuilds its direct index mapping
+on each update. In both cases, input shapes must stay fixed.
+
+The interactive extra includes both `ipywidgets` and `anywidget`. The default
+SVG renderer supplies clickable cell metadata. A custom SVG renderer without
+that metadata can still use the coordinate controls. Static figures require
+neither widget dependency. See [cross-operation origins](provenance.md) for
+structural and recursive value limits. Close the example with
+`chain_explorer.close()` when finished.
