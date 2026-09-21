@@ -67,8 +67,10 @@ notebooks in the `examples` folder.
   focus changes and light or dark figures
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
-- [Interactive focus](guide/interactive) follows indexed results to their source
-  elements and explores mathematical outputs with optional keyboard controls
+- [Interactive focus](guide/interactive) follows result cells with optional
+  click and keyboard controls across shape, combining and math operations
+- [Cross-operation origins](guide/provenance) records a chain and follows a
+  final element back to its original inputs, keeping repeated contributions
 
 ```{toctree}
 :maxdepth: 2
@@ -86,6 +88,7 @@ guide/translations
 guide/group-colours
 guide/memory
 guide/interactive
+guide/provenance
 ```
 
 ```{toctree}
