@@ -1,10 +1,14 @@
 # Explore one output in a notebook
 
-Install the optional controls in the same environment as your notebook kernel:
+Notebook controls are part of the standard installation. Install the package
+in the same environment as your notebook kernel:
 
 ```text
-pip install "rainbow-tensor[interactive]"
+python -m pip install rainbow-tensor
 ```
+
+The required `ipywidgets` and `anywidget` packages are installed automatically.
+Live controls also need a running kernel and a notebook host with widget support.
 
 Pass an operation and its usual inputs to `explore`:
 
@@ -71,7 +75,7 @@ The trace describes the current output. The index mapping can answer other
 output coordinates without changing the focus. Use `index_explorer.close()`
 when finished with the controls.
 
-Without notebook widgets, the same focused figure is available directly:
+For a script or a host without live widget support, use the same focused figure directly:
 
 ```python
 rt.index(x, selection, focus=(1, 1))
@@ -80,8 +84,8 @@ rt.index(x, selection, focus=(1, 1))
 Passing `focus` shows the source and result side by side and highlights their
 connection. A normal `rt.index(x, selection)` call keeps its original static
 source-selection view. The complete walkthrough in
-[14_index_explorer.ipynb](../../examples/14_index_explorer.ipynb) runs with or
-without the optional widget dependency.
+[14_index_explorer.ipynb](../../examples/14_index_explorer.ipynb) includes a
+static result alongside the notebook controls.
 
 ## Explore a reduction that keeps its axes
 
@@ -149,8 +153,9 @@ Keep their shape fixed while an explorer is open, or create a new explorer.
 
 Call `explorer.close()` when finished to release its widget communications.
 Static SVG export works without a running kernel. Live controls require an active
-kernel and a notebook host that supports Jupyter widgets. The optional dependency
-is imported only when `explore` is called.
+kernel and a notebook host that supports Jupyter widgets. The required widget
+packages are loaded only when `explore` is called. If either package is missing,
+repair the installation in the notebook kernel's environment.
 
 ## Explore a recorded chain
 
@@ -185,9 +190,9 @@ Record a new step to use changed selection parameters. This differs from
 `rt.explore(rt.index, array, selection)`, which rebuilds its direct index mapping
 on each update. In both cases, input shapes must stay fixed.
 
-The interactive extra includes both `ipywidgets` and `anywidget`. The default
-SVG renderer supplies clickable cell metadata. A custom SVG renderer without
-that metadata can still use the coordinate controls. Static figures require
-neither widget dependency. See [cross-operation origins](provenance.md) for
-structural and recursive value limits. Close the example with
+The default SVG renderer supplies clickable cell metadata. A custom SVG
+renderer without that metadata can still use the coordinate controls.
+Static figures remain available for export or hosts without live widget support.
+See [cross-operation origins](provenance.md) for structural and recursive value
+limits. Close the example with
 `chain_explorer.close()` when finished.

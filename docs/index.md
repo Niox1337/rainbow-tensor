@@ -19,7 +19,9 @@ pip install rainbow-tensor
 ```
 
 The distribution name is `rainbow-tensor` and the import name is
-`rainbow_tensor`.
+`rainbow_tensor`. Notebook controls are included in the standard installation.
+Use them in a running notebook with widget support, or save static SVG figures
+for other environments.
 
 ## Quick start
 
@@ -67,8 +69,8 @@ notebooks in the `examples` folder.
   focus changes and light or dark figures
 - [Memory layout](guide/memory) explains byte strides, contiguous arrays,
   and the difference between owning data and being backed by another object
-- [Interactive focus](guide/interactive) follows result cells with optional
-  click and keyboard controls across shape, combining and math operations
+- [Interactive focus](guide/interactive) follows result cells with click and
+  keyboard controls across shape, combining and math operations
 - [Cross-operation origins](guide/provenance) records a chain and follows a
   final element back to its original inputs, keeping repeated contributions
 - [Agent instructions](guide/llm-prompts) teach agents to generate runnable

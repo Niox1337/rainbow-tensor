@@ -61,8 +61,8 @@ describes the final operation. Its `provenance` contains the multi-step trace.
 
 ## Choose another result
 
-Install `rainbow-tensor[interactive]` in the notebook kernel environment for
-click and keyboard controls:
+The standard installation includes click and keyboard controls. Open the
+recorded result in a running notebook with widget support:
 
 ```python
 explorer = rt.explore(y)
@@ -74,7 +74,8 @@ also reach positions omitted by a large preview. `explorer.set_focus((1,))`
 selects `Y[1]`, whose value is `5 + 2 + 5 = 12`. `Y[2]` is `4 + 1 + 4 = 9`.
 Call `explorer.close()` when finished.
 
-Without widgets, use `y.visualize(focus=(1,))`. Static SVG files retain their
+For scripts or hosts without live widgets, use `y.visualize(focus=(1,))`.
+Static SVG files retain their
 highlights without a running kernel. Save `visual.text` separately to share the
 plain-text explanation alongside the figure.
 

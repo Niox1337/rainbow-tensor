@@ -31,15 +31,11 @@ Python **3.10 or newer** is required.
 python -m pip install rainbow-tensor
 ```
 
-For clickable result cells and notebook controls:
-
-```sh
-python -m pip install "rainbow-tensor[interactive]"
-```
-
-Install into the Python environment used by your notebook kernel. NumPy and
-IPython are included as dependencies. PyTorch, JAX and TensorFlow are optional
-and installed separately. Static SVG rendering does not require widget packages.
+The standard installation includes clickable result cells and notebook
+controls through `ipywidgets` and `anywidget`, along with NumPy and IPython.
+Install into the Python environment used by your notebook kernel. PyTorch,
+JAX and TensorFlow are optional and installed separately. Live controls need
+a notebook host with widget support. Static SVG figures also work in scripts.
 
 ## Your first visualization
 
@@ -54,13 +50,16 @@ x = np.arange(1, 7).reshape(2, 3)
 # [[1, 2, 3],
 #  [4, 5, 6]]
 
-visual = rt.sum(x, axis=1, focus=(1,))
-display(visual)
+sum_explorer = rt.explore(rt.sum, x, axis=1, focus=(1,))
+display(sum_explorer)
+visual = sum_explorer.visual
 ```
 
-The result has shape `(2,)`. Focusing output `(1,)` highlights the second row
-and explains `4 + 5 + 6 = 15`. Change the focus to `(0,)` to follow the first row.
-The explanation appears below the figure and is also available as `visual.text`.
+The result has shape `(2,)`. Output `(1,)` highlights the second row and
+explains `4 + 5 + 6 = 15`. Click output `(0,)` to follow the first row.
+The explanation appears below the figure and is also available through
+`sum_explorer.visual.text`. Call `sum_explorer.close()` when finished.
+For a script or a host without live widgets, use `rt.sum(x, axis=1, focus=(1,))`.
 
 To inspect an indexing expression instead:
 
@@ -110,8 +109,8 @@ or run [the worked notebook](https://github.com/Niox1337/rainbow-tensor/blob/mai
 
 ## Explore by clicking
 
-With the interactive extra installed, pass a tracked result or an operation
-and its arguments to `explore`:
+Pass a tracked result or an operation and its arguments to `explore`.
+The required widget packages are included in the standard installation:
 
 ```python
 explorer = rt.explore(y)
@@ -235,7 +234,7 @@ To work on the package:
 ```sh
 git clone https://github.com/Niox1337/rainbow-tensor.git
 cd rainbow-tensor
-python -m pip install -e ".[dev,interactive]"
+python -m pip install -e ".[dev]"
 python -m pytest
 python -m ruff check .
 ```
@@ -247,7 +246,7 @@ figures, and distribution checks exercise installed wheels and source packages.
 
 ```sh
 python -m build
-python scripts/check_distribution.py --interactive
+python scripts/check_distribution.py
 python -m pip install -r docs/requirements.txt
 python -m sphinx -b html -W --keep-going docs docs/_build/html
 ```
