@@ -3,6 +3,7 @@
 import os
 import sys
 from datetime import date
+from importlib import import_module
 
 # The package is pure standard library at import time, so adding the source
 # tree to the path is enough for autodoc; no install step is needed.
@@ -12,10 +13,7 @@ project = "rainbow-tensor"
 author = "Zhixiang Feng"
 copyright = f"{date.today().year}, {author}"
 
-try:
-    from rainbow_tensor import __version__ as release
-except Exception:
-    release = "0.7.0"
+release = import_module("rainbow_tensor").__version__
 version = release
 
 extensions = [

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rainbow-tensor"
-version = "1.3.0.dev0"
-description = "Visualise tensor shape, indexing, and slicing as SVG in Jupyter notebooks"
+version = "1.3.0"
+description = "Explain tensor operations and element origins with SVG visualizations"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -26,6 +26,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/Niox1337/rainbow-tensor"
+Documentation = "https://rainbow-tensor.zhixiangfeng.com/"
+Issues = "https://github.com/Niox1337/rainbow-tensor/issues"
+"Release notes" = "https://github.com/Niox1337/rainbow-tensor/releases"
 
 [project.optional-dependencies]
 dev = [

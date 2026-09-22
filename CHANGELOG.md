@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0 (unreleased)
+## 1.3.0 (2026-09-22)
 
 ### Added
 
@@ -14,6 +14,11 @@
 - Index result exploration with `explore(index, ...)`, preserving distinct repeated positions and reverse-slice order while highlighting the corresponding source element
 - Static `index(..., focus=...)` comparisons with a one-source coordinate trace, bounded previews, and translated provenance text
 - An index explorer notebook covering repeated gathers, reversed slices, scalar outputs, and empty results
+- Explicit `Flow` recipes trace output elements across indexing, shape changes, combining, reductions, matmul, and einsum without materialising intermediate arrays
+- Bounded provenance trees preserve repeated contribution paths, output ports, and each operation's arithmetic grouping
+- Clickable result cells, Enter and Space activation, and coordinate controls explore individual operations or complete recorded flows
+- Optional `focus` explains source coordinates for all shape-changing and combining views
+- A worked operation-origins notebook and a reusable LLM prompt guide for beginner visualizations
 
 ### Changed
 
@@ -22,6 +27,11 @@
 - Reduction groups and combining operands use colours generated from their logical IDs, with stable focus behaviour and paired light and dark paints
 - SVG text and paint primitives, tensor drawing, and panel composition have separate modules while existing renderer imports remain available
 - Equally shaped advanced-index arrays use direct candidate-set intersection, improving duplicate-gather previews without adding a native dependency
+- Repeat uses a constant-size mapping for uniform counts and prefix boundaries for variable counts instead of allocating one source position per output copy
+- Flow value requests plan recursive work before array reads, preserve live input values, and report skipped computation separately from structural truncation
+- The interactive extra includes `anywidget` for result-cell activation while static rendering remains independent of widget imports
+- The README now provides a complete entry point for installation, operation tracing, notebook interaction, supported APIs, and contributions
+- Documentation builds use the package version directly and fail on import errors instead of showing an outdated fallback version
 
 ## 1.2.0 (2026-09-22)
 

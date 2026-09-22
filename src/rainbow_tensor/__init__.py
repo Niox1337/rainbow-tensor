@@ -67,7 +67,7 @@ from .views import (
 )
 from .visual import TensorVisual
 
-__version__ = "1.3.0.dev0"
+__version__ = "1.3.0"
 __all__ = [
     "shape",
     "memory",
