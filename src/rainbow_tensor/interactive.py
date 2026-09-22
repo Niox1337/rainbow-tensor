@@ -1,4 +1,4 @@
-"""Optional notebook controls that trace a chosen output back to its sources."""
+"""Notebook controls that trace a chosen output back to its sources."""
 
 from functools import partial
 from html import escape
@@ -217,8 +217,8 @@ def explore(operation, *args, **kwargs):
     ``explore(tracked_tensor)`` follows a recorded flow back through its sources.
     Custom SVG renderers retain coordinate controls even without cell metadata.
 
-    Requires the optional ``rainbow-tensor[interactive]`` dependencies. They are
-    imported only here, so static rendering does not require notebook widgets.
+    ``ipywidgets`` and ``anywidget`` are installed with the package. They are
+    imported only here to keep static rendering free of widget initialization.
     Live controls need a running notebook kernel and widget support in its host.
     """
     mapped = (
@@ -239,7 +239,9 @@ def explore(operation, *args, **kwargs):
         from ._widgets import ExplorerFigure
     except ImportError as exc:
         raise ImportError(
-            'Notebook controls require: pip install "rainbow-tensor[interactive]"'
+            "Notebook controls require ipywidgets and anywidget. "
+            "Repair the installation in this Python environment with: "
+            "python -m pip install --upgrade rainbow-tensor"
         ) from exc
     if operation is index:
         operation = partial(_index_visual, focus_first=True)

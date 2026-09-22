@@ -1,6 +1,5 @@
 """Notebook controls keep static focus behavior and computation limits intact."""
 
-import builtins
 import subprocess
 import sys
 
@@ -12,7 +11,7 @@ import rainbow_tensor as rt
 
 @pytest.fixture
 def explorers():
-    pytest.importorskip("ipywidgets")
+    """Create controls with required dependencies and close every widget."""
     created = []
 
     def make(operation, *args, **kwargs):
@@ -33,17 +32,31 @@ def test_static_import_does_not_load_widgets():
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
 
 
-def test_missing_widgets_gives_install_instruction(monkeypatch):
-    original = builtins.__import__
+@pytest.mark.parametrize("missing_dependency", ["ipywidgets", "anywidget"])
+def test_missing_required_widget_dependency_gives_repair_instruction(missing_dependency):
+    """Explain how to repair either missing dependency in a fresh process."""
+    code = f"""
+import builtins
+import rainbow_tensor as rt
 
-    def without_widgets(name, *args, **kwargs):
-        if name == "ipywidgets":
-            raise ModuleNotFoundError("ipywidgets")
-        return original(name, *args, **kwargs)
+original = builtins.__import__
 
-    monkeypatch.setattr(builtins, "__import__", without_widgets)
-    with pytest.raises(ImportError, match=r"rainbow-tensor\[interactive\]"):
-        rt.explore(rt.sum, (2, 3), axis=1)
+def without_dependency(name, *args, **kwargs):
+    if name == {missing_dependency!r}:
+        raise ModuleNotFoundError(name)
+    return original(name, *args, **kwargs)
+
+builtins.__import__ = without_dependency
+try:
+    rt.explore(rt.sum, (2, 3), axis=1)
+except ImportError as exc:
+    assert 'ipywidgets and anywidget' in str(exc)
+    assert 'python -m pip install --upgrade rainbow-tensor' in str(exc)
+    assert isinstance(exc.__cause__, ModuleNotFoundError)
+else:
+    raise AssertionError('Missing required dependency was not reported')
+"""
+    subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
 
 
 def test_unsupported_operation_is_rejected():

@@ -30,7 +30,7 @@ jobs:
           pip install --upgrade build
           python -m build
       - name: Validate distributions
-        run: python scripts/check_distribution.py --interactive
+        run: python scripts/check_distribution.py
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:

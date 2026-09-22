@@ -15,7 +15,7 @@ from rainbow_tensor.renderers import SvgRenderer
 
 @pytest.fixture
 def explorers():
-    pytest.importorskip("anywidget")
+    """Exercise required click widgets and release their communications."""
     created = []
 
     def make(operation, *args, **kwargs):

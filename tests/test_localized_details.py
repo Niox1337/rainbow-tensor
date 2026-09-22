@@ -19,7 +19,7 @@ def restore_language():
 
 @pytest.fixture
 def explorers():
-    pytest.importorskip("ipywidgets")
+    """Create localized notebook controls using the required widget packages."""
     created = []
 
     def make(operation, *args, **kwargs):

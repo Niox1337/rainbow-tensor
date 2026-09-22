@@ -98,52 +98,51 @@ assert visuals[-1].text
 path = Path("smoke.svg")
 visuals[-1].save(path)
 assert path.read_text(encoding="utf-8") == visuals[-1].svg
-if sys.argv[2] == "interactive":
-    flow_explorer = rt.explore(result)
-    try:
-        assert "data-rt-coordinate" in flow_explorer.figure.value
-        assert "data-rt-coordinate" not in flow_explorer.visual.svg
-        flow_explorer.figure._handle_custom_msg({
-            "type": "focus", "revision": flow_explorer.figure.revision, "coordinate": "[2]",
-        }, [])
-        assert flow_explorer.focus == (2,)
-        roots = flow_explorer.visual.provenance.roots
-        assert {root.reference.coordinate: root.count for root in roots} == {(1, 0): 2, (0, 0): 1}
-    finally:
-        flow_explorer.close()
-    explorer = rt.explore(rt.mean, cube, axis=(-1, 0), keepdims=True)
-    try:
-        assert tuple(control.max for control in explorer.coordinates) == (0, 2, 0)
-        explorer.coordinates[1].value = 2
-        explorer.update_button.click()
-        visual = explorer.visual
-        assert explorer.focus == (0, 2, 0)
-        assert visual.trace.output_coord == (0, 2, 0)
-        assert visual.svg == rt.mean(
-            cube, axis=(-1, 0), keepdims=True, focus=(0, 2, 0),
-        ).svg
-    finally:
-        explorer.close()
-    indexed_explorer = rt.explore(rt.index, array, ([1, 0, 1], slice(None, None, -1)))
-    try:
-        assert indexed_explorer.focus == (0, 0)
-        indexed_explorer.coordinates[0].value = 2
-        indexed_explorer.update_button.click()
-        assert indexed_explorer.focus == (2, 0)
-        assert indexed_explorer.visual.trace.terms[0][0].coordinate == (1, 2)
-        assert indexed_explorer.visual.svg == rt.index(
-            array, ([1, 0, 1], slice(None, None, -1)), focus=(2, 0),
-        ).svg
-    finally:
-        indexed_explorer.close()
-    empty_explorer = rt.explore(rt.sum, (2, 0, 3), axis=2)
-    try:
-        assert empty_explorer.focus is None
-        assert empty_explorer.coordinates == ()
-        assert empty_explorer.update_button.disabled
-        assert empty_explorer.visual.trace is None
-    finally:
-        empty_explorer.close()
+flow_explorer = rt.explore(result)
+try:
+    assert "data-rt-coordinate" in flow_explorer.figure.value
+    assert "data-rt-coordinate" not in flow_explorer.visual.svg
+    flow_explorer.figure._handle_custom_msg({
+        "type": "focus", "revision": flow_explorer.figure.revision, "coordinate": "[2]",
+    }, [])
+    assert flow_explorer.focus == (2,)
+    roots = flow_explorer.visual.provenance.roots
+    assert {root.reference.coordinate: root.count for root in roots} == {(1, 0): 2, (0, 0): 1}
+finally:
+    flow_explorer.close()
+explorer = rt.explore(rt.mean, cube, axis=(-1, 0), keepdims=True)
+try:
+    assert tuple(control.max for control in explorer.coordinates) == (0, 2, 0)
+    explorer.coordinates[1].value = 2
+    explorer.update_button.click()
+    visual = explorer.visual
+    assert explorer.focus == (0, 2, 0)
+    assert visual.trace.output_coord == (0, 2, 0)
+    assert visual.svg == rt.mean(
+        cube, axis=(-1, 0), keepdims=True, focus=(0, 2, 0),
+    ).svg
+finally:
+    explorer.close()
+indexed_explorer = rt.explore(rt.index, array, ([1, 0, 1], slice(None, None, -1)))
+try:
+    assert indexed_explorer.focus == (0, 0)
+    indexed_explorer.coordinates[0].value = 2
+    indexed_explorer.update_button.click()
+    assert indexed_explorer.focus == (2, 0)
+    assert indexed_explorer.visual.trace.terms[0][0].coordinate == (1, 2)
+    assert indexed_explorer.visual.svg == rt.index(
+        array, ([1, 0, 1], slice(None, None, -1)), focus=(2, 0),
+    ).svg
+finally:
+    indexed_explorer.close()
+empty_explorer = rt.explore(rt.sum, (2, 0, 3), axis=2)
+try:
+    assert empty_explorer.focus is None
+    assert empty_explorer.coordinates == ()
+    assert empty_explorer.update_button.disabled
+    assert empty_explorer.visual.trace is None
+finally:
+    empty_explorer.close()
 print(f"Installed package smoke passed: {package_path}")
 """
 
@@ -195,8 +194,8 @@ def _check_source_files(source, checkout):
     print(f"Sdist includes {len(fixtures)} golden SVG fixtures and all checkout test files")
 
 
-def check_distribution(directory, *, interactive=False):
-    """Check one wheel and matching sdist without importing the working tree."""
+def check_distribution(directory):
+    """Check static and interactive rendering from a wheel and matching sdist."""
     wheel = _one_artifact(directory, "rainbow_tensor-*.whl")
     sdist = _one_artifact(directory, "rainbow_tensor-*.tar.gz")
     with ZipFile(wheel) as archive:
@@ -235,13 +234,11 @@ def check_distribution(directory, *, interactive=False):
         python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         working = workspace / "working"
         working.mkdir()
-        mode = "interactive" if interactive else "static"
-        requirement = str(wheel) + ("[interactive]" if interactive else "")
         pip = [str(python), "-I", "-m", "pip"]
-        _run([*pip, "install", requirement, "pytest>=7"], cwd=working, env=env)
+        _run([*pip, "install", str(wheel), "pytest>=7"], cwd=working, env=env)
         smoke_path = working / "smoke.py"
         smoke_path.write_text(SMOKE, encoding="utf-8")
-        smoke = [str(python), "-I", "-B", str(smoke_path), version, mode]
+        smoke = [str(python), "-I", "-B", str(smoke_path), version]
         _run(smoke, cwd=working, env=env)
         _run(
             [*pip, "install", "--no-deps", "--force-reinstall", str(source)],
@@ -266,13 +263,9 @@ def main():
         "--dist-dir", type=Path, default=Path("dist"),
         help="directory containing exactly one wheel and one sdist (default: dist)",
     )
-    parser.add_argument(
-        "--interactive", action="store_true",
-        help="install the interactive extra and check widget updates and cleanup",
-    )
     args = parser.parse_args()
     try:
-        check_distribution(args.dist_dir, interactive=args.interactive)
+        check_distribution(args.dist_dir)
     except (OSError, ValueError, subprocess.CalledProcessError, tarfile.TarError) as error:
         parser.exit(1, f"Distribution validation failed: {error}\n")
     except KeyboardInterrupt:

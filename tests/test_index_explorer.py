@@ -42,7 +42,7 @@ class CountingArray:
 
 @pytest.fixture
 def explorers():
-    pytest.importorskip("ipywidgets")
+    """Exercise required notebook controls and release them after each test."""
     created = []
 
     def make(array, index, **kwargs):

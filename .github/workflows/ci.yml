@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install
-        run: pip install -e ".[dev,interactive]"
+        run: pip install -e ".[dev]"
       - name: Lint
         run: ruff check .
       - name: Test
@@ -24,4 +24,4 @@ jobs:
         run: python -m build
       - name: Validate distributions
         if: matrix.python-version == '3.12'
-        run: python scripts/check_distribution.py --interactive
+        run: python scripts/check_distribution.py
