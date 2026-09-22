@@ -10,7 +10,7 @@
 
 [Documentation](https://rainbow-tensor.zhixiangfeng.com/) ·
 [Notebook examples](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) ·
-[LLM visualization guide](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) ·
+[Agent instructions](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) ·
 [Releases](https://github.com/Niox1337/rainbow-tensor/releases)
 
 rainbow-tensor turns tensor shapes and operations into SVG figures for Jupyter
@@ -215,8 +215,12 @@ and [translations](https://rainbow-tensor.zhixiangfeng.com/guide/translations.ht
 | [Learning path](https://rainbow-tensor.zhixiangfeng.com/guide/learning-path.html) | Small exercises that connect shapes, output coordinates and source values |
 | [Notebook collection](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) | Runnable examples from basic shapes through cross-operation tracing |
 | [API reference](https://rainbow-tensor.zhixiangfeng.com/api.html) | Function signatures, parameters and result objects |
-| [LLM visualization guide](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) | A reusable prompt and verified patterns for generating beginner explanations |
+| [Agent instructions](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) | Instructions and runnable patterns for agents generating visual NumPy explanations |
 | [Architecture](https://rainbow-tensor.zhixiangfeng.com/guide/architecture.html) | Coordinate mappings, rendering boundaries and performance decisions |
+
+Give the [agent instructions URL](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html)
+to your agent with a NumPy question. The page teaches the agent how to generate
+runnable Rainbow Tensor code and explain the result visually.
 
 ## Contributing
 
