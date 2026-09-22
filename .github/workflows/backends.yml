@@ -1,14 +1,11 @@
 name: Backend contracts
-
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   cpu-backend:
     name: CPU / ${{ matrix.backend }}
@@ -39,4 +36,4 @@ jobs:
       - name: Check installed dependencies
         run: python -m pip check
       - name: Test required backend
-        run: python -m pytest tests/test_backend_contract.py -q -ra
+        run: python -m pytest tests/test_backend_contract.py tests/test_flow_backends.py -q -ra
