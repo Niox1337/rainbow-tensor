@@ -100,7 +100,7 @@ def _source(backend, dtype, layout):
 @pytest.mark.parametrize("dtype", ["int32", "float32"])
 @pytest.mark.parametrize("layout", ["contiguous", "transposed"])
 @pytest.mark.parametrize(
-    "operation", ["index", "reshape", "transpose", "sum", "mean", "matmul", "einsum"]
+    "operation", ["index", "index_focus", "reshape", "transpose", "sum", "mean", "matmul", "einsum"]
 )
 def test_cpu_backend_operation_matches_numpy_cells(backend, dtype, layout, operation):
     array, reference = _source(backend, dtype, layout)
@@ -112,6 +112,14 @@ def test_cpu_backend_operation_matches_numpy_cells(backend, dtype, layout, opera
         assert renderer.selected == ((0, 1), (0, 2), (1, 1), (1, 2))
         actual = np.asarray([renderer.panels[0][coord] for coord in renderer.selected])
         actual = actual.reshape(expected.shape)
+    elif operation == "index_focus":
+        selection = ([1, 0, 1], slice(None, None, -1))
+        expected = reference[selection]
+        visual = rt.index(array, selection, focus=(-1, 1), renderer=renderer)
+        assert visual.trace.operation == "index"
+        assert visual.trace.output_coord == (2, 1)
+        assert visual.trace.terms[0][0].coordinate == (1, 1)
+        actual = renderer.panels[-1]
     elif operation == "reshape":
         expected = np.reshape(reference, (3, 2))
         visual = rt.reshape(array, (3, 2), renderer=renderer)

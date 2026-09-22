@@ -36,6 +36,53 @@ highlights and must not be used to reconstruct output order. Use
 `visual.index_mapping.source_coord(output_coordinate)` for that purpose.
 Scalar results occupy one display cell. Empty results contain no value cells.
 
+## Follow one output position
+
+Pass an output coordinate as `focus` to see the source and result side by side,
+with that output and its source element highlighted. There is no need to also
+set `show_result=True`.
+
+```python
+x = np.arange(12).reshape(3, 4)
+selection = ([2, 0, 2], slice(None, None, -2))
+visual = rt.index(x, selection, focus=(0, 0))
+visual
+visual.trace.terms[0][0].coordinate  # (2, 3)
+```
+
+The row index chooses rows 2, 0 and 2. The reverse slice chooses columns 3 and 1,
+so the result is `[[11, 9], [3, 1], [11, 9]]`. Output `(0, 0)` and output
+`(2, 0)` both read source `(2, 3)`. The repeated value remains two separate
+output positions:
+
+```python
+visual.index_mapping.source_coord((0, 0))  # (2, 3)
+visual.index_mapping.source_coord((2, 0))  # (2, 3)
+rt.index(x, selection, focus=(1, 1))       # reads source (0, 1), value 1
+```
+
+The focus is a coordinate in the result, not another index into the source.
+Negative coordinates count from the end of each result axis. Omitting `focus`
+preserves the original static view and its selection behaviour.
+
+A scalar result uses the empty coordinate tuple `()`:
+
+```python
+scalar = rt.index(x, (2, 3), focus=())
+scalar.trace.output_coord                  # ()
+scalar.trace.terms[0][0].coordinate         # (2, 3)
+```
+
+An empty result has no coordinate to focus. Display it with
+`rt.index(x, (slice(0, 0), slice(None)), show_result=True)`. Its trace is `None`,
+and an explicit focus raises `IndexError`.
+
+For keyboard controls, use `rt.explore(rt.index, x, selection)`. The explorer
+starts at the first output, provides one coordinate field per output axis,
+and applies edits when you press **Update focus**. Empty results have no fields
+and a disabled update button. See the [interactive guide](interactive.md) and
+[index explorer notebook](../../examples/14_index_explorer.ipynb).
+
 ## Integers and slices
 
 An integer drops an axis. A slice keeps it. Slice bounds and steps may be

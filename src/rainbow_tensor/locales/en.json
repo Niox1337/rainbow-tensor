@@ -115,5 +115,6 @@
   "interactive.update": "Update focus",
   "interactive.empty": "Empty result: no output coordinate to focus.",
   "interactive.showing": "Showing output {coordinate}.",
-  "interactive.error": "Could not update focus: {error}"
+  "interactive.error": "Could not update focus: {error}",
+  "trace.index_mapping": "Output {output} reads source {source}."
 }

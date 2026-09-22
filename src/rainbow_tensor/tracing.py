@@ -30,6 +30,8 @@ class OutputTrace:
     remain present in every term that uses them.
     An empty mean has zero terms and divisor zero, representing an undefined
     value (NaN), rather than an instruction to perform division by zero.
+    Indexing has one term containing its single source reference. This records
+    an identity mapping without evaluating values or changing their dtype.
 
     ``term_count`` counts the full expression. Views store its first eight terms
     at most, so ``complete`` is false when later terms have been omitted. The
@@ -89,6 +91,14 @@ def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
     if trace is None:
         return [t("trace.empty")]
+    if trace.operation == "index":
+        return [
+            t(
+                "trace.index_mapping",
+                output=trace.output_coord,
+                source=trace.terms[0][0].coordinate,
+            )
+        ]
     key = "trace.heading_one" if trace.term_count == 1 else "trace.heading_many"
     heading = t(key, coordinate=trace.output_coord, count=trace.term_count)
     if not trace.complete:

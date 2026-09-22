@@ -32,6 +32,21 @@ def explorers():
         explorer.close()
 
 
+def test_index_trace_and_controls_refresh_in_the_selected_language(explorers):
+    """Index provenance is translated once without an arithmetic term heading."""
+    rt.set_language("en")
+    explorer = explorers(rt.index, (3, 4), ([2, 0, 2], slice(None, None, -2)))
+    assert explorer.visual.text.count("Output (0, 0) reads source (2, 3).") == 1
+    rt.set_language("zh")
+    explorer.set_focus((1, 1))
+    expected = "输出 (1, 1) 读取源位置 (0, 1)。"
+    assert explorer.visual.text.count(expected) == 1
+    assert explorer.explanation.value.count(expected) == 1
+    assert explorer.update_button.description == "更新聚焦"
+    assert "reads source" not in explorer.visual.text
+    assert "uses 1 term" not in explorer.visual.text
+
+
 def test_english_trace_preserves_heading_and_source_equation():
     rt.set_language("en")
     trace = _build_trace("sum", (1,), 1, [((1, 0),)])

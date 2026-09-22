@@ -12,6 +12,7 @@ from ..renderers import resolve_renderer
 from ..selection import BasicSelection
 from ..shape import extract_shape
 from ..theme import resolve_theme
+from ..tracing import _build_trace, _normalize_focus, _trace_explanation
 from ..visual import (
     _preview_explanation,
     _shape_caption_parts,
@@ -95,7 +96,7 @@ def shape(array, theme=None, precision=2, renderer=None):
     return _visual(content, normalized, renderer, explanation=explanation)
 
 
-def index(array, index, theme=None, precision=2, renderer=None, *, show_result=False):
+def index(array, index, theme=None, precision=2, renderer=None, *, show_result=False, focus=None):
     """Visualise how an index selects elements from a tensor.
 
     ``array`` may be an array-like object with a ``.shape`` attribute, in
@@ -113,11 +114,43 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
     the index. A scalar result occupies one display cell, and empty results
     contain no value cells. The default remains the original source highlight.
 
+    Pass ``focus`` as a tuple of result coordinates to highlight that output and
+    its single source element. This enables the result panel automatically.
+    Negative coordinates count from the end of the result axes, and scalar
+    results use ``()``. Empty results have no valid focus. Omitting ``focus``
+    or passing ``None`` preserves the existing whole-selection display.
+
     ``visual.index_mapping.source_coord(coordinate)`` maps an output coordinate
     back to its source. ``result_count`` includes repeated output positions.
     ``visual.selected`` is a compact source-highlight iterable, not the output
     order. Basic selections also expose ``count``. Convert a selection to a list
     only when all unique source coordinates are explicitly needed.
+    With a focus, ``visual.trace`` records the output-to-source pair without
+    reading values. ``visual.selected`` still describes the full index selection.
+    """
+    return _index_visual(
+        array, index, theme, precision, renderer, show_result=show_result, focus=focus
+    )
+
+
+def _index_visual(
+    array,
+    index,
+    theme=None,
+    precision=2,
+    renderer=None,
+    *,
+    show_result=False,
+    focus=None,
+    focus_first=False,
+):
+    """Build one mapping and render either its selection or one output-to-source pair.
+
+    Notebook exploration sets ``focus_first`` to select the first output when
+    no coordinate was supplied. Ordinary static calls retain their unfocused
+    display. The mapping is prepared once, and focus validation and tracing
+    happen before the renderer can read source values. An empty result has no
+    trace even when first-output focus was requested.
     """
     if not isinstance(show_result, bool):
         raise TypeError("show_result must be a boolean")
@@ -128,6 +161,13 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
     mapping = IndexMapping(normalized, index)
     selected = mapping.selection
     result = mapping.result_shape
+    focus_requested = focus is not None or focus_first
+    focused = _normalize_focus(focus, result) if focus_requested else None
+    source_coordinate = mapping.source_coord(focused) if focused is not None else None
+    trace = (
+        _build_trace("index", focused, 1, [(source_coordinate,)]) if focused is not None else None
+    )
+    show_result = show_result or focus_requested
     preview_shapes = [normalized, result] if show_result else [normalized]
     explanation = mapping.explanation + _preview_explanation(preview_shapes, theme)
 
@@ -147,20 +187,30 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
             {
                 "shape": result,
                 "value_fn": result_value,
-                "selected": BasicSelection(result, (Ellipsis,)),
+                "selected": [focused]
+                if focused is not None
+                else BasicSelection(result, (Ellipsis,)),
                 "caption_parts": _shape_caption_parts(t("label.result"), result, theme),
             },
         ]
+        if focused is not None:
+            panels[0]["selected"] = [source_coordinate]
         explanation.append(t("index.result_order"))
         if mapping.result_count == 0:
             explanation.append(t("index.empty_result"))
+        if trace is not None:
+            explanation.extend(_trace_explanation(trace))
         content = renderer.render_panels(
-            panels=panels, connectors=["->"], explanation=explanation,
-            theme=theme, precision=precision,
+            panels=panels,
+            connectors=["->"],
+            explanation=explanation,
+            theme=theme,
+            precision=precision,
         )
     elif mapping.is_advanced:
         label = (
-            t("label.mask") if not isinstance(index, tuple)
+            t("label.mask")
+            if not isinstance(index, tuple)
             else t("label.index_expression", index=format_index(index))
         )
         content = renderer.render_tensor(
@@ -186,4 +236,7 @@ def index(array, index, theme=None, precision=2, renderer=None, *, show_result=F
         content, normalized, renderer, selected=selected, result=result, explanation=explanation
     )
     visual.index_mapping = mapping
+    visual.trace = trace
+    if focus_requested:
+        visual.metadata["trace_in_explanation"] = trace is not None
     return visual

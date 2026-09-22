@@ -1,14 +1,16 @@
-"""Optional notebook controls that redraw an existing mathematical visual."""
+"""Optional notebook controls that trace a chosen output back to its sources."""
 
+from functools import partial
 from html import escape
 
 from .explanations import t
 from .tracing import _normalize_focus, _trace_explanation
-from .views import einsum, matmul, mean, sum
+from .views import einsum, index, matmul, mean, sum
+from .views.shapes import _index_visual
 
 
 class FocusExplorer:
-    """Keep a mathematical visual and keyboard-editable output coordinates together.
+    """Keep a tensor visual and keyboard-editable output coordinates together.
 
     Create this object with :func:`explore`. ``visual`` is the latest successful
     static result and can be saved normally. ``set_focus`` also works from Python,
@@ -83,7 +85,7 @@ class FocusExplorer:
 
         ``coordinate`` follows the same tuple, rank, and bounds rules as the
         operation's ``focus`` argument. A scalar output uses ``()``. The original
-        theme, renderer, precision, and both calculation budgets remain in effect.
+        theme, renderer, precision, and any calculation budgets remain in effect.
         Empty results have no addressable output and reject focus updates.
         """
         if self._closed:
@@ -129,7 +131,7 @@ class FocusExplorer:
 
 
 def explore(operation, *args, **kwargs):
-    """Explore outputs of ``sum``, ``mean``, ``matmul``, or ``einsum`` in a notebook.
+    """Explore indexed results or mathematical outputs in a notebook.
 
     Pass the operation itself, followed by its usual arguments, for example
     ``explore(matmul, a, b, focus=(1, 2), max_terms=1000)``. Coordinates can be
@@ -139,16 +141,24 @@ def explore(operation, *args, **kwargs):
     Empty results have ``focus=None``, no coordinate fields, and a disabled
     update button. Their empty figure remains available for static export.
 
+    ``explore(index, array, selection)`` starts at the first result position and
+    highlights its corresponding source element. Each repeated gather position
+    remains separately selectable, and reverse slices keep their result order.
+    Both panels stay bounded by the theme's preview limits. The index mapping is
+    rebuilt on updates so edits to index arrays are reflected as well as values.
+
     Requires the optional ``rainbow-tensor[interactive]`` dependencies. They are
     imported only here, so static rendering does not require notebook widgets.
     Live controls need a running notebook kernel and widget support in its host.
     """
-    if operation not in (sum, mean, matmul, einsum):
-        raise ValueError("explore supports rt.sum, rt.mean, rt.matmul, and rt.einsum")
+    if operation not in (index, sum, mean, matmul, einsum):
+        raise ValueError("explore supports rt.index, rt.sum, rt.mean, rt.matmul, and rt.einsum")
     try:
         import ipywidgets as widgets
     except ImportError as exc:
         raise ImportError(
             'Notebook controls require: pip install "rainbow-tensor[interactive]"'
         ) from exc
+    if operation is index:
+        operation = partial(_index_visual, focus_first=True)
     return FocusExplorer(operation, args, kwargs, widgets)

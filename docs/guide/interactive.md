@@ -6,7 +6,7 @@ Install the optional controls in the same environment as your notebook kernel:
 pip install "rainbow-tensor[interactive]"
 ```
 
-Pass a mathematical operation and its usual inputs to `explore`:
+Pass an operation and its usual inputs to `explore`:
 
 ```python
 import numpy as np
@@ -20,13 +20,54 @@ explorer
 
 Edit an output coordinate with the keyboard and press **Update focus**.
 The source highlights and coordinate formula follow that output. Coordinates
-start at zero. `sum`, `mean`, and `einsum` work the same way. A scalar output
+start at zero. `sum`, `mean`, `einsum`, and `index` work the same way. A scalar output
 has no coordinate fields, only the update button.
 
-The controls reuse the static operations, including their numerical model and
+For mathematical operations, the controls reuse the numerical model and
 `max_terms` and `max_total_terms` budgets. Each update plans the new visible
 outputs under the same limits. Selecting another output never raises either
 limit. If the new plan exceeds a limit, output values appear as question marks.
+
+## Follow an indexed output back to its source
+
+Repeated indices create separate output positions that can share one source
+element. A reverse slice also changes the order. Try both together:
+
+```python
+x = np.arange(12).reshape(3, 4)
+selection = ([2, 0, 2], slice(None, None, -2))
+index_explorer = rt.explore(rt.index, x, selection)
+index_explorer
+```
+
+The result is `[[11, 9], [3, 1], [11, 9]]`. The explorer starts at output
+`(0, 0)`, which reads source `(2, 3)`. Output `(2, 0)` reads that same source
+element because row 2 was picked twice. Type either output coordinate into the
+fields and press **Update focus** to follow the connection.
+
+You can also change focus from Python:
+
+```python
+index_explorer.set_focus((1, 1))
+index_explorer.visual.trace.terms[0][0].coordinate  # (0, 1)
+index_explorer.visual.index_mapping.source_coord((2, 0))  # (2, 3)
+```
+
+The trace describes the current output. The index mapping can answer other
+output coordinates without changing the focus. Use `index_explorer.close()`
+when finished with the controls.
+
+Without notebook widgets, the same focused figure is available directly:
+
+```python
+rt.index(x, selection, focus=(1, 1))
+```
+
+Passing `focus` shows the source and result side by side and highlights their
+connection. A normal `rt.index(x, selection)` call keeps its original static
+source-selection view. The complete walkthrough in
+[14_index_explorer.ipynb](../../examples/14_index_explorer.ipynb) runs with or
+without the optional widget dependency.
 
 ## Explore a reduction that keeps its axes
 
