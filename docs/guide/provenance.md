@@ -75,7 +75,8 @@ selects `Y[1]`, whose value is `5 + 2 + 5 = 12`. `Y[2]` is `4 + 1 + 4 = 9`.
 Call `explorer.close()` when finished.
 
 Without widgets, use `y.visualize(focus=(1,))`. Static SVG files retain their
-highlights and explanations without a running kernel.
+highlights without a running kernel. Save `visual.text` separately to share the
+plain-text explanation alongside the figure.
 
 For a single operation, the same focus controls cover indexing, shape
 transformations, combining, reductions, matmul and einsum:

@@ -71,6 +71,8 @@ notebooks in the `examples` folder.
   click and keyboard controls across shape, combining and math operations
 - [Cross-operation origins](guide/provenance) records a chain and follows a
   final element back to its original inputs, keeping repeated contributions
+- [LLM lesson prompt](guide/llm-prompts) provides a reusable teaching prompt,
+  verified examples, and a checklist for beginner tensor visualisations
 
 ```{toctree}
 :maxdepth: 2
@@ -89,6 +91,7 @@ guide/group-colours
 guide/memory
 guide/interactive
 guide/provenance
+guide/llm-prompts
 ```
 
 ```{toctree}

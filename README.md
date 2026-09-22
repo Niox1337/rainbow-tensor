@@ -1,231 +1,258 @@
 # rainbow-tensor
 
-Colourful SVG visuals for tensor shapes, indexing, and operations, built for Jupyter notebooks and teaching.
+**See how tensor operations move, reuse and combine elements.**
 
-[![PyPI version](https://img.shields.io/pypi/v/rainbow-tensor.svg?color=8b5cf6)](https://pypi.org/project/rainbow-tensor/)
-[![Python versions](https://img.shields.io/pypi/pyversions/rainbow-tensor.svg)](https://pypi.org/project/rainbow-tensor/)
-[![License](https://img.shields.io/pypi/l/rainbow-tensor.svg?color=blue)](https://github.com/Niox1337/rainbow-tensor/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-rainbow--tensor-8b5cf6.svg)](https://rainbow-tensor.zhixiangfeng.com/)
+[![PyPI](https://img.shields.io/pypi/v/rainbow-tensor.svg)](https://pypi.org/project/rainbow-tensor/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://github.com/Niox1337/rainbow-tensor/blob/main/pyproject.toml)
+[![Tests](https://github.com/Niox1337/rainbow-tensor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Niox1337/rainbow-tensor/actions/workflows/ci.yml)
+[![Backend contracts](https://github.com/Niox1337/rainbow-tensor/actions/workflows/backends.yml/badge.svg?branch=main)](https://github.com/Niox1337/rainbow-tensor/actions/workflows/backends.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Niox1337/rainbow-tensor/blob/main/LICENSE)
 
-```python
-rt.shape(np.arange(8).reshape(2, 2, 2))
+[Documentation](https://rainbow-tensor.zhixiangfeng.com/) ·
+[Notebook examples](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) ·
+[LLM visualization guide](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) ·
+[Releases](https://github.com/Niox1337/rainbow-tensor/releases)
+
+rainbow-tensor turns tensor shapes and operations into SVG figures for Jupyter
+notebooks, lessons and technical explanations. Choose an output element to see
+its source coordinates and the calculation behind it. Record several operations
+to follow that element all the way back to the original inputs.
+
+[![Four tensor panels showing repeated reverse indexing, transpose and sum, with the sources of the first output highlighted](https://raw.githubusercontent.com/Niox1337/rainbow-tensor/main/examples/images/operation_origins.svg)](https://raw.githubusercontent.com/Niox1337/rainbow-tensor/main/examples/images/operation_origins.svg)
+
+*One result, three contributions, two original positions. The first output is
+`6 + 3 + 6 = 15`, because the same source element was sampled twice.*
+
+## Installation
+
+Python **3.10 or newer** is required.
+
+```sh
+python -m pip install rainbow-tensor
 ```
 
-![Shape (2, 2, 2)](examples/images/shape_2x2x2.svg)
+For clickable result cells and notebook controls:
 
-## Why rainbow-tensor
-
-Tensor shapes are hard to hold in your head, and an index like `(0, slice(None), 1)` gives no hint of what it selects until you run it. A printed array is just a wall of numbers. rainbow-tensor draws the tensor as nested coloured frames and highlights exactly which elements an operation touches, so the structure and the result are clear at a glance.
-
-Every axis keeps one colour through every view, so you can follow an axis as it moves, folds, or stretches. That makes it a fast way to learn how reshapes and reductions work, to teach shape transformations, and to debug a confusing indexing or broadcasting bug. The core imports no deep learning framework, so it stays light and works with plain NumPy or any array that exposes a shape.
-
-## Install
-
-```bash
-pip install rainbow-tensor
+```sh
+python -m pip install "rainbow-tensor[interactive]"
 ```
 
-The distribution name is `rainbow-tensor` and the import name is `rainbow_tensor`.
+Install into the Python environment used by your notebook kernel. NumPy and
+IPython are included as dependencies. PyTorch, JAX and TensorFlow are optional
+and installed separately. Static SVG rendering does not require widget packages.
 
-## Quick start
+## Your first visualization
 
-Run inside a Jupyter notebook or an IPython shell so the SVG is displayed. The convention is to import the package as `rt`.
+Paste this into a notebook cell:
 
 ```python
 import numpy as np
 import rainbow_tensor as rt
+from IPython.display import display
 
-x = np.arange(8).reshape(2, 2, 2)
+x = np.arange(1, 7).reshape(2, 3)
+# [[1, 2, 3],
+#  [4, 5, 6]]
 
-rt.shape(x)                          # draw the structure
-rt.index(x, (0, slice(None), 1))     # highlight what an index selects
+visual = rt.sum(x, axis=1, focus=(1,))
+display(visual)
 ```
 
-![Index (0, :, 1)](examples/images/index_0_all_1.svg)
+The result has shape `(2,)`. Focusing output `(1,)` highlights the second row
+and explains `4 + 5 + 6 = 15`. Change the focus to `(0,)` to follow the first row.
+The explanation appears below the figure and is also available as `visual.text`.
 
-Each call returns a small result object. Its `svg` attribute holds the SVG string, its `text` attribute holds the explanation printed under the figure, and `save` writes the SVG to a file.
-
-## What it can show
-
-Shape changing, combining, and broadcasting views draw the source and the result side by side, so the mapping between them is easy to follow.
-
-- **Shapes and indexing** with `shape` and `index`, covering integers, slices, ellipsis, new axes, boolean masks, and fancy integer arrays
-- **Reshaping and moving axes** with `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, and `expand_dims`
-- **Reductions and math** with `sum`, `mean`, `matmul`, and `einsum`, including multiple reduction axes and `keepdims`
-- **Combining** with `concatenate`, `stack`, `broadcast`, `repeat`, and `take`
-- **Output explanations** with `focus=` on indexing, shape transformations, combining and math
-- **Cross-operation origins** with `Flow`, following a final element through its recorded steps
-- **Memory layout** with `memory`, including byte strides and data ownership
+To inspect an indexing expression instead:
 
 ```python
-rt.sum(np.arange(12).reshape(3, 4), 0)
+selection = ([1, 0, 1], slice(None, None, -1))
+display(rt.index(x, selection, focus=(2, 0)))
 ```
 
-![Sum over axis 0](examples/images/sum_axis0.svg)
+The result is `[[6, 5, 4], [3, 2, 1], [6, 5, 4]]`. Its position `(2, 0)` reads
+source `(1, 2)`. Repeated picks keep their separate positions in the result.
 
-Reduction groups receive generated colours instead of cycling through a short
-palette. Matching source and result cells keep the same colour when focus moves,
-with paired paints for light and dark themes. Try the
-[group colour notebook](examples/13_group_colours.ipynb) with twelve outputs.
+## Follow a complete operation chain
 
-Reduce several axes together and keep their positions for later broadcasting:
-
-```python
-x = np.arange(24).reshape(2, 3, 4)
-rt.mean(x, axis=(0, 2), keepdims=True, focus=(0, 1, 0))  # (2, 3, 4) -> (1, 3, 1)
-```
-
-The focused mean combines eight source values and divides by eight. Omit `axis`
-to reduce every axis, or pass `axis=()` to preserve every element. The
-[reduction guide](docs/guide/reductions-and-math.md) explains the shape rules,
-and [`10_reduction_axes.ipynb`](examples/10_reduction_axes.ipynb) works through
-row normalisation with `keepdims` and broadcasting.
-
-Scalars and empty tensors keep their actual shapes. `rt.shape(np.array(7))`
-shows one cell at `()`, while `rt.shape((2, 0, 3))` shows **No elements**.
-Reducing the zero-length axis gives six zeros for `sum` or six NaNs for `mean`.
-Reducing a different axis can leave an empty output with no focus coordinate.
-Try [`11_scalars_and_empty_tensors.ipynb`](examples/11_scalars_and_empty_tensors.ipynb)
-to compare these cases step by step.
-
-```python
-rt.einsum("ij,jk->ik", np.arange(6).reshape(2, 3), np.arange(12).reshape(3, 4))
-```
-
-![Einsum ij and jk to ik](examples/images/einsum_ij_jk_ik.svg)
-
-## Follow one output
-
-Choose an output coordinate to highlight its contributing source cells and
-read the corresponding formula.
-
-```python
-a = np.arange(6).reshape(2, 3)
-b = np.arange(12).reshape(3, 4)
-
-visual = rt.matmul(a, b, focus=(1, 2))
-visual                             # highlights 3 * 2 + 4 * 6 + 5 * 10 = 80
-visual.trace.terms                 # ordered, inspectable source references
-rt.mean(a, axis=1, focus=(-1,))     # follow the last row
-rt.memory(a.T)                     # explain strides and storage ownership
-```
-
-Start with [the learning guide](docs/guide/learning-path.md) or run
-[`07_explaining_outputs.ipynb`](examples/07_explaining_outputs.ipynb).
-
-## Compare an index with its result
-
-```python
-x = np.array([10, 20, 30])
-rt.index(x, ([2, 0, 2],), show_result=True)  # source -> [30, 10, 30]
-```
-
-The comparison keeps source colours and highlights the result. Repeated picks
-stay repeated, and reverse slices retain their order. See the
-[indexing guide](docs/guide/indexing.md) for output-to-source coordinate lookup.
-
-For optional notebook controls, install `rainbow-tensor[interactive]` and use
-the same index with `explore`:
-
-```python
-explorer = rt.explore(rt.index, x, ([2, 0, 2],))
-explorer
-```
-
-Click a visible result cell to highlight its source. You can also type a result
-position and press **Update focus**, or use Enter or Space on a focused cell.
-Results `(0,)` and `(2,)` both read source `(2,)`, while remaining separate
-output positions. `rt.index(x, ([2, 0, 2],), focus=(2,))` produces a static
-focused comparison without widgets. The
-[index explorer notebook](examples/14_index_explorer.ipynb) adds reverse slices,
-and the [interactive guide](docs/guide/interactive.md) covers updates and export.
-`rt.explore` also supports shape transformations, combining operations, sums,
-means, matmul, and einsum.
-
-## Follow an element through several operations
-
-Record a chain explicitly, then select its final output:
+`Flow` records the steps that produced a result. Each step retains its shape
+and coordinate mapping without allocating a complete intermediate tensor.
 
 ```python
 flow = rt.Flow()
-source = flow.input(np.arange(1, 7).reshape(2, 3), name="X")
-selected = flow.index(source, ([1, 0, 1], slice(None, None, -1)), name="S")
+source = flow.input(x, name="X")
+selected = flow.index(source, selection, name="S")
 transposed = flow.transpose(selected, name="T")
 y = flow.sum(transposed, axis=1, name="Y")
 
-y.shape                         # (3,)
-y.value((0,))                   # 15
-y.visualize(focus=(0,))          # a regular TensorVisual with each recorded step
-rt.explore(y)                   # optional clickable notebook explorer
+assert y.shape == (3,)
+assert [y.value((i,)) for i in range(3)] == [15, 12, 9]
+display(y.visualize(focus=(0,)))
 ```
 
-`Y[0]` receives `X[1, 2] + X[0, 2] + X[1, 2]`, or `6 + 3 + 6`.
-There are three contributions from two original positions. The repeated source
-is counted twice, and the intervening index and transpose stay visible.
-`y.trace((0,))` exposes the bounded coordinate history without reading values.
+For `Y[0]`, the trace follows `T[0, 0]`, `T[0, 1]` and `T[0, 2]` through the
+transpose and index back to `X[1, 2]`, `X[0, 2]` and `X[1, 2]`. The duplicate
+contribution remains visible.
 
-Flow captures operation parameters and keeps input values live. It evaluates
-selected elements with Python scalar arithmetic, without executing backend
-kernels or materialising intermediate arrays. Read the
-[provenance guide](docs/guide/provenance.md) for budgets and refresh behaviour,
-or work through [15_operation_origins.ipynb](examples/15_operation_origins.ipynb).
+```python
+trace = y.trace((0,))
+assert trace.complete
+counts = {item.reference.coordinate: item.count for item in trace.roots}
+assert counts == {(1, 2): 2, (0, 2): 1}
+```
 
-## Keep previews small
+A structural trace reads no array values. Input occurrence counts describe
+paths through the recorded expression, not coefficients or derivatives.
+Record operations explicitly through `flow` to retain their history. Input
+values are read afresh on each value query or visualization.
 
-Basic slice selections store ranges instead of expanding every selected
-coordinate. Reductions compute only the output groups a renderer requests.
-Math views accept `max_terms`, defaulting to 10,000 terms per output cell, and
-`max_total_terms`, defaulting to 100,000 across the visible outputs. When either
-limit is exceeded, output values show `?` with an explanation instead of partial
-results. Set both limits to `None` to allow full evaluation of the preview.
+Read the [provenance guide](https://rainbow-tensor.zhixiangfeng.com/guide/provenance.html)
+or run [the worked notebook](https://github.com/Niox1337/rainbow-tensor/blob/main/examples/15_operation_origins.ipynb).
 
-Numerical previews use Python scalar arithmetic. Accumulation dtype, rounding,
-and overflow can differ from a framework's native kernels. Each math view
-explains that model and identifies any generated placeholder operands.
+## Explore by clicking
+
+With the interactive extra installed, pass a tracked result or an operation
+and its arguments to `explore`:
+
+```python
+explorer = rt.explore(y)
+display(explorer)
+
+# A single operation can be explored without recording a Flow.
+index_explorer = rt.explore(rt.index, x, selection)
+display(index_explorer)
+```
+
+Click a visible result cell to update the source highlights and explanation.
+Enter and Space activate a focused cell. Coordinate fields also reach positions
+hidden by a large preview.
+
+```python
+explorer.set_focus((2,))
+explorer.visual.save("focused-result.svg")
+
+# Run these when you have finished with the controls.
+explorer.close()
+index_explorer.close()
+```
+
+Live controls need a running notebook kernel and a host with widget support.
+`y.visualize(focus=(2,))` produces the equivalent static figure.
+
+## Supported operations
+
+| What you want to understand | Public views |
+| --- | --- |
+| Tensor structure | `shape` |
+| Slices, masks and repeated gathers | `index`, `take`, `repeat` |
+| Reshaping and axis movement | `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, `expand_dims` |
+| Joining and broadcasting | `concatenate`, `stack`, `broadcast` |
+| Reductions and contractions | `sum`, `mean`, `matmul`, `einsum` |
+| Storage metadata | `memory` |
+
+Operation views support `focus=` to explain one result element. The same
+operations are available as `Flow` methods. `shape` and `memory` are standalone
+inspection views. `flow.broadcast` returns one tracked output per input, each
+with its own values and output port.
+
+Indexing supports integers, slices, ellipsis, new axes, boolean masks and
+advanced integer arrays. Reductions support multiple axes, negative axes,
+`axis=None`, `axis=()` and `keepdims=True`. Scalars use shape and coordinate
+`()`. Empty tensors retain their zero-length dimensions and have no selectable
+output element.
+
+NumPy arrays and CPU tensors from **PyTorch, JAX and TensorFlow** are covered by
+the backend contract suite. Other array-like inputs need a shape and scalar
+coordinate access. Shape tuples such as `rt.shape((2, 3, 4))` use generated
+row-major placeholder values.
+
+## Figures, explanations and limits
+
+Every view returns a `TensorVisual` with an SVG, a plain-text explanation and
+operation metadata. Its `trace` describes a focused output. Visuals from a
+recorded Flow also expose a bounded `provenance` tree.
+
+```python
+visual.save("row-sum.svg")
+print(visual.text)
+```
+
+`save` writes the figure only. Keep `visual.text` alongside it when sharing the
+explanation outside a notebook. SVG figures remain usable without a running
+Python process.
+
+Large tensors use bounded previews. Repeat mappings and basic slice selections
+remain compact instead of enumerating every output position. Math views default
+to 10,000 terms per output and 100,000 across the preview. Flow evaluation also
+counts recursive factor references and input reads. Work that exceeds a budget
+is shown as `?`, and incomplete structural traces identify the limit reached.
+
+Numerical previews use **Python scalar arithmetic**. Backend accumulation dtype,
+rounding and overflow may differ. The figures explain logical operations and
+coordinate origins, while `memory` reports available storage metadata.
 
 ## Theme and language
 
 The default `auto` theme follows the viewer's light or dark preference, including
-saved SVG files. Language selection follows the Python environment and system
-locale. English and Simplified Chinese are included. Both settings can be
-overridden for reproducible examples.
+in saved SVG files. Language follows the Python environment and system locale.
+English and Simplified Chinese are included.
 
 ```python
-rt.shape(x, theme="dark")         # override this figure
-rt.set_default_theme("auto")     # follow the viewer again
-rt.set_language("zh-CN")         # use the Chinese catalog
-rt.get_resolved_language()        # "zh"
-rt.set_language("auto")          # follow the kernel's system settings
+rt.set_default_theme("auto")
+rt.set_language("en")
+display(rt.shape(x, theme="dark"))  # Override the theme for one figure.
 ```
 
-A new language needs only a JSON catalog with translated messages. Missing
-entries fall back to English, and `rt.load_translations("translations")` loads
-additional catalogs from a directory. See the [translation guide](docs/guide/translations.md)
-and [`12_theme_and_language.ipynb`](examples/12_theme_and_language.ipynb).
-Explicit light and dark themes, custom `Theme.variant` settings, and
-`set_default_axis_colors` remain available.
+Add a language by supplying a JSON translation catalog. Missing entries fall
+back to English, and `rt.load_translations("translations")` loads extra catalogs
+without changing application code. See
+[themes](https://rainbow-tensor.zhixiangfeng.com/guide/themes-and-configuration.html)
+and [translations](https://rainbow-tensor.zhixiangfeng.com/guide/translations.html).
 
-## Documentation
+## Learn and teach
 
-The full guide and API reference live at [rainbow-tensor.zhixiangfeng.com](https://rainbow-tensor.zhixiangfeng.com/).
+| Start here | What you will find |
+| --- | --- |
+| [Learning path](https://rainbow-tensor.zhixiangfeng.com/guide/learning-path.html) | Small exercises that connect shapes, output coordinates and source values |
+| [Notebook collection](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) | Runnable examples from basic shapes through cross-operation tracing |
+| [API reference](https://rainbow-tensor.zhixiangfeng.com/api.html) | Function signatures, parameters and result objects |
+| [LLM visualization guide](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) | A reusable prompt and verified patterns for generating beginner explanations |
+| [Architecture](https://rainbow-tensor.zhixiangfeng.com/guide/architecture.html) | Coordinate mappings, rendering boundaries and performance decisions |
 
-Runnable notebooks for every feature group live in [`examples`](examples), and more sample images live in [`examples/images`](examples/images).
+## Contributing
 
-## Development
+Bug reports, clearer teaching examples and translation catalogs are welcome.
+For a bug report, include a small reproducing input, the operation, the expected
+result and your package, Python and backend versions. Use
+[GitHub Issues](https://github.com/Niox1337/rainbow-tensor/issues) to report a
+problem or discuss a new operation.
 
-```bash
-pip install -e ".[dev,interactive]"
-pytest
-ruff check .
+To work on the package:
+
+```sh
+git clone https://github.com/Niox1337/rainbow-tensor.git
+cd rainbow-tensor
+python -m pip install -e ".[dev,interactive]"
+python -m pytest
+python -m ruff check .
+```
+
+Optional backend tests skip when their framework is absent from that Python
+environment. CI separately requires PyTorch, JAX and TensorFlow, as well as
+running the main suite on Python 3.10 and 3.12. SVG golden tests protect existing
+figures, and distribution checks exercise installed wheels and source packages.
+
+```sh
 python -m build
 python scripts/check_distribution.py --interactive
+python -m pip install -r docs/requirements.txt
+python -m sphinx -b html -W --keep-going docs docs/_build/html
 ```
 
 The distribution check expects one wheel and one source archive in `dist`.
-Use `--dist-dir PATH` when building into another directory. It creates a fresh
-temporary environment, installs dependencies, checks both installed packages,
-and runs the source archive's tests with its included SVG fixtures.
+Use `--dist-dir PATH` for a different build directory. Keep changes focused and
+add a regression example when correcting an operation's behavior.
 
 ## License
 
-MIT
+[MIT](https://github.com/Niox1337/rainbow-tensor/blob/main/LICENSE),
+Copyright 2026 Zhixiang Feng.
