@@ -53,7 +53,8 @@ Shape changing, combining, and broadcasting views draw the source and the result
 - **Reshaping and moving axes** with `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, and `expand_dims`
 - **Reductions and math** with `sum`, `mean`, `matmul`, and `einsum`, including multiple reduction axes and `keepdims`
 - **Combining** with `concatenate`, `stack`, `broadcast`, `repeat`, and `take`
-- **Output explanations** with `focus=` on sums, means, matmul, and einsum
+- **Output explanations** with `focus=` on indexing, shape transformations, combining and math
+- **Cross-operation origins** with `Flow`, following a final element through its recorded steps
 - **Memory layout** with `memory`, including byte strides and data ownership
 
 ```python
@@ -131,13 +132,43 @@ explorer = rt.explore(rt.index, x, ([2, 0, 2],))
 explorer
 ```
 
-Choose a result position and press **Update focus** to highlight its source.
+Click a visible result cell to highlight its source. You can also type a result
+position and press **Update focus**, or use Enter or Space on a focused cell.
 Results `(0,)` and `(2,)` both read source `(2,)`, while remaining separate
 output positions. `rt.index(x, ([2, 0, 2],), focus=(2,))` produces a static
 focused comparison without widgets. The
 [index explorer notebook](examples/14_index_explorer.ipynb) adds reverse slices,
 and the [interactive guide](docs/guide/interactive.md) covers updates and export.
-`rt.explore` also supports sums, means, matmul, and einsum.
+`rt.explore` also supports shape transformations, combining operations, sums,
+means, matmul, and einsum.
+
+## Follow an element through several operations
+
+Record a chain explicitly, then select its final output:
+
+```python
+flow = rt.Flow()
+source = flow.input(np.arange(1, 7).reshape(2, 3), name="X")
+selected = flow.index(source, ([1, 0, 1], slice(None, None, -1)), name="S")
+transposed = flow.transpose(selected, name="T")
+y = flow.sum(transposed, axis=1, name="Y")
+
+y.shape                         # (3,)
+y.value((0,))                   # 15
+y.visualize(focus=(0,))          # a regular TensorVisual with each recorded step
+rt.explore(y)                   # optional clickable notebook explorer
+```
+
+`Y[0]` receives `X[1, 2] + X[0, 2] + X[1, 2]`, or `6 + 3 + 6`.
+There are three contributions from two original positions. The repeated source
+is counted twice, and the intervening index and transpose stay visible.
+`y.trace((0,))` exposes the bounded coordinate history without reading values.
+
+Flow captures operation parameters and keeps input values live. It evaluates
+selected elements with Python scalar arithmetic, without executing backend
+kernels or materialising intermediate arrays. Read the
+[provenance guide](docs/guide/provenance.md) for budgets and refresh behaviour,
+or work through [15_operation_origins.ipynb](examples/15_operation_origins.ipynb).
 
 ## Keep previews small
 

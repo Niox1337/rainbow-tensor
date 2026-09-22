@@ -25,8 +25,11 @@ class TensorVisual:
     stay available for inspection and testing. ``metadata`` holds optional
     operation details, such as the storage attributes reported by `memory`.
     Unknown metadata is explicit rather than inferred from a shape.
-    Math views and focused index views attach a bounded, immutable ``trace``
-    describing one output. Other views leave ``trace`` as ``None``.
+    Math views and focused operation views attach a bounded, immutable ``trace``
+    describing one output. Other views leave ``trace`` as ``None``. Recorded
+    flows also attach a ``provenance`` tree that follows earlier operations.
+    Its occurrence counts and truncation flags remain inspectable without a
+    running notebook kernel.
     Index views attach an ``index_mapping`` for ordered output-to-source lookup.
     """
 
@@ -53,6 +56,7 @@ class TensorVisual:
         self.mime_type = mime_type
         self.metadata = dict(metadata) if metadata is not None else {}
         self.trace = trace
+        self.provenance = None
         self.index_mapping = None
 
     def _repr_svg_(self):

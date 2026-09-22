@@ -6,7 +6,11 @@ these mappings into values to draw and the tests cross check every result
 against NumPy.
 """
 
-from ..shape import _check_axis, _integer_or_sequence
+from bisect import bisect_right
+from dataclasses import dataclass
+from itertools import accumulate
+
+from ..shape import _as_integer, _check_axis, _integer_or_sequence
 
 # Repeat -------------------------------------------------------------------
 
@@ -46,6 +50,55 @@ def repeat_source_positions(axis_size, repeats):
     return positions
 
 
+@dataclass(frozen=True, slots=True)
+class _RepeatSourceLookup:
+    """Resolve repeat positions without storing each copy's source index.
+
+    Uniform repetition needs only an integer count. Variable repetition stores
+    one cumulative end per input element, so memory depends on the input axis
+    rather than the number of copies. ``count`` remains usable when a logical
+    output is larger than Python's platform-sized ``len`` limit.
+    """
+
+    count: int
+    _fixed_count: int | None
+    _ends: tuple[int, ...] = ()
+
+    def __len__(self):
+        """Return the output axis size when it fits Python's length protocol."""
+        return self.count
+
+    def __getitem__(self, position):
+        """Return a source index, accepting integer and negative positions."""
+        position = _as_integer(position, "repeat result position")
+        if position < 0:
+            position += self.count
+        if not 0 <= position < self.count:
+            raise IndexError("repeat result position is out of range")
+        if self._fixed_count is not None:
+            return position // self._fixed_count
+        return bisect_right(self._ends, position)
+
+
+def repeat_source_lookup(axis_size, repeats):
+    """Build a bounded-memory mapping from repeat results to source positions.
+
+    The lookup accepts a single repeat count or one count per input element,
+    including zero counts. Read ``lookup[position]`` to resolve one output
+    coordinate and ``lookup.count`` for its exact output size. Scalar counts
+    use constant memory and variable counts use memory proportional to the
+    input axis. No list proportional to the repeated output is constructed.
+    """
+    axis_size = _as_integer(axis_size, "axis size")
+    if axis_size < 0:
+        raise ValueError(f"axis size must be nonnegative, got {axis_size}")
+    counts = _repeat_spec(axis_size, repeats)
+    if isinstance(counts, int):
+        return _RepeatSourceLookup(axis_size * counts, counts)
+    ends = tuple(accumulate(counts))
+    return _RepeatSourceLookup(ends[-1] if ends else 0, None, ends)
+
+
 def repeat_result_shape(shape, repeats, axis):
     """Return the repeat shape, treating a scalar as one element on axis zero."""
     shape = shape or (1,)
@@ -58,8 +111,8 @@ def repeat_result_shape(shape, repeats, axis):
 def repeat_source_coord(result_coord, source_positions, axis, shape=None):
     """Map a result coordinate back to the source element it copies.
 
-    Along the repeated axis the result position picks its source index from the
-    materialised copy list, and every other axis is copied straight through.
+    Along the repeated axis the result position picks its source index from a
+    copy list or lazy lookup, and every other axis is copied straight through.
     Passing the original scalar ``shape=()`` maps each copy to coordinate ``()``.
     """
     if shape == ():

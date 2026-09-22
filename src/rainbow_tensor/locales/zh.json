@@ -116,5 +116,15 @@
   "interactive.empty": "结果为空：没有可聚焦的输出坐标。",
   "interactive.showing": "当前显示输出 {coordinate}。",
   "interactive.error": "无法更新聚焦：{error}",
-  "trace.index_mapping": "输出 {output} 读取源位置 {source}。"
+  "trace.index_mapping": "输出 {output} 读取源位置 {source}。",
+  "trace.mapping": "{operation} 将输出 {output} 映射到输入 {operand} 的 {source}。",
+  "flow.heading": "逐步查看生成 {name} 的元素来源。",
+  "flow.equation": "{output} = {expression}  （{operation}）",
+  "flow.truncated": "追踪在 {limits} 处停止，尚未展开隐藏的步骤和来源。",
+  "flow.roots": "完整表达式中的输入出现次数。次数表示来源路径，并非数值系数：",
+  "flow.roots_partial": "当前部分追踪中已到达的输入出现次数，未统计隐藏路径：",
+  "flow.root_count": "{source}：出现 {count} 次",
+  "flow.panels_omitted": "省略了较早的 {count} 个张量面板，已追踪到的元素仍在公式中显示。",
+  "flow.values_skipped": "读取数组值之前，共享数值预算在 {limit} 处停止。数值以问号显示。",
+  "flow.generated": "此流程包含由形状输入按行优先生成的占位值。"
 }
