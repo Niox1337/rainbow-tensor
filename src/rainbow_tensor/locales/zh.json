@@ -126,5 +126,6 @@
   "flow.root_count": "{source}：出现 {count} 次",
   "flow.panels_omitted": "省略了较早的 {count} 个张量面板，已追踪到的元素仍在公式中显示。",
   "flow.values_skipped": "读取数组值之前，共享数值预算在 {limit} 处停止。数值以问号显示。",
-  "flow.generated": "此流程包含由形状输入按行优先生成的占位值。"
+  "flow.generated": "此流程包含由形状输入按行优先生成的占位值。",
+  "trace.binary": "输出 {coordinate}：A[{left}] {symbol} B[{right}]。"
 }

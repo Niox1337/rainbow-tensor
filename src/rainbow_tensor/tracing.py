@@ -20,6 +20,19 @@ class OperandRef:
 
 
 @dataclass(frozen=True, slots=True)
+class BinaryExpression:
+    """An ordered binary operation whose operands retain distinct source roles.
+
+    ``operator`` is add, subtract, multiply, or divide. Unlike a trace's
+    sum-of-products terms, this expression applies that operator directly to
+    its left and right references, even when both reference the same element.
+    """
+
+    operator: str
+    operands: tuple[OperandRef, OperandRef]
+
+
+@dataclass(frozen=True, slots=True)
 class OutputTrace:
     """Describe the sum of products that produces one normalized output coordinate.
 
@@ -39,6 +52,10 @@ class OutputTrace:
     at most, so ``complete`` is false when later terms have been omitted. The
     ordered tuples and frozen references can be safely inspected or exported
     without retaining backend arrays or mutable intermediate values.
+
+    Binary arithmetic uses ``expression`` and leaves ``terms`` empty. Its
+    ``term_count`` is one operation. This preserves the existing meaning of
+    terms while keeping subtraction and division explicitly ordered.
     """
 
     operation: str
@@ -47,6 +64,7 @@ class OutputTrace:
     terms: tuple[tuple[OperandRef, ...], ...]
     complete: bool
     divisor: int = 1
+    expression: BinaryExpression | None = None
 
 
 def _normalize_focus(focus, result_shape):
@@ -91,6 +109,16 @@ def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
     if trace is None:
         return [t("trace.empty")]
+    if trace.expression is not None:
+        from .ops.elementwise import BINARY_SYMBOLS
+
+        left, right = trace.expression.operands
+        return [t(
+            "trace.binary", coordinate=trace.output_coord,
+            left=", ".join(map(str, left.coordinate)) or "()",
+            right=", ".join(map(str, right.coordinate)) or "()",
+            symbol=BINARY_SYMBOLS[trace.expression.operator],
+        )]
     if trace.operation == "index" and trace.terms:
         return [
             t(
