@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 
 from ..evaluation import validate_max_terms
+from ..ops.elementwise import evaluate_binary
 from ..shape import _as_integer, extract_shape
 from ..tracing import _normalize_focus
 from ..visual import _source_value
@@ -16,6 +17,9 @@ class TraceStep:
 
     The same element can appear in several steps. Terms preserve multiplication
     groups and division belongs to this step, so nested means stay explicit.
+    Binary operations instead use ``binary_operator`` and ordered ``operands``.
+    Their terms are empty, so subtraction and division cannot be mistaken for
+    a sum of products. All child numbers refer to this trace's occurrence tuple.
     """
 
     reference: ElementRef
@@ -25,6 +29,8 @@ class TraceStep:
     divisor: int
     terms: tuple[tuple[int, ...], ...] = ()
     complete: bool = False
+    binary_operator: str | None = None
+    operands: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +79,8 @@ def trace_output(node, focus=None, *, max_depth=6, max_nodes=80, max_edges=120):
     if coordinate is None:
         return ProvenanceTrace(None, (), (), True, (), 0)
     root = node.ref(coordinate)
-    steps = [TraceStep(root, node.operation, 0, node.term_count, node.divisor)]
+    steps = [TraceStep(root, node.operation, 0, node.term_count, node.divisor,
+                       binary_operator=node.binary_operator)]
     roots = Counter()
     reasons = set()
     edge_count = 0
@@ -113,13 +120,18 @@ def trace_output(node, focus=None, *, max_depth=6, max_nodes=80, max_edges=120):
                     steps.append(TraceStep(
                         reference, child.operation, step.depth + 1,
                         child.term_count, child.divisor,
+                        binary_operator=child.binary_operator,
                     ))
                     edge_count += 1
                 if children:
                     terms.append(tuple(children))
                 if not finished:
                     break
-            steps[position] = replace(step, terms=tuple(terms), complete=finished)
+            steps[position] = replace(
+                step, complete=finished,
+                terms=() if current.binary_operator else tuple(terms),
+                operands=terms[0] if current.binary_operator and terms else (),
+            )
         position += 1
     return ProvenanceTrace(
         root, tuple(steps), tuple(RootContribution(ref, count) for ref, count in roots.items()),
@@ -189,6 +201,9 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
         node = _node(flow, reference)
         if node.operation == "input":
             value = _source_value(node.source, node.shape)(reference.coordinate)
+        elif node.binary_operator is not None:
+            left, right = planned[reference][0]
+            value = evaluate_binary(node.binary_operator, values[left], values[right])
         elif node.operation not in {"sum", "mean", "matmul", "einsum"}:
             value = values[planned[reference][0][0]]
         elif node.divisor == 0:

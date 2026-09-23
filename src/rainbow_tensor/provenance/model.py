@@ -41,6 +41,7 @@ class TrackedTensor:
     divisor: int = 1
     source: Any = field(default=None, repr=False)
     origin: Callable | None = field(default=None, repr=False)
+    binary_operator: str | None = None
     numeric_sources: frozenset[str] = field(init=False)
 
     def __post_init__(self):
@@ -77,7 +78,7 @@ class TrackedTensor:
     def value(self, coordinate=None, *, max_terms=10_000, max_total_terms=100_000):
         """Evaluate one element using Python scalars after planning all work.
 
-        Each operation keeps its own sum, product, and mean division. Shared
+        Each operation keeps its own arithmetic and ordered operand roles. Shared
         intermediate elements are evaluated once per call. Exceeding a budget
         raises ValueBudgetExceeded before any input values are read.
         """

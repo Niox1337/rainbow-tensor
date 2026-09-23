@@ -93,14 +93,14 @@ class Flow:
         return f"n{sequence}", names
 
     def _node(self, operation, inputs, shape, terms, term_count=1, *, divisor=1,
-              name=None, source=None, origin=None):
+              name=None, source=None, origin=None, binary_operator=None):
         """Register one immutable recipe after all operation validation succeeds."""
         node_id, names = self._identity(operation, name)
         node = TrackedTensor(
             flow=self, node_id=node_id, output_port=0, name=names[0],
             operation=operation, shape=tuple(shape), inputs=inputs,
             term_count=term_count, divisor=divisor, term_factory=terms, source=source,
-            origin=origin,
+            origin=origin, binary_operator=binary_operator,
         )
         self._nodes[(node_id, 0)] = node
         return node
