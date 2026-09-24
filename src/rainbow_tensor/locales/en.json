@@ -127,5 +127,8 @@
   "flow.panels_omitted": "{count} earlier tensor panel(s) are omitted. Their reached elements remain in the equations.",
   "flow.values_skipped": "The shared value budget stopped at {limit} before any array values were read. Values are shown as question marks.",
   "flow.generated": "This flow includes generated row-major placeholder values from shape-only inputs.",
-  "trace.binary": "Output {coordinate}: A[{left}] {symbol} B[{right}]."
+  "trace.binary": "Output {coordinate}: A[{left}] {symbol} B[{right}].",
+  "elementwise.operands": "{operation}: {a} {symbol} {b}.",
+  "elementwise.rule": "Each output combines the left and right source values in that order.",
+  "elementwise.divide_zero": "Division uses Python scalar arithmetic. A zero denominator raises ZeroDivisionError."
 }

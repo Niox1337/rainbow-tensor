@@ -8,18 +8,22 @@ from ._svg.interaction import capture_cells, interactive_svg
 from .explanations import t
 from .tracing import _normalize_focus, _trace_explanation
 from .views import (
+    add,
     broadcast,
     concatenate,
+    divide,
     einsum,
     expand_dims,
     index,
     matmul,
     mean,
     moveaxis,
+    multiply,
     repeat,
     reshape,
     squeeze,
     stack,
+    subtract,
     sum,
     swapaxes,
     take,
@@ -225,7 +229,7 @@ def explore(operation, *args, **kwargs):
         reshape, transpose, swapaxes, moveaxis, squeeze, expand_dims,
         concatenate, stack, repeat, take, broadcast,
     )
-    if operation not in (index, sum, mean, matmul, einsum, *mapped):
+    if operation not in (index, sum, mean, matmul, einsum, add, subtract, multiply, divide, *mapped):
         from .provenance.model import TrackedTensor
 
         if not isinstance(operation, TrackedTensor):

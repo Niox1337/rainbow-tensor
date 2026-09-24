@@ -9,6 +9,7 @@ in :mod:`rainbow_tensor.ops`.
 
 from .combining import broadcast, concatenate, repeat, stack, take
 from .einsum import einsum
+from .elementwise import add, divide, multiply, subtract
 from .reductions import matmul, mean, sum
 from .reshaping import expand_dims, moveaxis, reshape, squeeze, swapaxes, transpose
 from .shapes import index, shape
@@ -31,4 +32,8 @@ __all__ = [
     "stack",
     "broadcast",
     "einsum",
+    "add",
+    "subtract",
+    "multiply",
+    "divide",
 ]
