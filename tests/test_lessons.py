@@ -141,3 +141,14 @@ def test_optimized_python_cannot_skip_lesson_assertions(checker, tmp_path, monke
     with pytest.raises(RuntimeError, match="without -O"):
         checker.execute_lesson(source, tmp_path)
 
+
+def test_copied_runner_uses_installed_version_without_source(checker, tmp_path, monkeypatch):
+    """The installed-package validation tree needs no copied source package for its CLI."""
+    monkeypatch.setattr(checker, "ROOT", tmp_path)
+
+    def installed_version(name):
+        assert name == "rainbow-tensor"
+        return "9.8.7"
+
+    monkeypatch.setattr(checker, "version", installed_version)
+    assert checker._version() == "rainbow-tensor lesson checker 9.8.7"

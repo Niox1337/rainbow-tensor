@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+from importlib.metadata import version
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,8 +161,11 @@ def _positive_seconds(value):
 
 
 def _version():
-    """Report the checkout version without importing optional backend packages."""
-    tree = ast.parse((ROOT / "src" / "rainbow_tensor" / "__init__.py").read_text("utf-8"))
+    """Report the checkout version, or the installed version in copied validation files."""
+    initialization = ROOT / "src" / "rainbow_tensor" / "__init__.py"
+    if not initialization.is_file():
+        return f"rainbow-tensor lesson checker {version('rainbow-tensor')}"
+    tree = ast.parse(initialization.read_text("utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets
@@ -183,7 +187,8 @@ def main(argv=None):
     parser.add_argument("--worker", choices=LESSONS, help=argparse.SUPPRESS)
     options = parser.parse_args(argv)
     if options.worker:
-        sys.path.insert(0, str(ROOT / "src"))
+        if (ROOT / "src" / "rainbow_tensor" / "__init__.py").is_file():
+            sys.path.insert(0, str(ROOT / "src"))
         report = execute_lesson(lesson_source(options.worker), Path.cwd())
         print(json.dumps(report))
         return 0
@@ -216,4 +221,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Lesson validation interrupted", file=sys.stderr)
         raise SystemExit(130) from None
-

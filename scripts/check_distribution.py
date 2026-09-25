@@ -184,14 +184,38 @@ def _check_source_files(source, checkout):
         for path in (checkout / "tests").rglob("*")
         if path.is_file() and path.suffix in {".py", ".svg"}
     }
-    required = {Path("tests/test_golden.py"), Path("scripts/check_distribution.py")}
+    required = {
+        Path("tests/test_golden.py"), Path("scripts/check_distribution.py"),
+        Path("scripts/check_lessons.py"),
+    }
+    expected.update(
+        path.relative_to(checkout)
+        for path in (checkout / "examples" / "lessons").glob("*.py")
+    )
     missing = sorted(str(path) for path in expected | required if not (source / path).is_file())
     if missing:
         raise ValueError("The sdist is missing validation files: " + ", ".join(missing))
     fixtures = list((source / "tests/golden").glob("*.svg"))
     if not fixtures:
         raise ValueError("The sdist contains no golden SVG fixtures")
-    print(f"Sdist includes {len(fixtures)} golden SVG fixtures and all checkout test files")
+    print(f"Sdist includes {len(fixtures)} golden SVG fixtures and all tests and lessons")
+
+
+def _copy_validation_files(source, destination):
+    """Copy executable checks without adding unpacked package code to their import path.
+
+    Both the wheel and the sdist installation use this same validation tree.
+    Omitting src ensures that lesson workers and pytest exercise the installed
+    distribution instead of importing the unpacked source by accident.
+    """
+    destination.mkdir()
+    shutil.copytree(source / "tests", destination / "tests")
+    shutil.copytree(source / "examples" / "lessons", destination / "examples" / "lessons")
+    scripts = destination / "scripts"
+    scripts.mkdir()
+    for name in ("check_distribution.py", "check_lessons.py"):
+        shutil.copyfile(source / "scripts" / name, scripts / name)
+    return destination
 
 
 def check_distribution(directory):
@@ -234,21 +258,25 @@ def check_distribution(directory):
         python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         working = workspace / "working"
         working.mkdir()
+        validation = _copy_validation_files(source, working / "validation")
+        lessons = [str(python), "-I", "-B", str(validation / "scripts" / "check_lessons.py")]
         pip = [str(python), "-I", "-m", "pip"]
         _run([*pip, "install", str(wheel), "pytest>=7"], cwd=working, env=env)
         smoke_path = working / "smoke.py"
         smoke_path.write_text(SMOKE, encoding="utf-8")
         smoke = [str(python), "-I", "-B", str(smoke_path), version]
         _run(smoke, cwd=working, env=env)
+        _run(lessons, cwd=working, env=env)
         _run(
             [*pip, "install", "--no-deps", "--force-reinstall", str(source)],
             cwd=working,
             env=env,
         )
         _run(smoke, cwd=working, env=env)
+        _run(lessons, cwd=working, env=env)
         _run(
             [
-                str(python), "-I", "-B", "-m", "pytest", str(source / "tests"),
+                str(python), "-I", "-B", "-m", "pytest", str(validation / "tests"),
                 "-q", "--import-mode=importlib", "-p", "no:cacheprovider",
             ],
             cwd=working,

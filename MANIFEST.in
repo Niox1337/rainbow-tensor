@@ -1,2 +1,4 @@
 recursive-include tests *.py *.svg
 include scripts/check_distribution.py
+include scripts/check_lessons.py
+recursive-include examples/lessons *.py
