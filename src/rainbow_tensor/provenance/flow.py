@@ -36,6 +36,7 @@ from ..ops.einsum import (
     einsum_term_count,
     parse_einsum_subscripts,
 )
+from ..ops.elementwise import normalize_operand
 from ..ops.reductions import iter_matmul_source_terms
 from ..shape import _check_axis, extract_shape
 from ..visual import TensorVisual
@@ -114,14 +115,17 @@ class Flow:
         return self._node(operation, inputs, shape, terms, name=name, origin=origin)
 
     def input(self, array_or_shape, *, name=None):
-        """Register an array or a shape tuple as an explicit provenance boundary.
+        """Register an array, numeric literal, or shape tuple as an input.
 
         Array values are read only during a later value or visual query. A shape
         tuple represents generated row-major values, matching the static views.
         Recording the same array twice creates two distinct logical inputs.
+        A numeric literal is a scalar. Register constants here before passing
+        them to a binary operation, just as for an array input.
         """
         if isinstance(array_or_shape, (TrackedTensor, TensorVisual)):
             raise TypeError("input expects an array or a shape, not a tracked tensor or visual")
+        array_or_shape = normalize_operand(array_or_shape)
         shape = extract_shape(array_or_shape)
         source = array_or_shape if hasattr(array_or_shape, "shape") else shape
         return self._node("input", (), shape, lambda coordinate: iter(()), 0,
@@ -256,6 +260,55 @@ class Flow:
             self._nodes[(node_id, port)] = node
             outputs.append(node)
         return tuple(outputs)
+
+    def _binary(self, operation, a, b, name):
+        """Record one ordered scalar operation at each broadcast output coordinate."""
+        inputs = self._operands((a, b))
+        shape = broadcast_result_shape(tuple(array.shape for array in inputs))
+
+        def operands(coordinate):
+            yield tuple(array.ref(broadcast_source_coord(coordinate, array.shape))
+                        for array in inputs)
+
+        return self._node(operation, inputs, shape, operands,
+                          name=name, binary_operator=operation)
+
+    def add(self, a, b, *, name=None):
+        """Record elementwise addition with independent left and right origins.
+
+        Both inputs must be tracked in this Flow. Their shapes broadcast as
+        in NumPy. Use ``flow.input(value)`` to register a scalar constant.
+        Reusing the same input keeps two occurrence paths but reads each
+        needed source element once within a numerical query.
+        """
+        return self._binary("add", a, b, name)
+
+    def subtract(self, a, b, *, name=None):
+        """Record broadcast subtraction, preserving the minuend and subtrahend.
+
+        Inputs follow :meth:`add`. The traced expression keeps ``a - b`` in
+        that order and never interprets origin counts as signed coefficients.
+        """
+        return self._binary("subtract", a, b, name)
+
+    def multiply(self, a, b, *, name=None):
+        """Record elementwise multiplication rather than a matrix contraction.
+
+        Inputs follow :meth:`add`. Each output has exactly two ordered
+        operand roles, including when both roles reach the same source.
+        """
+        return self._binary("multiply", a, b, name)
+
+    def divide(self, a, b, *, name=None):
+        """Record true division with separate numerator and denominator paths.
+
+        Inputs follow :meth:`add`. Division uses Python scalar arithmetic,
+        and a zero denominator raises ZeroDivisionError during evaluation.
+        Recording and structural tracing do not read values or perform division.
+        A row-normalization chain can reuse its input in the numerator and
+        a keepdims sum in the denominator without flattening either expression.
+        """
+        return self._binary("divide", a, b, name)
 
     def _reduce(self, array, axis, keepdims, operation, name):
         """Preserve reduction grouping and a mean's divisor as a separate recipe."""

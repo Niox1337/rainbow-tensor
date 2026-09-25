@@ -3,9 +3,10 @@
 from ..explanations import t
 from ..layout import build_layout
 from ..numerics import numeric_explanation
+from ..ops.elementwise import BINARY_SYMBOLS
 from ..renderers import resolve_renderer
 from ..theme import resolve_theme
-from ..tracing import OperandRef, OutputTrace
+from ..tracing import BinaryExpression, OperandRef, OutputTrace
 from ..visual import _preview_explanation, _shape_caption_parts, _visual
 from .query import ValueBudgetExceeded, _limit, _node, evaluate_values
 
@@ -24,6 +25,19 @@ def _equations(flow, trace):
         if step.reference in seen or step.operation == "input":
             continue
         seen.add(step.reference)
+        if step.binary_operator is not None:
+            expression = "..."
+            if step.operands:
+                left, right = (trace.steps[child].reference for child in step.operands)
+                expression = (
+                    f"{_label(flow, left)} {BINARY_SYMBOLS[step.binary_operator]} "
+                    f"{_label(flow, right)}"
+                )
+            lines.append(t(
+                "flow.equation", output=_label(flow, step.reference),
+                operation=step.operation, expression=expression,
+            ))
+            continue
         terms = [
             " * ".join(_label(flow, trace.steps[child].reference) for child in term)
             for term in step.terms
@@ -47,6 +61,16 @@ def _immediate_trace(node, provenance):
     if provenance.root is None:
         return None
     coordinate = provenance.root.coordinate
+    if node.binary_operator is not None:
+        step = provenance.steps[0]
+        expression = None
+        if step.operands:
+            expression = BinaryExpression(node.binary_operator, tuple(
+                OperandRef(operand, provenance.steps[child].reference.coordinate)
+                for operand, child in enumerate(step.operands)
+            ))
+        return OutputTrace(node.operation, coordinate, 1, (), step.complete,
+                           expression=expression)
     terms = []
     for children in provenance.steps[0].terms[:8]:
         term = tuple(provenance.steps[child].reference for child in children)
@@ -125,6 +149,8 @@ def render_flow(
     for source, panel in zip(displayed, panels):
         panel["value_fn"] = lambda coord, source=source: values.get(source.ref(coord), "?")
     explanation = [t("flow.heading", name=node.name)]
+    if any(step.binary_operator == "divide" for step in trace.steps):
+        explanation.append(t("elementwise.divide_zero"))
     if trace.root is None:
         explanation.append(t("trace.empty"))
     else:
