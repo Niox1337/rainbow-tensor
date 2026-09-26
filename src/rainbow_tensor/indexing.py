@@ -251,12 +251,40 @@ def format_token(entry):
 
 
 def _format_array(entry):
-    """Format a possibly nested integer index array as ``[[0, 1], [2, 3]]``."""
-    if _is_array_like(entry):
-        return "[" + ", ".join(_format_array(entry[i]) for i in range(len(entry))) + "]"
-    if _is_bool(entry):
-        return "True" if entry else "False"
-    return str(int(entry))
+    """Format an index array with bounded entries and nesting, retaining both ends.
+
+    A label reads at most 32 indexed entries across its entire nested tree.
+    Each level shows at most three entries from either end, and recursion stops
+    after four array levels. Child quotas share the remaining entry allowance
+    instead of each receiving a fresh budget. Omission counts describe entries
+    at their containing level, so labels never claim omitted values are absent
+    from the actual index mapping.
+    """
+    def format_part(value, budget, depth):
+        if not _is_array_like(value):
+            if _is_bool(value):
+                return "True" if value else "False"
+            return str(int(value))
+        length = len(value)
+        if not length:
+            return "[]"
+        count = min(length, 6, budget) if depth < 4 else 0
+        if not count:
+            return "[" + t("index.label_omission", count=length, length=length) + "]"
+        head = (count + 1) // 2
+        tail = count - head
+        positions = [*range(head), *range(length - tail, length)]
+        child_budget = (budget - count) // count
+        parts = []
+        for position, index in enumerate(positions):
+            if position == head and count < length:
+                parts.append(t("index.label_omission", count=length - count, length=length))
+            parts.append(format_part(value[index], child_budget, depth + 1))
+        if not tail and count < length:
+            parts.append(t("index.label_omission", count=length - count, length=length))
+        return "[" + ", ".join(parts) + "]"
+
+    return format_part(entry, 32, 0)
 
 
 def format_index(index):
