@@ -159,5 +159,6 @@
   "playground.shape": "Result shape: {shape}",
   "playground.matches": "Your predicted shape matches.",
   "playground.differs": "Compare your prediction with the result shape.",
-  "index.label_omission": "... ({count} of {length} entries omitted)"
+  "index.label_omission": "... ({count} of {length} entries omitted)",
+  "interactive.result_grid": "Result cells. Arrow keys move within the current slice. Enter or Space selects a cell. Coordinate fields select other slices."
 }

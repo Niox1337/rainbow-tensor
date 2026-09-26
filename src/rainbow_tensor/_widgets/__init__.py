@@ -1,4 +1,4 @@
-"""Optional browser widget loaded only when a notebook explorer is created."""
+"""Browser widget loaded only when a notebook explorer is created."""
 
 from importlib.resources import files
 
@@ -12,3 +12,5 @@ class ExplorerFigure(AnyWidget):
     _esm = files(__package__).joinpath("explorer.js").read_text(encoding="utf-8")
     value = Unicode("").tag(sync=True)
     revision = Int(0).tag(sync=True)
+    description = Unicode("").tag(sync=True)
+    label = Unicode("").tag(sync=True)

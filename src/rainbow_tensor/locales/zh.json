@@ -159,5 +159,6 @@
   "playground.shape": "结果形状：{shape}",
   "playground.matches": "你预测的形状正确。",
   "playground.differs": "请比较你的预测与结果形状。",
-  "index.label_omission": "...（共 {length} 项，省略 {count} 项）"
+  "index.label_omission": "...（共 {length} 项，省略 {count} 项）",
+  "interactive.result_grid": "结果单元格。方向键可在当前切片内移动，回车或空格选择单元格，坐标输入框可选择其他切片。"
 }

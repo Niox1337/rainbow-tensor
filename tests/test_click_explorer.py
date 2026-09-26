@@ -137,6 +137,20 @@ def test_scalar_clicks_and_empty_results_are_distinct(explorers):
     assert empty.update_button.disabled
 
 
+def test_result_grid_has_one_tab_stop_and_announces_the_selected_sources(explorers):
+    explorer = explorers(rt.transpose, (2, 3))
+    entry = [cell for cell in buttons(explorer) if cell.get("tabindex") == "0"]
+    assert len(entry) == 1
+    assert entry[0].get("data-rt-coordinate") == "[0,0]"
+    click(explorer, (2, 1))
+    entry = [cell for cell in buttons(explorer) if cell.get("tabindex") == "0"]
+    assert len(entry) == 1
+    assert entry[0].get("data-rt-coordinate") == "[2,1]"
+    assert "(1, 2)" in explorer.figure.description
+    assert "Arrow keys" in explorer.figure.label
+    assert "aria-live" not in explorer.visual.svg
+
+
 def test_click_failure_keeps_previous_figure_and_focus(explorers):
     source = np.arange(6).reshape(2, 3)
     explorer = explorers(rt.sum, source, axis=1)

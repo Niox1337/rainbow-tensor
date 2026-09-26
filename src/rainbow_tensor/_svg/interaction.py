@@ -64,9 +64,10 @@ def interactive_svg(svg, panels, output_panel, focus):
             label = escape(t("interactive.showing", coordinate=coordinate), quote=True)
             payload = escape(dumps(coordinate, separators=(",", ":")), quote=True)
             pressed = "true" if coordinate == focus else "false"
+            tab_index = "0" if coordinate == focus else "-1"
             pieces.extend((
                 body[position:at],
-                f'<g data-rt-coordinate="{payload}" role="button" tabindex="0" '
+                f'<g data-rt-coordinate="{payload}" role="button" tabindex="{tab_index}" '
                 f'aria-label="{label}" aria-pressed="{pressed}">{fragment}</g>',
             ))
             position = at + len(fragment)

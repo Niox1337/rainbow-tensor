@@ -102,6 +102,8 @@ class FocusExplorer:
         )
         with self.figure.hold_sync():
             self.figure.value = content
+            self.figure.description = "\n".join(_trace_explanation(self.visual.trace))
+            self.figure.label = t("interactive.result_grid")
             self.figure.revision += 1
         lines = list(self.visual.explanation)
         if (
@@ -229,7 +231,8 @@ def explore(operation, *args, **kwargs):
         reshape, transpose, swapaxes, moveaxis, squeeze, expand_dims,
         concatenate, stack, repeat, take, broadcast,
     )
-    if operation not in (index, sum, mean, matmul, einsum, add, subtract, multiply, divide, *mapped):
+    supported = (index, sum, mean, matmul, einsum, add, subtract, multiply, divide, *mapped)
+    if operation not in supported:
         from .provenance.model import TrackedTensor
 
         if not isinstance(operation, TrackedTensor):
