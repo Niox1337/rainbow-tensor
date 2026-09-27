@@ -102,7 +102,9 @@ class FocusExplorer:
         )
         with self.figure.hold_sync():
             self.figure.value = content
-            self.figure.description = "\n".join(_trace_explanation(self.visual.trace))
+            self.figure.description = self.visual.metadata.get(
+                "interaction_description", "\n".join(_trace_explanation(self.visual.trace)),
+            )
             self.figure.label = t("interactive.result_grid")
             self.figure.revision += 1
         lines = list(self.visual.explanation)

@@ -70,6 +70,7 @@ from .views import (
     transpose,
 )
 from .visual import TensorVisual
+from .walkthrough import Walkthrough, walkthrough
 
 __version__ = "1.3.1"
 __all__ = [
@@ -104,6 +105,8 @@ __all__ = [
     "OutputTrace",
     "explore",
     "FocusExplorer",
+    "Walkthrough",
+    "walkthrough",
     "SvgRenderer",
     "SVG",
     "get_default_renderer",
