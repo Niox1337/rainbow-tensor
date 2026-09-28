@@ -70,12 +70,22 @@ starting with the smallest candidate set. An empty intermediate intersection
 stops the query. Differently shaped arrays retain the general broadcast-aware
 join, including its treatment of singleton and private axes.
 
-Long index labels are another cost outside the cell budget. The current
-[index formatter](../../src/rainbow_tensor/indexing.py) prints complete index
-arrays. In the benchmark below, four source cells produce about 483 KB of SVG
-because the two index arrays each contain 40,000 entries. Abbreviating these
-labels is a separate presentation change, not a reason to enlarge the value
-read budget.
+Index labels have their own limits. The
+[index formatter](../../src/rainbow_tensor/indexing.py) shares a budget of 32
+indexed entries across a label's nested arrays and stops after four recursive
+levels. It retains head and tail entries where the budget permits, and localized
+omission markers report the containing array's original length. Small labels
+keep their complete notation. These limits affect captions only, so the index
+mapping still retains every result position.
+
+A size check on 23 September 2026 used the preview command below with
+`--group-size 20000 --loops 1`. Both versions retained 40,000 gather positions
+and read four source cells. Only the index label formatter changed:
+
+| Label formatter | Complete SVG size |
+| --- | --- |
+| Full index arrays | 482,687 bytes |
+| Bounded head and tail labels | 2,902 bytes |
 
 Repeat follows the same principle. Uniform counts use a constant-size quotient
 lookup. Per-element counts use cumulative boundaries and binary search, with
