@@ -219,3 +219,65 @@ def test_cpu_backend_scalar_and_empty_cells(backend, shape, operation, args):
         assert visual.result_shape == expected.shape
     assert renderer.panels[-1].shape == expected.shape
     np.testing.assert_allclose(renderer.panels[-1], expected, equal_nan=True)
+
+
+@pytest.mark.parametrize("operation", ["add", "subtract", "multiply", "divide"])
+@pytest.mark.parametrize("dtype", ["int32", "float32"])
+@pytest.mark.parametrize("layout", ["contiguous", "transposed"])
+def test_cpu_backend_binary_cells_keep_broadcast_operand_order(backend, operation, dtype, layout):
+    """Read real backend cells while comparing each ordered binary result with NumPy."""
+    array, reference = _source(backend, dtype, layout)
+    right_reference = np.array([2, 4, 8], dtype=dtype)
+    right = backend.array(right_reference)
+    expected = getattr(np, operation)(reference, right_reference)
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(array, right, focus=(1, 2), renderer=renderer)
+    np.testing.assert_array_equal(renderer.panels[0], reference)
+    np.testing.assert_array_equal(renderer.panels[1], right_reference)
+    np.testing.assert_allclose(renderer.panels[-1], expected, rtol=1e-6, atol=1e-6)
+    assert visual.result_shape == expected.shape
+    assert [(ref.operand, ref.coordinate) for ref in visual.trace.expression.operands] == [
+        (0, (1, 2)), (1, (2,)),
+    ]
+    assert visual.trace.expression.operator == operation
+    assert visual.trace.terms == ()
+
+
+@pytest.mark.parametrize("operation", ["add", "subtract", "multiply", "divide"])
+@pytest.mark.parametrize("left_shape,right_shape", [
+    ((), ()), ((), (2, 3)), ((2, 3), ()), ((2, 0, 3), (1, 3)),
+])
+def test_cpu_backend_binary_scalar_and_empty_cells(backend, operation, left_shape, right_shape):
+    """Broadcast scalars and empty arrays without manufacturing an output coordinate."""
+    left_reference = np.full(left_shape, 6, dtype="float32")
+    right_reference = np.full(right_shape, 2, dtype="float32")
+    expected = getattr(np, operation)(left_reference, right_reference)
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(
+        backend.array(left_reference), backend.array(right_reference), renderer=renderer,
+    )
+    np.testing.assert_allclose(renderer.panels[-1], expected)
+    assert visual.result_shape == expected.shape
+    if expected.size:
+        assert visual.trace.output_coord == (0,) * len(expected.shape)
+    else:
+        assert visual.trace is None
+        assert visual.metadata["value_evaluation"]["output_count"] == 0
+
+
+@pytest.mark.parametrize("operation", ["add", "subtract", "multiply", "divide"])
+def test_cpu_backend_binary_supports_literal_operands(backend, operation):
+    reference = np.array([2, 4], dtype="float32")
+    renderer = RecordingRenderer()
+    visual = getattr(rt, operation)(3, backend.array(reference), renderer=renderer)
+    np.testing.assert_allclose(renderer.panels[-1], getattr(np, operation)(3, reference))
+    assert visual.trace.expression.operands[0].coordinate == ()
+
+
+def test_cpu_backend_division_keeps_python_zero_denominator_semantics(backend):
+    with pytest.raises(ZeroDivisionError):
+        rt.divide(
+            backend.array(np.array([1], dtype="float32")),
+            backend.array(np.array([0], dtype="float32")),
+            renderer=RecordingRenderer(),
+        )
