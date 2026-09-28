@@ -24,6 +24,7 @@ from .explanations import (
 )
 from .interactive import FocusExplorer, explore
 from .memory import memory
+from .playground import ReductionPlayground, reduction_playground
 from .provenance import Flow, TrackedTensor, ValueBudgetExceeded
 from .renderers import (
     SVG,
@@ -107,6 +108,8 @@ __all__ = [
     "FocusExplorer",
     "Walkthrough",
     "walkthrough",
+    "ReductionPlayground",
+    "reduction_playground",
     "SvgRenderer",
     "SVG",
     "get_default_renderer",
