@@ -174,7 +174,7 @@ class FocusExplorer:
             return
         try:
             self.set_focus(coordinate)
-        except (TypeError, ValueError, IndexError, RuntimeError) as exc:
+        except (TypeError, ValueError, IndexError, RuntimeError, ArithmeticError) as exc:
             self.status.value = t("interactive.error", error=exc)
 
     def _on_update(self, button):
@@ -183,7 +183,7 @@ class FocusExplorer:
             return
         try:
             self.set_focus(tuple(control.value for control in self.coordinates))
-        except (TypeError, ValueError, IndexError, RuntimeError) as exc:
+        except (TypeError, ValueError, IndexError, RuntimeError, ArithmeticError) as exc:
             self.status.value = t("interactive.error", error=exc)
 
     def _ipython_display_(self):

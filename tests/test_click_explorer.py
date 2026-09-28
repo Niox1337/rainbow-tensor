@@ -268,3 +268,25 @@ def test_static_import_does_not_load_browser_widget_dependency():
         "import sys\nimport rainbow_tensor as rt\nrt.transpose((2, 3))\n"
         "assert 'anywidget' not in sys.modules\nassert 'ipywidgets' not in sys.modules",
     ], check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize("trigger", ["button", "cell"])
+def test_division_callback_reports_zero_without_replacing_the_previous_figure(explorers, trigger):
+    """A live zero denominator is an actionable UI error for both valid update paths."""
+    denominator = np.array([1, 2])
+    explorer = explorers(rt.divide, np.array([4, 8]), denominator)
+    before = explorer.visual
+    figure = explorer.figure.value
+    revision = explorer.figure.revision
+    denominator[1] = 0
+    if trigger == "button":
+        explorer.coordinates[0].value = 1
+        explorer.update_button.click()
+    else:
+        click(explorer, (1,))
+    assert explorer.visual is before
+    assert explorer.focus == (0,)
+    assert explorer.figure.value == figure
+    assert explorer.figure.revision == revision
+    assert "zero" in explorer.status.value
+    assert explorer.status.value != "Showing output (0,)."
