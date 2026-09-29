@@ -102,11 +102,17 @@ assert counts == {(1, 2): 2, (0, 2): 1}
 ```
 
 `trace.steps` is an immutable tuple of occurrences. The first step describes
-the selected output. Each step's `terms` contains ordered tuples of child
-positions in `trace.steps`. Factors inside a term multiply together, and terms
+the selected output. A sum-of-products step's `terms` contains ordered tuples
+of child positions in `trace.steps`. Factors inside a term multiply together, and terms
 are summed at that step. Each `ElementRef` identifies a node, an output port
 and a coordinate. Input identity is part of the reference, so equal coordinates
 in two different inputs remain distinct.
+
+Binary steps instead set `binary_operator` and store two ordered child
+positions in `operands`. Their `terms` is empty. Apply that operator to the
+left and right child, preserving subtraction and division order. The immediate
+`OutputTrace` uses `expression.operator` and `expression.operands` for the
+same distinction.
 
 `trace.roots` counts reached paths to original inputs. These are participation
 counts, not coefficients or derivatives. In a matrix product, a source value
@@ -121,12 +127,22 @@ flattening them into one unweighted sum.
 | Selection | `index`, `take`, `repeat` |
 | Shape changes | `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, `expand_dims` |
 | Multiple inputs | `concatenate`, `stack`, `broadcast` |
-| Arithmetic | `sum`, `mean`, `matmul`, `einsum` |
+| Elementwise arithmetic | `add`, `subtract`, `multiply`, `divide` |
+| Reductions and contractions | `sum`, `mean`, `matmul`, `einsum` |
 
 Pass tracked tensors from the same Flow as operands. Names are optional but
 must be unique within that Flow when provided. Ordinary arrays enter through
 `flow.input`. An existing array's earlier history cannot be reconstructed from
 its values, so record each step that should appear in the explanation.
+
+Register constants explicitly, such as `two = flow.input(2, name="Two")`,
+before using `flow.divide(source, two)`. A numeric literal supplies one scalar
+value. A shape tuple continues to supply generated row-major values.
+
+`rt.walkthrough(node)` can select an intermediate occurrence and advance
+through its contributions. The [guided normalization lesson](guided-lessons.md)
+uses this to inspect the row sum inside a denominator without flattening the
+surrounding division.
 
 Broadcast returns one output for each input, stretched to their common shape:
 
@@ -165,8 +181,9 @@ Shared intermediate elements are cached only within that request. Input shapes
 must remain fixed, and a numerical request rejects a shape changed after
 recording.
 
-Evaluation uses Python scalar arithmetic, preserving the sum, multiplication
-and mean division at each operation. It does not execute a backend kernel or
+Evaluation uses Python scalar arithmetic, preserving each binary operation,
+sum, product, and mean division. A zero denominator in `divide` raises
+`ZeroDivisionError`, including `0 / 0`. It does not execute a backend kernel or
 materialise intermediate tensors. Accumulation dtype, rounding and overflow
 can differ from NumPy, PyTorch, JAX or TensorFlow kernels.
 

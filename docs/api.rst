@@ -19,14 +19,26 @@ Shape changing and combining
 .. autofunction:: moveaxis
 .. autofunction:: squeeze
 .. autofunction:: expand_dims
-.. autofunction:: matmul
-.. autofunction:: sum
-.. autofunction:: mean
 .. autofunction:: concatenate
 .. autofunction:: stack
 .. autofunction:: take
 .. autofunction:: repeat
 .. autofunction:: broadcast
+
+Elementwise arithmetic
+----------------------
+
+.. autofunction:: add
+.. autofunction:: subtract
+.. autofunction:: multiply
+.. autofunction:: divide
+
+Reductions and contractions
+---------------------------
+
+.. autofunction:: sum
+.. autofunction:: mean
+.. autofunction:: matmul
 .. autofunction:: einsum
 
 Result object
@@ -41,12 +53,28 @@ Result object
 .. autoclass:: OperandRef
    :members:
 
+.. autoclass:: BinaryExpression
+   :members:
+
 Notebook controls
 -----------------
 
 .. autofunction:: explore
 
 .. autoclass:: FocusExplorer
+   :members:
+
+.. autofunction:: walkthrough
+
+.. autoclass:: Walkthrough
+   :members:
+
+.. autoclass:: rainbow_tensor.provenance.lesson.LessonSnapshot
+   :members:
+
+.. autofunction:: reduction_playground
+
+.. autoclass:: ReductionPlayground
    :members:
 
 Recorded operation flows

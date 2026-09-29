@@ -37,6 +37,10 @@ Install into the Python environment used by your notebook kernel. PyTorch,
 JAX and TensorFlow are optional and installed separately. Live controls need
 a notebook host with widget support. Static SVG figures also work in scripts.
 
+The guided examples below target the 1.5.0 source checkout. To try them before
+that version is published, run `python -m pip install -e .` from the repository
+root in your notebook's Python environment.
+
 ## Your first visualization
 
 Paste this into a notebook cell:
@@ -137,6 +141,37 @@ index_explorer.close()
 Live controls need a running notebook kernel and a host with widget support.
 `y.visualize(focus=(2,))` produces the equivalent static figure.
 
+## Build a calculation one contribution at a time
+
+Use a walkthrough when the learner needs to see a subtotal grow:
+
+```python
+lesson = rt.walkthrough(rt.mean, x, axis=1, focus=(1,))
+display(lesson)
+```
+
+For the row `[4, 5, 6]`, **Next term** advances through subtotals 4, 9 and 15.
+The final mean remains `15 / 3 = 5`. A walkthrough also accepts a recorded
+Flow result, so the learner can select an intermediate occurrence, such as
+the row sum used as a denominator. `lesson.snapshot` exposes the current
+term and numerical state. Call `lesson.close()` when finished.
+
+To compare reduction axes, start with a shape prediction:
+
+```python
+playground = rt.reduction_playground(rt.sum, x, axis=1)
+display(playground)
+```
+
+Enter `(2,)`, then reveal the answer. Turn on `keepdims` and predict `(2, 1)`.
+The source and matching NumPy expression remain visible while the answer is
+hidden. `playground.set_parameters(axis=0)` applies another recipe from Python.
+Call `playground.close()` when finished.
+
+The [guided lessons](https://rainbow-tensor.zhixiangfeng.com/guide/guided-lessons.html)
+connect elementwise arithmetic, subtotals and row normalization with executable
+examples.
+
 ## Supported operations
 
 | What you want to understand | Public views |
@@ -145,6 +180,7 @@ Live controls need a running notebook kernel and a host with widget support.
 | Slices, masks and repeated gathers | `index`, `take`, `repeat` |
 | Reshaping and axis movement | `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, `expand_dims` |
 | Joining and broadcasting | `concatenate`, `stack`, `broadcast` |
+| Elementwise arithmetic | `add`, `subtract`, `multiply`, `divide` |
 | Reductions and contractions | `sum`, `mean`, `matmul`, `einsum` |
 | Storage metadata | `memory` |
 
@@ -152,6 +188,12 @@ Operation views support `focus=` to explain one result element. The same
 operations are available as `Flow` methods. `shape` and `memory` are standalone
 inspection views. `flow.broadcast` returns one tracked output per input, each
 with its own values and output port.
+
+Elementwise views pair the two broadcast source coordinates while retaining
+their order. `rt.divide(x, 2)` accepts a scalar literal. In a Flow, register
+that constant with `flow.input(2)` first. Binary traces expose
+`trace.expression.operator` and ordered `trace.expression.operands`, keeping
+subtraction and division distinct from sums of products.
 
 Indexing supports integers, slices, ellipsis, new axes, boolean masks and
 advanced integer arrays. Reductions support multiple axes, negative axes,
@@ -188,6 +230,7 @@ is shown as `?`, and incomplete structural traces identify the limit reached.
 Numerical previews use **Python scalar arithmetic**. Backend accumulation dtype,
 rounding and overflow may differ. The figures explain logical operations and
 coordinate origins, while `memory` reports available storage metadata.
+Division by a zero denominator raises `ZeroDivisionError`, including `0 / 0`.
 
 ## Theme and language
 
@@ -212,6 +255,8 @@ and [translations](https://rainbow-tensor.zhixiangfeng.com/guide/translations.ht
 | Start here | What you will find |
 | --- | --- |
 | [Learning path](https://rainbow-tensor.zhixiangfeng.com/guide/learning-path.html) | Small exercises that connect shapes, output coordinates and source values |
+| [Verified lessons](https://rainbow-tensor.zhixiangfeng.com/guide/verified-lessons.html) | Canonical teaching examples whose assertions and focus changes run in CI |
+| [Guided lessons](https://rainbow-tensor.zhixiangfeng.com/guide/guided-lessons.html) | Binary arithmetic, contribution walkthroughs, row normalization and axis prediction |
 | [Notebook collection](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) | Runnable examples from basic shapes through cross-operation tracing |
 | [API reference](https://rainbow-tensor.zhixiangfeng.com/api.html) | Function signatures, parameters and result objects |
 | [Agent instructions](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) | Instructions and runnable patterns for agents generating visual NumPy explanations |
@@ -237,6 +282,7 @@ cd rainbow-tensor
 python -m pip install -e ".[dev]"
 python -m pytest
 python -m ruff check .
+python scripts/check_lessons.py
 ```
 
 Optional backend tests skip when their framework is absent from that Python

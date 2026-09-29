@@ -1,370 +1,300 @@
 # Agent instructions: teach NumPy with Rainbow Tensor
 
-This page is written for an LLM agent. When a user gives you this URL, use it
-as the API and teaching reference for generating Rainbow Tensor code that helps
-them understand NumPy visually. Read the instructions directly. The user does
-not need to copy a prompt, fill in a template, or learn this reference first.
+This page is a working reference for an LLM agent using the **rainbow-tensor
+1.5.0 source checkout**. Read it directly when a user supplies this URL.
+Generate runnable code that answers their NumPy question with a useful
+visualization and a checked explanation. The user does not need to copy a
+prompt or fill in a template.
 
-The examples target **rainbow-tensor 1.3.1**. Your output should answer the
-user's NumPy question with runnable code, a useful visualization, and a short
-explanation of how particular output elements were produced.
+Use the user's expression and data when supplied. Otherwise choose a small
+deterministic NumPy array with distinct values. If the user supplies only this
+URL, ask which operation or expression they want to understand.
 
-## Your task
+## Build the lesson around one question
 
-Use the user's expression, data, and learning goal when supplied. Otherwise,
-choose a small deterministic NumPy array with distinct values. Prefer an
-interactive lesson in a live notebook with widget support. Let the learner
-select output cells and watch their source highlights and equations change.
-Use a focused static figure for scripts, exported lessons, or hosts without
-live widget support. If the user only supplies this URL without a topic, ask
-which NumPy operation or expression they want to understand.
+1. State what the learner should predict, such as the shape of a reduction or
+   the source cells of `result[1]`.
+2. Show the input values and shapes, then compute the real NumPy result.
+3. Choose the control that answers the question. Use `explore` to select
+   outputs, `walkthrough` to advance through contributions, or
+   `reduction_playground` to change axes and predict the new shape.
+4. Name the output coordinate and its source coordinates. Explain the local
+   arithmetic as well as the colours. Keep repeated contributions and the
+   order of subtraction or division.
+5. Assert the shape and at least one value or source mapping against NumPy.
+   Say which assertions you actually executed. Mark unexecuted checks as
+   unverified.
+6. Give one concrete next interaction and its expected answer. Do not leave
+   the learner with an unexplained widget.
 
-Follow this sequence when composing your answer:
+Return complete notebook cells with imports and short explanations between
+them. Use `display(...)` for each figure or controller. Keep controls open
+while the learner explores, then explain how to call `.close()`.
+For a script, exported lesson, or host without widget support, use the current
+static `.visual`, or the equivalent static operation.
 
-1. Identify the NumPy concept and one concrete question to explain. For a
-   reduction, this might be which input elements produce `result[1]`.
-2. Write the real NumPy computation. Keep it separate from the visualization.
-   Show the input values, input shape, and expected result shape.
-3. Choose the matching Rainbow Tensor call from the reference below. Use
-   `rt.explore` for a supported operation or tracked chain in a live notebook.
-   Start at one valid output coordinate and tell the learner which second
-   output to select and what change to look for.
-4. Explain the coordinate mapping or local arithmetic in words. Name the
-   coordinates as well as their colours. Preserve repeated contributions.
-5. Check the shape and at least one value or source mapping with assertions.
-   Compare with the real NumPy result. Say which checks you actually ran.
-6. Offer one small variation or prediction question, such as changing the
-   focus, axis, or slice direction. Include enough information to check it.
-
-Return complete, runnable cells with imports and brief explanations between
-cells. Show the source, result, and selected contribution together before a long
-text explanation. Use `Flow` when the question spans several operations so the
-learner can follow a final cell back through the intermediate steps. Keep the
-example small and give one concrete interaction to try, such as selecting both
-copies of a repeated source. Use `display(...)` for each view. For scripts, save
-SVG files and print their `.text` explanation. If you cannot execute code, state
-that its checks are unverified.
-
-Write the explanation in the user's language. Keep Python identifiers and
-comments in English. Leave the theme automatic unless requested otherwise.
-Use `rt.available_languages()` before selecting a figure language with
+Write the explanation in the user's language. Keep Python names and comments
+in English. Leave the theme automatic unless requested otherwise. Call
+`rt.available_languages()` before selecting figure text with
 `rt.set_language(...)`. Do not invent locale codes or translation keys.
 
-## Runtime and return types
+## Runtime and object contracts
 
-Install into the environment used by the notebook kernel or Python script:
+Install the matching checkout in the environment used by the notebook kernel.
+Run this command from its repository root. The version described here may
+include features that have not yet been published to PyPI.
 
 ```bash
-python -m pip install "rainbow-tensor==1.3.1"
+python -m pip install -e .
 ```
 
-The distribution name is `rainbow-tensor`. Import it as
-`import rainbow_tensor as rt`. NumPy, IPython, `ipywidgets`, and `anywidget`
-are required dependencies. A normal installation includes notebook controls.
-Widget imports alone do not establish that a host can display live controls.
+Import `rainbow_tensor as rt`. NumPy, IPython, `ipywidgets`, and `anywidget`
+are required dependencies. Missing widget packages indicate an incomplete
+installation. Widget imports alone do not prove that a notebook host can
+display live controls.
 
-Keep these objects distinct:
-
-| Object | Purpose | How to use it |
+| Object | Role | Public interface |
 | --- | --- | --- |
-| NumPy array | Execute the computation and check NumPy semantics | Index it, call NumPy operations, inspect `.shape` |
-| `TensorVisual` | Display one operation and its metadata | Use `display(visual)`, `.svg`, `.text`, `.save(path)`, `.result_shape` |
-| `TrackedTensor` | Record an explicit operation chain within a `Flow` | Use `.shape`, `.visualize(focus=...)`, `.trace(coordinate)`, `.value(coordinate)` |
-| `FocusExplorer` | Select result cells and update their source highlights | Use `display(explorer)`, `.set_focus(coordinate)`, `.visual`, `.close()` |
+| NumPy array | Execute native computation | Indexing, NumPy methods, `.shape` |
+| `TensorVisual` | One static operation or selected lesson view | `.svg`, `.text`, `.save(path)`, `.result_shape`, `.trace` |
+| `TrackedTensor` | An explicitly recorded Flow recipe | `.shape`, `.visualize(focus=...)`, `.trace(coord)`, `.value(coord)` |
+| `FocusExplorer` | Select another result and inspect its sources | `.set_focus(coord)`, `.visual`, `.close()` |
+| `Walkthrough` | Select an occurrence and contribution | `.snapshot`, `.next_term()`, `.select_term(index)`, `.select_occurrence(index)`, `.set_focus(coord)`, `.visual`, `.close()` |
+| `ReductionPlayground` | Change axes and predict the output shape | `.set_parameters(...)`, `.prediction.value`, `.reveal()`, `.hide()`, `.explorer`, `.visual`, `.close()` |
 
-Static calls such as `rt.sum(x, axis=1)` return `TensorVisual`, not arrays.
-Do not index that object or pass it as the input to another tensor operation.
-For a single-input operation, `visual.shape` describes the source and
-`visual.result_shape` describes the result. A shape tuple such as `(2, 3)`
-creates generated row-major values starting at zero. Pass an actual array when
-explaining the user's values.
+A static call such as `rt.sum(x, axis=1)` returns a display object. Do not
+index it or pass it to another tensor operation. For a single-input operation,
+`visual.shape` describes the source and `visual.result_shape` the output.
+A tracked tensor's `.shape` describes its logical result.
 
-`focus` is a tuple of **output** coordinates. It is not the input selection.
-Use `focus=()` for a scalar output. Empty outputs have no valid coordinate,
-so omit focus. Keep the first example small enough to show all relevant cells.
+A shape tuple such as `(2, 3)` generates row-major example values from zero.
+It does not provide literal data. Elementwise operands and `flow.input`
+also accept numeric literals as scalar values. For a scalar shape view, use
+`rt.shape(np.array(7))`.
 
-## Translate NumPy expressions into visualizations
+Focus is a tuple of **output** coordinates, not an input index expression.
+Use `()` for a scalar. Empty outputs have no focus coordinate, so omit it.
+Keep the introductory example small enough to show every relevant cell.
 
-Use this table to select a lesson view. Operation rows open live explorers.
-`shape` and `memory` are static inspection views. The rows are API patterns,
-with `x`, `a`, `b`, `selection`, and `focus` supplied by your example.
-Pass the operation itself to `rt.explore`, followed by its inputs and options.
-Do not pass an already rendered `TensorVisual`. For example,
-`rt.explore(rt.sum, x, axis=1)` is valid, while
-`rt.explore(rt.sum(x, axis=1))` is not.
+## Translate a NumPy question into an API call
 
-| NumPy expression or concept | Rainbow Tensor lesson view | What to explain |
-| --- | --- | --- |
-| `x.shape` | `rt.shape(x)` | Axis numbers, lengths, and nested structure |
-| `x[selection]` | `rt.explore(rt.index, x, selection, focus=focus)` | Which source coordinate supplies the chosen output |
-| `x.reshape((3, 2))` | `rt.explore(rt.reshape, x, (3, 2), focus=focus)` | Row-major positions before and after a shape change |
-| `x.transpose((1, 0))` | `rt.explore(rt.transpose, x, (1, 0), focus=focus)` | How swapping the two axes moves coordinates |
-| `np.take(x, [1, 0, 1], axis=0)` | `rt.explore(rt.take, x, [1, 0, 1], axis=0, focus=focus)` | Reordered and repeated selections |
-| `np.repeat(x, 2, axis=0)` | `rt.explore(rt.repeat, x, 2, axis=0, focus=focus)` | Separate copies that share a source |
-| `np.concatenate([a, b], axis=0)` | `rt.explore(rt.concatenate, [a, b], axis=0, focus=focus)` | Joining an existing axis |
-| `np.stack([a, b], axis=0)` | `rt.explore(rt.stack, [a, b], axis=0, focus=focus)` | Introducing a new axis |
-| `np.broadcast_arrays(a, b)` | `rt.explore(rt.broadcast, a, b, focus=focus, focus_operand=0)` | Expansion of one operand to the common shape |
-| `x.sum(axis=1, keepdims=True)` | `rt.explore(rt.sum, x, axis=1, keepdims=True, focus=focus)` | Which axis is reduced and why a length-one axis remains |
-| `x.mean(axis=1)` | `rt.explore(rt.mean, x, axis=1, focus=focus)` | The selected group's sum and its divisor |
-| `a @ b` | `rt.explore(rt.matmul, a, b, focus=focus)` | The ordered products forming a chosen output |
-| `np.einsum("ij,jk->ik", a, b)` | `rt.explore(rt.einsum, "ij,jk->ik", a, b, focus=focus)` | Retained and contracted indices |
-| `x.strides` and storage layout | `rt.memory(x)` | Backend-reported storage, separately from logical origins |
+The names `x`, `a`, `b`, `selection`, and `focus` below are supplied by
+the example. Check the input and output shapes before choosing a coordinate.
 
-The reshape row requires six elements, the transpose and reduction rows assume
-suitable two-dimensional arrays, and every focus must match its output shape.
-Other supported shape operations are `swapaxes`, `moveaxis`, `squeeze`, and
-`expand_dims`. Consult the [API reference](../api) for their exact signatures.
+| NumPy concept | Rainbow Tensor call |
+| --- | --- |
+| Tensor axes and shape | `rt.shape(x)` |
+| `x[selection]` | `rt.explore(rt.index, x, selection, focus=focus)` |
+| `x.reshape((3, 2))` | `rt.explore(rt.reshape, x, (3, 2), focus=focus)` |
+| `x.transpose((1, 0))` | `rt.explore(rt.transpose, x, (1, 0), focus=focus)` |
+| `np.take(x, [1, 0, 1], axis=0)` | `rt.explore(rt.take, x, [1, 0, 1], axis=0, focus=focus)` |
+| `np.repeat(x, 2, axis=0)` | `rt.explore(rt.repeat, x, 2, axis=0, focus=focus)` |
+| `np.concatenate([a, b], axis=0)` | `rt.explore(rt.concatenate, [a, b], axis=0, focus=focus)` |
+| `np.stack([a, b], axis=0)` | `rt.explore(rt.stack, [a, b], axis=0, focus=focus)` |
+| Operand expansion | `rt.explore(rt.broadcast, a, b, focus=focus, focus_operand=0)` |
+| `a + b`, `a - b` | `rt.explore(rt.add, a, b, focus=focus)` or `rt.explore(rt.subtract, a, b, focus=focus)` |
+| `a * b`, `a / b` | `rt.explore(rt.multiply, a, b, focus=focus)` or `rt.explore(rt.divide, a, b, focus=focus)` |
+| `x.sum(axis=1, keepdims=True)` | `rt.explore(rt.sum, x, axis=1, keepdims=True, focus=focus)` |
+| `x.mean(axis=1)` | `rt.explore(rt.mean, x, axis=1, focus=focus)` |
+| `a @ b` | `rt.explore(rt.matmul, a, b, focus=focus)` |
+| `np.einsum("ij,jk->ik", a, b)` | `rt.explore(rt.einsum, "ij,jk->ik", a, b, focus=focus)` |
+| Physical array storage | `rt.memory(x)` |
 
-Do not assume that every NumPy keyword is supported:
+Pass the operation itself to `explore`. Do not pass an already rendered
+visual. `shape` and `memory` are standalone inspection views.
+Other shape operations are `swapaxes`, `moveaxis`, `squeeze`, and
+`expand_dims`. See the [API reference](../api) for exact signatures.
 
-- `repeat` and `take` default to `axis=0` and require an integer axis. NumPy's
-  default flattening behaviour is different. To reproduce it, flatten the
-  array first with `x.reshape(-1)` and visualize that flattened input.
-- `reshape` has no `order` argument. Do not claim that a view explains a
-  Fortran-order reshape or proves whether NumPy copied the array.
-- `sum` and `mean` accept `axis=None`, an integer, or a tuple, plus `keepdims`.
-  They do not accept NumPy's `dtype`, `out`, or `where` keywords.
-- Indexing supports integer positions, slices, ellipsis, new axes, boolean
-  masks, and advanced integer arrays. Boolean scalar indices are unsupported.
-- `broadcast` explains operand expansion. It does not add or multiply the
-  operands. Choose `focus_operand=0` or `1` to inspect the corresponding input.
-- There is no general `rt.add`, `rt.multiply`, or automatic NumPy interception.
-  For an unsupported operation, compute its result with NumPy and display
-  that array with `rt.shape`. State that its internal operation is not traced.
+Preserve these differences from NumPy:
 
-## Pattern 1: generate a focused reduction explanation
+- `repeat` and `take` default to `axis=0` and reject `axis=None`.
+  Flatten first with `x.reshape(-1)`, or record
+  `flow.reshape(node, (-1,))`.
+- `reshape` has no `order` argument. Do not claim that it explains
+  Fortran-order reshaping or establishes whether an array was copied.
+- `sum` and `mean` accept axes and `keepdims`, but not NumPy's
+  `dtype`, `out`, or `where` keywords.
+- Indexing supports integers, slices, ellipsis, new axes, boolean masks, and
+  advanced integer arrays. Boolean scalar indices are unsupported.
+- `broadcast` explains expansion, not arithmetic. A static broadcast view
+  takes two operands. Choose `focus_operand=0` or `1` for its result.
+  `flow.broadcast` returns one tracked output per input. Unpack the outputs.
+- No NumPy operation is intercepted automatically. For an unsupported
+  operation, compute its result natively and show it with `rt.shape`.
+  State that its internal operation and earlier history are not traced.
 
-Use this self-contained pattern when the user asks about reduction axes. Keep
-the NumPy result visible and let the learner choose which row contributes to
-an output. The first selection highlights the second row.
+## Pattern 1: select a reduction output
 
-```python
-import numpy as np
-import rainbow_tensor as rt
-from IPython.display import display
+For `[[1, 2, 3], [4, 5, 6]]`, reducing axis 1 produces `[6, 15]`.
+Explain that the selected second output combines source coordinates
+`(1, 0)`, `(1, 1)`, and `(1, 2)`. The next selection changes the source
+row and gives `1 + 2 + 3 = 6`.
 
-x = np.arange(1, 7).reshape(2, 3)
-result = x.sum(axis=1)
-assert result.tolist() == [6, 15]
-
-reduction_explorer = rt.explore(rt.sum, x, axis=1, focus=(1,))
-assert reduction_explorer.visual.result_shape == result.shape == (2,)
-assert result[1] == x[1, 0] + x[1, 1] + x[1, 2] == 15
-
-display(reduction_explorer)
-print(result)
+```{literalinclude} ../../examples/lessons/reduction.py
+:language: python
 ```
 
-Explain that axis 0 selects rows and axis 1 moves through entries within a
-row. Reducing axis 1 produces one sum per row. Output `(1,)` comes from
-`X[1, 0]`, `X[1, 1]`, and `X[1, 2]`, giving `4 + 5 + 6 = 15`.
-Tell the learner to click output `(0,)` and predict the highlighted row before
-checking `1 + 2 + 3 = 6`. Python can make the same change with
-`reduction_explorer.set_focus((0,))`.
+Ask what changes with `axis=0`. The result becomes `[5, 7, 9]`.
+With `keepdims=True` in the original example, the output shape is `(2, 1)`
+and the second row's focus is `(1, 0)`.
 
-For a follow-up, switch to `axis=0`. The NumPy result is `[5, 7, 9]` with
-shape `(3,)`. If you instead add `keepdims=True` to the original reduction,
-the result shape is `(2, 1)` and the matching focus becomes `(1, 0)`.
+## Pattern 2: preserve repeated selections
 
-## Pattern 2: generate an indexing explanation
+A repeated gather and a reverse slice make two output positions read the
+same input. Keep the selection identical in NumPy and the visualization.
 
-Use a repeated gather with a reverse slice to show why distinct output
-positions can read the same source. Keep the original selection unchanged
-between the NumPy expression and the visual call.
-
-```python
-import numpy as np
-import rainbow_tensor as rt
-from IPython.display import display
-
-x = np.arange(1, 7).reshape(2, 3)
-selection = ([1, 0, 1], slice(None, None, -1))
-result = x[selection]
-assert result.tolist() == [[6, 5, 4], [3, 2, 1], [6, 5, 4]]
-
-index_explorer = rt.explore(rt.index, x, selection, focus=(0, 0))
-visual = index_explorer.visual
-assert visual.shape == x.shape == (2, 3)
-assert visual.result_shape == result.shape == (3, 3)
-assert visual.index_mapping.source_coord((0, 0)) == (1, 2)
-assert visual.index_mapping.source_coord((2, 0)) == (1, 2)
-assert visual.trace.output_coord == (0, 0)
-display(index_explorer)
+```{literalinclude} ../../examples/lessons/repeated_index.py
+:language: python
 ```
 
-Ask the learner to click outputs `(0, 0)` and `(2, 0)`. Both highlight
-`X[1, 2]`, whose value is 6, even though their result positions differ. Then
-select `(1, 0)` to see the source move to `X[0, 2]`, whose value is 3.
-Do not collapse the two occurrences into one output position.
+Outputs `(0, 0)` and `(2, 0)` both read `X[1, 2] = 6`.
+Output `(1, 0)` reads `X[0, 2] = 3`. Do not collapse repeated result
+positions into one highlighted source.
 
-## Pattern 3: explain broadcasting before arithmetic
+## Pattern 3: explain expansion before addition
 
-For a question about `a + b`, visualize how both operands expand, then compute
-the addition in NumPy. The broadcast figure only explains the expansion.
+At output `(1, 2)`, shapes `(2, 1)` and `(1, 3)` supply values 20 and 3.
+Changing to `(0, 2)` changes the left source but keeps the right source.
 
-```python
-import numpy as np
-import rainbow_tensor as rt
-from IPython.display import display
-
-a = np.array([[10], [20]])
-b = np.array([[1, 2, 3]])
-expanded_a, expanded_b = np.broadcast_arrays(a, b)
-result = a + b
-assert result.tolist() == [[11, 12, 13], [21, 22, 23]]
-assert expanded_a[1, 2] == a[1, 0] == 20
-assert expanded_b[1, 2] == b[0, 2] == 3
-assert result[1, 2] == expanded_a[1, 2] + expanded_b[1, 2] == 23
-
-left_explorer = rt.explore(rt.broadcast, a, b, focus=(1, 2), focus_operand=0)
-right_explorer = rt.explore(rt.broadcast, a, b, focus=(1, 2), focus_operand=1)
-assert left_explorer.result_shape == right_explorer.result_shape == result.shape
-
-display(left_explorer)
-display(right_explorer)
-display(rt.shape(result))
+```{literalinclude} ../../examples/lessons/broadcast.py
+:language: python
 ```
 
-Explain right-aligned dimension matching: `(2, 1)` and `(1, 3)` both expand
-to `(2, 3)`. At output `(1, 2)`, the values come from `a[1, 0]` and `b[0, 2]`.
-Have the learner select `(0, 2)` in both explorers. The left source changes
-to `a[0, 0]` while the right source stays at `b[0, 2]`. These are separate
-controls, so changing one does not change the other. The final shape view
-shows the addition's values without tracing the addition.
+The two controls are independent. In this pattern NumPy performs addition.
+Use Pattern 5 when the arithmetic itself should appear in the traced view.
 
-## Pattern 4: trace a NumPy expression across operations
+## Pattern 4: follow a chain back to its original input
 
-Use `Flow` when the user wants to know how several steps produced a value.
-Record each operation explicitly. Keep all tracked operands in the same Flow,
-and use unique names there. NumPy operations on the original arrays do not
-record history. Flow does not run native backend kernels or materialise
-intermediate arrays.
+Record every relevant step through a single `Flow`. Use unique explicit
+names and tracked operands from that Flow. Register constants with
+`flow.input(value)` before using them in Flow arithmetic.
 
-This pattern explains `x[selection].T.sum(axis=1)` and checks it against NumPy:
-
-```python
-import numpy as np
-import rainbow_tensor as rt
-from IPython.display import display
-
-x = np.arange(1, 7).reshape(2, 3)
-selection = ([1, 0, 1], slice(None, None, -1))
-result = x[selection].T.sum(axis=1)
-
-flow = rt.Flow()
-source = flow.input(x, name="X")
-selected = flow.index(source, selection, name="S")
-transposed = flow.transpose(selected, name="T")
-y = flow.sum(transposed, axis=1, name="Y")
-
-assert selected.shape == (3, 3)
-assert transposed.shape == (3, 3)
-assert y.shape == result.shape == (3,)
-assert [y.value((i,)) for i in range(3)] == result.tolist() == [15, 12, 9]
-
-trace = y.trace((0,))
-assert trace.complete
-counts = {root.reference.coordinate: root.count for root in trace.roots}
-assert counts == {(1, 2): 2, (0, 2): 1}
-
-chain_explorer = rt.explore(y, focus=(0,))
-assert chain_explorer.visual.result_shape == result.shape
-assert chain_explorer.visual.provenance.complete
-display(chain_explorer)
+```{literalinclude} ../../examples/lessons/operation_origins.py
+:language: python
 ```
 
-Explain the local operations in order, retaining the repeated term:
+The selected result is:
 
 ```text
 Y[0] = T[0, 0] + T[0, 1] + T[0, 2]
-     = S[0, 0] + S[1, 0] + S[2, 0]
      = X[1, 2] + X[0, 2] + X[1, 2]
      = 6 + 3 + 6
      = 15
 ```
 
-Tell the learner to select `Y[1]` next and follow the highlighted path through
-the transpose and repeated index. Its calculation is `5 + 2 + 5 = 12`.
-Three contributions reach two distinct original cells. Root occurrence counts
-are participation counts, not derivatives or general arithmetic coefficients.
-Keep products and each mean's divisor local to the operation that produced
-them. With several original inputs, retain the full `root.reference` when
-collecting counts so equal coordinates in different arrays stay distinct.
+Then follow `Y[1] = 5 + 2 + 5 = 12`. Three contributions reach two original
+cells. With several original inputs, key counts by the full `root.reference`
+rather than coordinates alone. Counts describe participation, not derivatives
+or general arithmetic coefficients.
 
-Flow provides the same operation families listed above, excluding the
-standalone `shape` and `memory` views. `flow.broadcast(a, b)` returns a tuple
-of tracked outputs, one per operand. Unpack it before recording another
-operation. To flatten before `repeat` or `take`, record
-`flow.reshape(node, (-1,))` first.
+Flow does not run native backend kernels or materialise complete intermediate
+arrays. Existing arrays carry no recoverable prior history. The recipe captures
+parameters such as index arrays, while source values are read afresh on each
+query. Keep input shapes fixed.
 
-## Choose the right delivery for the environment
+## Pattern 5: preserve ordered binary arithmetic
 
-Prefer the live explorers above when the learner has a running notebook with
-widget support. Each result cell can be selected with a click, Enter, or Space.
-Coordinate fields also reach outputs omitted from a large preview. Give the
-learner an initial focus and one meaningful second selection, rather than
-leaving a widget without instructions. A scalar has one cell at `()`, and an
-empty output has no selection.
+Binary views retain both source roles. Inspect
+`visual.trace.expression.operator` and `.operands`.
+Their `trace.terms` is empty. Do not treat subtraction or division as an
+implicit sum of products.
 
-Keep controls open during the lesson. Tell the learner to call the matching
-`.close()` method when finished, such as `chain_explorer.close()`. Do not put
-that call immediately after `display` in the main cell. After a focus update,
-read `explorer.visual` again to obtain the current figure and explanation.
-
-Use explicit static output when the host cannot display live widgets, or when
-the requested deliverable is a script or exported figure. A successful import
-does not guarantee browser support. Missing `ipywidgets` or `anywidget` means
-the package installation is incomplete. Recommend reinstalling the package in
-the kernel environment instead of describing either dependency as optional.
-
-For a script or portable output, reuse `y` from Pattern 4 and save the figure
-and explanation separately:
-
-```python
-from pathlib import Path
-
-visual = y.visualize(focus=(0,))
-visual.save("tensor-origins.svg")
-Path("tensor-origins.txt").write_text(visual.text, encoding="utf-8")
-print(visual.text)
+```{literalinclude} ../../examples/lessons/elementwise.py
+:language: python
 ```
 
-`save` writes the figure only. It does not save a PNG or embed the accompanying
-text explanation. A saved SVG has no live Python controls.
+At output `(1, 2)`, inputs 20 and 3 give 23 by addition, 17 by subtraction,
+and 60 by elementwise multiplication. A literal denominator 2 is a scalar at
+`()`. Explain `multiply` separately from matrix multiplication.
 
-## Guardrails for generated explanations
+## Pattern 6: advance through contributions
 
-- **Numerical semantics.** Arithmetic previews use Python scalar arithmetic.
-  NumPy dtype accumulation, overflow, and rounding can differ. Use the real
-  NumPy result as the reference when those details are the lesson's subject.
+`rt.walkthrough` accepts `rt.sum`, `rt.mean`, `rt.matmul`, or a tracked
+Flow result. It does not accept every function supported by `explore`.
+
+```{literalinclude} ../../examples/lessons/guided_terms.py
+:language: python
+```
+
+Separate the mean's subtotals 4, 9, and 15 from its final value `15 / 3 = 5`.
+In the matrix product, the products `1 * 3` and `2 * 4` sum to 11.
+`snapshot.factor_values`, `term_value`, `subtotal`, and `output_value`
+expose different quantities.
+
+Tell the learner which term to select next. Term indices are zero-based.
+Occurrence indices belong to the current trace and must be read again after
+the output changes. Check `snapshot.trace.complete` and
+`snapshot.numeric_complete` separately. An available subtotal must not be
+described as including omitted terms.
+
+## Pattern 7: inspect a denominator's own operation
+
+For row normalization, record the row total with `keepdims=True`, then
+record division. Inspect the denominator's sum as a separate occurrence.
+
+```{literalinclude} ../../examples/lessons/row_normalization.py
+:language: python
+```
+
+The output is `9 / (3 + 6 + 9) = 0.5`. The value 9 occurs on two paths.
+That count is not a coefficient of two. Discover the sum occurrence from
+the current trace rather than hardcoding an ID.
+
+## Pattern 8: predict a shape before revealing it
+
+`rt.reduction_playground` accepts `rt.sum` or `rt.mean`. It keeps the
+source and corresponding NumPy expression visible while hiding the answer.
+
+```{literalinclude} ../../examples/lessons/reduction_axes.py
+:language: python
+```
+
+For shape `(2, 3, 4)`, reducing axes `(0, 2)` gives `(3,)`, or
+`(1, 3, 1)` with `keepdims=True`. `axis=()` reduces no axes and
+`axis=None` reduces all axes. Each parameter change resets the prediction.
+A still-valid output focus is retained, otherwise it resets to the first
+output or no focus for an empty output.
+
+Use `set_parameters`, `reveal()`, and `hide()` for programmatic changes.
+The hidden result remains accessible through `playground.visual`.
+Predict mode hides the answer in the interface, not its numerical evaluation.
+Calculation limits remain in force.
+
+## Delivery and numerical boundaries
+
+All patterns above use the canonical files run by
+`python scripts/check_lessons.py`. See [verified lessons](verified-lessons.md)
+and [guided lessons](guided-lessons.md) for exercises and checked answers.
+
+- **Live controls.** Use a notebook with a running kernel and widget support.
+  Output cells support click, Enter, and Space. Coordinate fields reach
+  positions hidden by a large preview. Re-read `controller.visual` after
+  changes, and keep controllers open until the learner finishes.
+- **Static output.** `visual.save("lesson.svg")` saves the figure only.
+  Save `visual.text` separately when its explanation is needed outside the
+  notebook. SVG export does not produce PNG or retain live Python controls.
+- **Numerical semantics.** Preview arithmetic uses Python scalars. Native
+  accumulation dtype, rounding, and overflow can differ. In particular,
+  `divide` raises `ZeroDivisionError` for any zero denominator, including
+  `0 / 0`. Use real NumPy results when teaching backend numerical behaviour.
 - **Scalars and empties.** A scalar has one coordinate, `()`. An empty output
-  has none. Distinguish it from an empty reduction group, which can produce a
-  real output cell with sum 0 or mean NaN.
-- **Partial traces.** A single-operation `OutputTrace` stores at most eight
-  terms. Check `.complete`. Flow tracing defaults to `max_depth=6`,
-  `max_nodes=80`, and `max_edges=120`. Check `.complete` and
-  `.truncated_reasons` before calling a list of sources exhaustive.
-- **Bounded evaluation.** Arithmetic previews and Flow value queries default
-  to `max_terms=10_000` and `max_total_terms=100_000`. Their scopes differ.
-  A budget-limited figure shows `?`, meaning unevaluated, not zero.
-  `TrackedTensor.value` raises `rt.ValueBudgetExceeded`. Simplify a teaching
-  example rather than silently removing its limits.
-- **Live inputs.** Flow copies operation parameters such as index arrays.
-  Input values remain live and are read again on refresh. Keep their shapes
-  fixed. An edited input value can change the next answer.
-- **Unsupported behaviour.** Do not invent methods, keywords, or tracing
-  support. Displaying a NumPy result with `rt.shape` does not recover its
-  earlier operations. Logical origins do not establish physical memory use.
+  has none. An empty reduction group can still produce a real output cell
+  with sum 0 or undefined mean NaN.
+- **Bounded traces.** Sum-of-products `OutputTrace.terms` stores at most eight
+  terms. Check `.complete`. Binary expressions use `.expression` instead.
+  Flow defaults to `max_depth=6`, `max_nodes=80`, and `max_edges=120`.
+  Check its completeness and truncation reasons before claiming that a source
+  list is exhaustive.
+- **Bounded values.** Arithmetic and Flow queries default to
+  `max_terms=10_000` and `max_total_terms=100_000`, with different scopes.
+  A question mark means unevaluated, not zero. `TrackedTensor.value` raises
+  `rt.ValueBudgetExceeded` if its plan exceeds a limit. Prefer a smaller
+  teaching example to silently disabling limits.
+- **Storage.** Logical origins do not prove whether an operation made a copy.
+  Use `rt.memory` for the backend's available storage information.
 
-Before returning generated code, check that it runs in order, compares the
-NumPy result with the visualized operation, uses valid focus coordinates, and
-explains at least one actual source mapping or calculation. Keep duplicate
-contributions visible. Label generated values, incomplete traces, and
-unverified checks accurately. In a live notebook, include a concrete result
-selection that reveals a useful contrast or repeated source. Keep a static
-version available for environments without live widget support.
-
-For less common cases, consult the [API reference](../api),
-[indexing rules](indexing.md), [numerical semantics](reductions-and-math.md),
-[Flow and its budgets](provenance.md), [widget behaviour](interactive.md), and
-[language configuration](translations.md).
+Before returning a generated lesson, verify its imports, output shape,
+focused coordinate, source coordinates, and local arithmetic. Check a second
+selection or parameter choice. Preserve duplicates and local divisors.
+Label generated values, partial traces, and skipped evaluation accurately.
+Give the learner a concrete prediction and a way to check the answer.
