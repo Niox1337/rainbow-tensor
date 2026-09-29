@@ -28,8 +28,8 @@ Space. Coordinate fields and **Update focus** reach positions hidden by the
 preview. Coordinates start at zero. A scalar output has one clickable cell and
 no coordinate fields.
 
-`index`, `sum`, `mean`, `einsum`, shape transformations and combining operations
-use the same controls. For example:
+`index`, `sum`, `mean`, `einsum`, elementwise arithmetic, shape transformations
+and combining operations use the same controls. For example:
 
 ```python
 reshape_explorer = rt.explore(rt.reshape, a, (3, 2))
@@ -40,6 +40,16 @@ broadcast_explorer = rt.explore(rt.broadcast, (2, 1), (1, 3), focus_operand=1)
 For broadcast, `focus_operand=0` or `1` chooses which stretched output can be
 selected. Shapes and memory views describe structure and storage without an
 output operation to trace, so they remain static.
+
+For `add`, `subtract`, `multiply`, and `divide`, the selected trace uses
+`expression.operator` and ordered `expression.operands`. Its `terms` tuple
+is empty. This keeps the roles of a numerator and denominator, or the left
+and right side of subtraction, explicit.
+
+Use [guided lessons](guided-lessons.md) when selecting outputs is only the
+first step. `rt.walkthrough` advances through contributions and intermediate
+Flow occurrences. `rt.reduction_playground` changes sum or mean axes and
+asks for a shape prediction before revealing the result.
 
 For mathematical operations, the controls reuse the numerical model and
 `max_terms` and `max_total_terms` budgets. Each update plans the new visible

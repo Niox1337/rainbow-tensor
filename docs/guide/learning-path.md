@@ -4,6 +4,11 @@ Start with small arrays whose values you can check by hand. Use one question
 per figure: what is the shape, which cells are selected, or how is one output
 computed?
 
+The [verified lessons](verified-lessons.md) provide complete examples whose
+assertions run in CI. Continue to [guided lessons](guided-lessons.md) when you
+want to advance one contribution at a time or predict how an axis change
+affects the result.
+
 ```python
 import numpy as np
 from IPython.display import display
@@ -51,6 +56,11 @@ Both focus on the same row. Its sum is `3 + 4 + 5 = 12`, while its mean is
 `12 / 3 = 4`. A one-dimensional output needs a one-element coordinate tuple,
 including its trailing comma. Negative coordinates count from the end.
 A scalar output uses `focus=()`.
+
+To see the subtotal grow, use
+`rt.walkthrough(rt.mean, a, axis=1, focus=(1,))`. Its contributions give
+subtotals 3, 7 and 12 before division by 3 produces the final mean, 4.
+The walkthrough also supports sums, matrix products, and recorded Flow results.
 
 ## Count elements before interpreting an empty result
 
@@ -102,6 +112,16 @@ The visual explains the reduction and broadcasting. NumPy computes the array
 used for division. To combine several axes, pass a tuple such as `axis=(0, 2)`.
 Omitting `axis` reduces all axes, while `axis=()` reduces none. See the
 [reduction guide](reductions-and-math.md) for their result shapes and focus tuples.
+
+To trace the division itself, record `flow.sum` with `keepdims=True` and pass
+that tracked row total to `flow.divide`. The
+[normalization lesson](guided-lessons.md) follows the numerator and denominator
+separately. Its walkthrough can inspect the sum inside the denominator.
+
+Use `rt.reduction_playground(rt.sum, scores, axis=1)` to predict a new shape
+before changing axes or `keepdims`. The source remains visible while the
+answer is hidden. This is a display choice, and the current static result
+remains accessible through the playground's `.visual`.
 
 ## Read the same calculation as einsum
 

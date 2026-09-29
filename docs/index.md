@@ -53,6 +53,8 @@ notebooks in the `examples` folder.
   terms, compares a sum with a mean, and introduces memory layout
 - [Verified lessons](guide/verified-lessons) provides executable examples with
   checked answers, source mappings, and a second output to explore
+- [Guided lessons](guide/guided-lessons) follows ordered arithmetic and running
+  subtotals, then asks the learner to predict reduction shapes
 - [Shapes](guide/shapes) draws a tensor and explains the colour scheme, float
   precision, saving, scalar and empty tensors, and big tensor previews
 - [Indexing](guide/indexing) covers integers, slices, ellipsis, new axes,
@@ -86,6 +88,7 @@ notebooks in the `examples` folder.
 
 guide/learning-path
 guide/verified-lessons
+guide/guided-lessons
 guide/shapes
 guide/indexing
 guide/reshaping

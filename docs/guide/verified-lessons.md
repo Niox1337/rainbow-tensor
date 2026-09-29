@@ -134,6 +134,7 @@ The package's distribution checks also run these lessons against installed
 wheel and source distributions.
 
 For the teaching rationale, read the [learning path](learning-path.md).
+Continue with [guided arithmetic and reductions](guided-lessons.md) for
+ordered binary expressions, term-by-term explanations and axis prediction.
 For instructions on generating a lesson from a NumPy question, use the
 [agent reference](llm-prompts.md).
-
