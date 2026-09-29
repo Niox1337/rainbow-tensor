@@ -28,6 +28,10 @@ LESSONS = {
     "operation-origins": "operation_origins.py",
     "scalars-and-empties": "scalars_and_empties.py",
     "bounded-work": "bounded_work.py",
+    "elementwise": "elementwise.py",
+    "guided-terms": "guided_terms.py",
+    "row-normalization": "row_normalization.py",
+    "reduction-axes": "reduction_axes.py",
 }
 
 
@@ -52,6 +56,8 @@ def execute_lesson(source, output_directory):
     import IPython.display
 
     import rainbow_tensor as rt
+    from rainbow_tensor.playground import ReductionPlayground
+    from rainbow_tensor.walkthrough import Walkthrough
 
     source = Path(source).resolve()
     tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
@@ -102,7 +108,8 @@ def execute_lesson(source, output_directory):
     finally:
         # Namespace discovery also closes an explorer created before a failed assert.
         controls.extend(
-            item for item in namespace.values() if isinstance(item, rt.FocusExplorer)
+            item for item in namespace.values()
+            if isinstance(item, (rt.FocusExplorer, Walkthrough, ReductionPlayground))
         )
         closed = set()
         for control in controls:

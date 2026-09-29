@@ -57,24 +57,27 @@ def test_missing_registered_source_fails_the_command(checker, tmp_path, monkeypa
     assert "Lesson source is missing" in capsys.readouterr().err
 
 
-def test_failed_assertion_names_source_line_and_closes_widget(checker, tmp_path, monkeypatch):
+@pytest.mark.parametrize("factory", ["explore", "walkthrough", "reduction_playground"])
+def test_failed_assertion_names_source_line_and_closes_widget(
+    checker, tmp_path, monkeypatch, factory,
+):
     """A lesson failure restores display settings and releases its live controls."""
     source = tmp_path / "wrong_answer.py"
     source.write_text(
         "import rainbow_tensor as rt\n"
-        "explorer = rt.explore(rt.sum, (2, 3), axis=1)\n"
+        f"explorer = rt.{factory}(rt.sum, (2, 3), axis=1)\n"
         "assert False, 'the predicted answer is wrong'\n",
         encoding="utf-8",
     )
     explorers = []
-    original_explore = rt.explore
+    original_explore = getattr(rt, factory)
 
     def record(*args, **kwargs):
         explorer = original_explore(*args, **kwargs)
         explorers.append(explorer)
         return explorer
 
-    monkeypatch.setattr(rt, "explore", record)
+    monkeypatch.setattr(rt, factory, record)
     original_display = IPython.display.display
     original_language = rt.get_language()
     original_theme = rt.get_default_theme()
@@ -88,7 +91,10 @@ def test_failed_assertion_names_source_line_and_closes_widget(checker, tmp_path,
     assert rt.get_default_theme() is original_theme
     assert len(explorers) == 1
     with pytest.raises(RuntimeError, match="closed"):
-        explorers[0].set_focus((0,))
+        if factory == "reduction_playground":
+            explorers[0].set_parameters(axis=0)
+        else:
+            explorers[0].set_focus((0,))
 
 
 def test_lesson_without_assertions_is_rejected_before_execution(checker, tmp_path):
