@@ -1,7 +1,9 @@
 """Notebook lessons that isolate one contribution within a recorded expression."""
 
+from functools import partial
+
 from .explanations import t
-from .interactive import FocusExplorer
+from .interactive import FocusExplorer, _own_widget
 from .layout import build_layout
 from .numerics import numeric_explanation
 from .ops.elementwise import BINARY_SYMBOLS
@@ -152,20 +154,14 @@ class _LessonFocusExplorer(FocusExplorer):
         self.owner = owner
         super().__init__(owner._render, (), {"focus": focus}, widgets, figure_class)
 
-    def _show(self):
-        super()._show()
-        self.owner._sync(self.visual.metadata["lesson"])
+    def _prepare_display(self, visual, panels, focus):
+        display = super()._prepare_display(visual, panels, focus)
+        display["lesson"] = self.owner._prepare_sync(visual.metadata["lesson"])
+        return display
 
-
-def _owned(widgets):
-    """Include layout and style models when collecting widget resources to close."""
-    owned = list(widgets)
-    for widget in tuple(owned):
-        for name in ("layout", "style"):
-            item = getattr(widget, name, None)
-            if item is not None and item not in owned:
-                owned.append(item)
-    return owned
+    def _show(self, display):
+        super()._show(display)
+        self.owner._sync(display["lesson"])
 
 
 class Walkthrough:
@@ -190,28 +186,25 @@ class Walkthrough:
         self._syncing = False
         self._closed = False
         self._callbacks = False
-        self.occurrences = widgets.Dropdown(description=t("lesson.occurrence"))
-        self.previous_button = widgets.Button(description=t("lesson.previous"))
-        self.next_button = widgets.Button(description=t("lesson.next"))
-        self.term_label = widgets.Label()
-        self._controls = widgets.HBox([
-            self.occurrences, self.previous_button, self.next_button, self.term_label,
-        ], layout=widgets.Layout(flex_flow="row wrap"))
-        self._owned_widgets = _owned([
-            self.occurrences, self.previous_button, self.next_button,
-            self.term_label, self._controls,
-        ])
+        self._owned_widgets = []
+        own = partial(_own_widget, self._owned_widgets)
         try:
+            self.occurrences = own(widgets.Dropdown())
+            self.previous_button = own(widgets.Button())
+            self.next_button = own(widgets.Button())
+            self.term_label = own(widgets.Label())
+            self._controls = own(widgets.HBox([
+                self.occurrences, self.previous_button, self.next_button, self.term_label,
+            ], layout=own(widgets.Layout(flex_flow="row wrap"))))
             self.explorer = _LessonFocusExplorer(self, widgets, ExplorerFigure, focus)
-            self.widget = widgets.VBox([self._controls, self.explorer.widget])
-            self._owned_widgets.extend(_owned([self.widget]))
+            self.widget = own(widgets.VBox([self._controls, self.explorer.widget]))
+            self.occurrences.observe(self._on_occurrence, names="value")
+            self.previous_button.on_click(self._on_previous)
+            self.next_button.on_click(self._on_next)
+            self._callbacks = True
         except Exception:
             self.close()
             raise
-        self.occurrences.observe(self._on_occurrence, names="value")
-        self.previous_button.on_click(self._on_previous)
-        self.next_button.on_click(self._on_next)
-        self._callbacks = True
 
     @property
     def snapshot(self):
@@ -235,31 +228,44 @@ class Walkthrough:
             occurrence, term = 0, None
         return _render_lesson(self.node, normalized, occurrence, term, **self._options)
 
-    def _sync(self, snapshot):
-        self._selection = (snapshot.occurrence or 0, snapshot.term)
-        self._syncing = True
-        try:
-            self.occurrences.description = t("lesson.occurrence")
-            self.occurrences.options = tuple(
+    def _prepare_sync(self, snapshot):
+        """Resolve lesson labels before committing a candidate explorer snapshot."""
+        if snapshot.term is not None:
+            term_label = t("lesson.term", number=snapshot.term + 1, total=snapshot.step.term_count)
+        elif snapshot.step is not None and snapshot.step.term_count:
+            term_label = t("lesson.prefix", shown=0, total=snapshot.step.term_count)
+        else:
+            term_label = t("lesson.no_terms")
+        return {
+            "selection": (snapshot.occurrence or 0, snapshot.term),
+            "description": t("lesson.occurrence"),
+            "options": tuple(
                 (f"{index}: {_label(self.node.flow, step.reference)} ({step.operation})", index)
                 for index, step in enumerate(snapshot.trace.steps)
-            )
-            self.occurrences.value = snapshot.occurrence
-            self.occurrences.disabled = snapshot.occurrence is None
-            self.previous_button.description = t("lesson.previous")
-            self.next_button.description = t("lesson.next")
-            self.previous_button.disabled = snapshot.term is None or snapshot.term == 0
-            self.next_button.disabled = (
-                snapshot.term is None or snapshot.term + 1 >= snapshot.available_terms
-            )
-            if snapshot.term is not None:
-                self.term_label.value = t(
-                    "lesson.term", number=snapshot.term + 1, total=snapshot.step.term_count,
-                )
-            elif snapshot.step is not None and snapshot.step.term_count:
-                self.term_label.value = t("lesson.prefix", shown=0, total=snapshot.step.term_count)
-            else:
-                self.term_label.value = t("lesson.no_terms")
+            ),
+            "occurrence": snapshot.occurrence,
+            "previous": t("lesson.previous"),
+            "next": t("lesson.next"),
+            "previous_disabled": snapshot.term is None or snapshot.term == 0,
+            "next_disabled": snapshot.term is None or snapshot.term + 1 >= snapshot.available_terms,
+            "term_label": term_label,
+        }
+
+    def _sync(self, display):
+        """Apply prepared controls and retain them for recovery from failed callbacks."""
+        self._selection = display["selection"]
+        self._syncing = True
+        try:
+            self.occurrences.description = display["description"]
+            self.occurrences.options = display["options"]
+            self.occurrences.value = display["occurrence"]
+            self.occurrences.disabled = display["occurrence"] is None
+            self.previous_button.description = display["previous"]
+            self.next_button.description = display["next"]
+            self.previous_button.disabled = display["previous_disabled"]
+            self.next_button.disabled = display["next_disabled"]
+            self.term_label.value = display["term_label"]
+            self._display = display
         finally:
             self._syncing = False
 
@@ -305,7 +311,7 @@ class Walkthrough:
         try:
             action()
         except (TypeError, ValueError, IndexError, RuntimeError, ArithmeticError) as error:
-            self._sync(self.snapshot)
+            self._sync(self._display)
             self.explorer.status.value = t("interactive.error", error=error)
 
     def _on_occurrence(self, change):

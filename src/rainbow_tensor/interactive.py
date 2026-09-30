@@ -32,6 +32,14 @@ from .views import (
 from .views.shapes import _index_visual
 
 
+def _own_widget(owned, widget):
+    """Track a new control and its auxiliary models before the next allocation."""
+    for model in (widget, getattr(widget, "layout", None), getattr(widget, "style", None)):
+        if model is not None and model not in owned:
+            owned.append(model)
+    return widget
+
+
 class FocusExplorer:
     """Keep clickable output cells and editable output coordinates together.
 
@@ -51,6 +59,8 @@ class FocusExplorer:
         self._args = args
         self._options = dict(options)
         self._closed = False
+        self._callbacks = False
+        self._owned_widgets = []
         with capture_cells() as panels:
             self.visual = operation(*args, **options)
         self._panels = panels
@@ -59,67 +69,70 @@ class FocusExplorer:
             raise ValueError("explore requires an SVG renderer")
         self.focus = self.visual.trace.output_coord if self.visual.trace is not None else None
         self.result_shape = self.visual.result_shape
-        self.coordinates = tuple(
-            widgets.BoundedIntText(
-                value=value, min=0, max=size - 1, description=t("interactive.axis", axis=axis),
+        display = self._prepare_display(self.visual, panels, self.focus)
+        own = partial(_own_widget, self._owned_widgets)
+        try:
+            self.coordinates = tuple(
+                own(widgets.BoundedIntText(value=value, min=0, max=size - 1))
+                for value, size in zip(self.focus or (), self.result_shape)
             )
-            for axis, (value, size) in enumerate(zip(self.focus or (), self.result_shape))
-        )
-        self.update_button = widgets.Button(
-            description=t("interactive.update"), icon="refresh", disabled=self.focus is None,
-        )
-        self.status = widgets.Label()
-        self.figure = figure_class()
-        self.explanation = widgets.HTML()
-        self._controls = widgets.HBox(
-            [*self.coordinates, self.update_button],
-            layout=widgets.Layout(flex_flow="row wrap"),
-        )
-        self.widget = widgets.VBox([
-            self._controls, self.status, self.figure, self.explanation,
-        ])
-        self._owned_widgets = [
-            *self.coordinates, self.update_button, self.status, self.figure,
-            self.explanation, self._controls, self.widget,
-        ]
-        for control in tuple(self._owned_widgets):
-            for name in ("layout", "style"):
-                model = getattr(control, name, None)
-                if model is not None and model not in self._owned_widgets:
-                    self._owned_widgets.append(model)
-        self.update_button.on_click(self._on_update)
-        self.figure.on_msg(self._on_cell)
-        self._show()
+            self.update_button = own(widgets.Button(icon="refresh", disabled=self.focus is None))
+            self.status = own(widgets.Label())
+            self.figure = own(figure_class())
+            self.explanation = own(widgets.HTML())
+            self._controls = own(widgets.HBox(
+                [*self.coordinates, self.update_button],
+                layout=own(widgets.Layout(flex_flow="row wrap")),
+            ))
+            self.widget = own(widgets.VBox([
+                self._controls, self.status, self.figure, self.explanation,
+            ]))
+            self.update_button.on_click(self._on_update)
+            self.figure.on_msg(self._on_cell)
+            self._callbacks = True
+            self._show(display)
+        except Exception:
+            self.close()
+            raise
 
-    def _show(self):
-        """Refresh the widgets from the last successful static visual."""
-        for axis, control in enumerate(self.coordinates):
-            control.description = t("interactive.axis", axis=axis)
-        self.update_button.description = t("interactive.update")
-        output_panel = self.visual.metadata.get("focused_output_panel", len(self._panels) - 1)
-        content, self._clickable = interactive_svg(
-            self.visual.svg, self._panels, output_panel, self.focus,
-        )
+    def _prepare_display(self, visual, panels, focus):
+        """Format and annotate a candidate before replacing the successful display."""
+        output_panel = visual.metadata.get("focused_output_panel", len(panels) - 1)
+        content, clickable = interactive_svg(visual.svg, panels, output_panel, focus)
+        description = visual.metadata.get("interaction_description")
+        if description is None:
+            description = "\n".join(_trace_explanation(visual.trace))
+        lines = list(visual.explanation)
+        if visual.trace is not None and not visual.metadata.get("trace_in_explanation", False):
+            lines.extend(_trace_explanation(visual.trace))
+        return {
+            "axes": tuple(t("interactive.axis", axis=axis) for axis in range(len(focus or ()))),
+            "update": t("interactive.update"),
+            "content": content,
+            "clickable": clickable,
+            "description": description,
+            "label": t("interactive.result_grid"),
+            "explanation": (
+                '<pre style="white-space:pre-wrap">' + escape("\n".join(lines)) + "</pre>"
+            ),
+            "status": t("interactive.empty") if focus is None else t(
+                "interactive.showing", coordinate=focus,
+            ),
+        }
+
+    def _show(self, display):
+        """Apply prepared widget values without evaluating inputs or translating again."""
+        for control, label in zip(self.coordinates, display["axes"]):
+            control.description = label
+        self.update_button.description = display["update"]
+        self._clickable = display["clickable"]
         with self.figure.hold_sync():
-            self.figure.value = content
-            self.figure.description = self.visual.metadata.get(
-                "interaction_description", "\n".join(_trace_explanation(self.visual.trace)),
-            )
-            self.figure.label = t("interactive.result_grid")
+            self.figure.value = display["content"]
+            self.figure.description = display["description"]
+            self.figure.label = display["label"]
             self.figure.revision += 1
-        lines = list(self.visual.explanation)
-        if (
-            self.visual.trace is not None
-            and not self.visual.metadata.get("trace_in_explanation", False)
-        ):
-            lines.extend(_trace_explanation(self.visual.trace))
-        self.explanation.value = (
-            '<pre style="white-space:pre-wrap">' + escape("\n".join(lines)) + "</pre>"
-        )
-        self.status.value = (
-            t("interactive.empty")
-            if self.focus is None else t("interactive.showing", coordinate=self.focus)
-        )
+        self.explanation.value = display["explanation"]
+        self.status.value = display["status"]
 
     def set_focus(self, coordinate):
         """Redraw one output and return its visual, preserving state on failure.
@@ -141,12 +154,13 @@ class FocusExplorer:
             raise ValueError("explore requires an SVG renderer")
         if visual.result_shape != self.result_shape:
             raise ValueError("the output shape changed, create a new explorer")
+        display = self._prepare_display(visual, panels, normalized)
         self.visual = visual
         self._panels = panels
         self.focus = normalized
         for control, value in zip(self.coordinates, normalized):
             control.value = value
-        self._show()
+        self._show(display)
         return visual
 
     def _on_cell(self, widget, content, buffers):
@@ -192,12 +206,13 @@ class FocusExplorer:
         display(self.widget)
 
     def close(self):
-        """Release widget communications and disable further updates."""
+        """Release acquired widgets, including an incompletely initialized explorer."""
         if self._closed:
             return
         self._closed = True
-        self.update_button.on_click(self._on_update, remove=True)
-        self.figure.on_msg(self._on_cell, remove=True)
+        if self._callbacks:
+            self.update_button.on_click(self._on_update, remove=True)
+            self.figure.on_msg(self._on_cell, remove=True)
         for widget in self._owned_widgets:
             widget.close()
 

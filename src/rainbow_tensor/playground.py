@@ -1,15 +1,15 @@
 """Predict and inspect how reduction axes change an output's shape and sources."""
 
 from ast import literal_eval
+from functools import partial
 from html import escape
 
 from .explanations import t
-from .interactive import explore
+from .interactive import _own_widget, explore
 from .ops import normalize_reduction_axes, reduce_result_shape, validate_keepdims
 from .shape import extract_shape
 from .tracing import _normalize_focus
 from .views import mean, shape, sum
-from .walkthrough import _owned
 
 _UNCHANGED = object()
 
@@ -43,13 +43,14 @@ class ReductionPlayground:
         self.input_visual = self._input_visual()
         self.explorer = explore(operation, array, axis=self.axis, keepdims=self.keepdims, **options)
         try:
+            self.revealed = not predict
+            display = self._prepare_result(self.explorer, self.revealed)
             self._build_widgets()
+            self._sync_controls()
+            self._show_result(display)
         except Exception:
             self.close()
             raise
-        self.revealed = not predict
-        self._sync_controls()
-        self._show_result()
 
     def _parameters(self, axis, keepdims):
         """Normalize controls before opening or replacing a widget."""
@@ -77,37 +78,35 @@ class ReductionPlayground:
     def _build_widgets(self):
         import ipywidgets as widgets
 
-        self.axis_mode = widgets.Dropdown(description=t("playground.axes"), options=[
+        own = partial(_own_widget, self._owned_widgets)
+
+        self.axis_mode = own(widgets.Dropdown(description=t("playground.axes"), options=[
             (t("playground.all_axes"), "all"), (t("playground.no_axes"), "none"),
             (t("playground.axis_tuple"), "selected"),
-        ])
-        self.axes = widgets.SelectMultiple(
+        ]))
+        self.axes = own(widgets.SelectMultiple(
             description=t("playground.axis_tuple"), options=[
                 (t("interactive.axis", axis=axis), axis) for axis in range(len(self.source_shape))
             ],
-        )
-        self.keepdims_control = widgets.Checkbox(description=t("playground.keepdims"))
-        self.apply_button = widgets.Button(description=t("playground.apply"))
-        self.prediction = widgets.Text(description=t("playground.prediction"), placeholder="(2, 3)")
-        self.reveal_button = widgets.Button(description=t("playground.reveal"))
-        self.status = widgets.Label()
-        self.expression_view = widgets.HTML()
-        self.source_figure = widgets.HTML(value=self.input_visual.svg)
-        self.result_box = widgets.VBox()
-        self._controls = widgets.HBox([
+        ))
+        self.keepdims_control = own(widgets.Checkbox(description=t("playground.keepdims")))
+        self.apply_button = own(widgets.Button(description=t("playground.apply")))
+        self.prediction = own(widgets.Text(
+            description=t("playground.prediction"), placeholder="(2, 3)",
+        ))
+        self.reveal_button = own(widgets.Button(description=t("playground.reveal")))
+        self.status = own(widgets.Label())
+        self.expression_view = own(widgets.HTML())
+        self.source_figure = own(widgets.HTML(value=self.input_visual.svg))
+        self.result_box = own(widgets.VBox())
+        self._controls = own(widgets.HBox([
             self.axis_mode, self.axes, self.keepdims_control, self.apply_button,
-        ], layout=widgets.Layout(flex_flow="row wrap"))
-        self._prediction_controls = widgets.HBox([self.prediction, self.reveal_button])
-        self.widget = widgets.VBox([
+        ], layout=own(widgets.Layout(flex_flow="row wrap"))))
+        self._prediction_controls = own(widgets.HBox([self.prediction, self.reveal_button]))
+        self.widget = own(widgets.VBox([
             self.source_figure, self._controls, self.expression_view,
             self._prediction_controls, self.status, self.result_box,
-        ])
-        self._owned_widgets = _owned([
-            self.axis_mode, self.axes, self.keepdims_control, self.apply_button,
-            self.prediction, self.reveal_button, self.status, self.expression_view,
-            self.source_figure, self.result_box, self._controls,
-            self._prediction_controls, self.widget,
-        ])
+        ]))
         self.axis_mode.observe(self._on_axis_mode, names="value")
         self.apply_button.on_click(self._on_apply)
         self.reveal_button.on_click(self._on_reveal)
@@ -133,15 +132,23 @@ class ReductionPlayground:
         self.keepdims_control.value = self.keepdims
         self.expression_view.value = "<code>" + escape(self.expression) + "</code>"
 
-    def _show_result(self):
-        self.result_box.children = (self.explorer.widget,) if self.revealed else ()
-        self.reveal_button.description = t(
-            "playground.hide" if self.revealed else "playground.reveal"
-        )
-        self.prediction.disabled = self.revealed
-        self.status.value = t("playground.shape", shape=self.explorer.result_shape) if (
-            self.revealed
-        ) else t("playground.predict")
+    def _prepare_result(self, explorer, revealed):
+        """Format a result before replacing controls or opening its output panel."""
+        return {
+            "children": (explorer.widget,) if revealed else (),
+            "description": t("playground.hide" if revealed else "playground.reveal"),
+            "disabled": revealed,
+            "status": t("playground.shape", shape=explorer.result_shape) if revealed else t(
+                "playground.predict",
+            ),
+        }
+
+    def _show_result(self, display):
+        """Apply result traits that were prepared before committing controller state."""
+        self.result_box.children = display["children"]
+        self.reveal_button.description = display["description"]
+        self.prediction.disabled = display["disabled"]
+        self.status.value = display["status"]
 
     def set_parameters(self, *, axis=_UNCHANGED, keepdims=_UNCHANGED):
         """Apply a new recipe atomically, closing the old explorer only after success."""
@@ -157,6 +164,11 @@ class ReductionPlayground:
         options = {**self._options, "focus": focus}
         input_visual = self._input_visual()
         replacement = explore(self.operation, self.array, axis=resolved, keepdims=kept, **options)
+        try:
+            display = self._prepare_result(replacement, not self._predict)
+        except Exception:
+            replacement.close()
+            raise
         previous = self.explorer
         self.explorer = replacement
         self.axis, self.keepdims = resolved, kept
@@ -165,7 +177,7 @@ class ReductionPlayground:
         self.prediction.value = ""
         self.revealed = not self._predict
         self._sync_controls()
-        self._show_result()
+        self._show_result(display)
         previous.close()
         return self.visual
 
@@ -173,8 +185,7 @@ class ReductionPlayground:
         """Show the result and compare an optional tuple-shaped prediction."""
         if self._closed:
             raise RuntimeError("this reduction playground is closed")
-        self.revealed = True
-        self._show_result()
+        display = self._prepare_result(self.explorer, True)
         if self.prediction.value.strip():
             try:
                 predicted = literal_eval(self.prediction.value)
@@ -187,15 +198,18 @@ class ReductionPlayground:
             key = "playground.matches" if valid and predicted == self.explorer.result_shape else (
                 "playground.differs"
             )
-            self.status.value += " " + t(key)
+            display["status"] += " " + t(key)
+        self.revealed = True
+        self._show_result(display)
         return self.visual
 
     def hide(self):
         """Hide the current result so the learner can make another prediction."""
         if self._closed:
             raise RuntimeError("this reduction playground is closed")
+        display = self._prepare_result(self.explorer, False)
         self.revealed = False
-        self._show_result()
+        self._show_result(display)
 
     def _on_axis_mode(self, change):
         self.axes.disabled = change["new"] != "selected"
@@ -213,8 +227,12 @@ class ReductionPlayground:
             self.status.value = t("interactive.error", error=error)
 
     def _on_reveal(self, button):
-        if not self._closed:
+        if self._closed:
+            return
+        try:
             self.hide() if self.revealed else self.reveal()
+        except (TypeError, ValueError, IndexError, RuntimeError, ArithmeticError) as error:
+            self.status.value = t("interactive.error", error=error)
 
     def _ipython_display_(self):
         from IPython.display import display
