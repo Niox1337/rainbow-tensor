@@ -93,6 +93,7 @@ class ReductionPlayground:
         self.apply_button = own(widgets.Button(description=t("playground.apply")))
         self.prediction = own(widgets.Text(
             description=t("playground.prediction"), placeholder="(2, 3)",
+            style={"description_width": "initial"},
         ))
         self.reveal_button = own(widgets.Button(description=t("playground.reveal")))
         self.status = own(widgets.Label())
