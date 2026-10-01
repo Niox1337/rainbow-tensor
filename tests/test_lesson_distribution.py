@@ -61,4 +61,3 @@ def test_missing_packaged_lesson_files_fail_validation(
     with pytest.raises(ValueError, match="missing validation files") as caught:
         distribution_checker._check_source_files(source, checkout)
     assert str(Path(missing)) in str(caught.value)
-

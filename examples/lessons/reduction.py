@@ -25,4 +25,3 @@ assert [term[0].coordinate for term in explorer.visual.trace.terms] == [
 ]
 assert result[0] == 1 + 2 + 3 == 6
 display(explorer)
-

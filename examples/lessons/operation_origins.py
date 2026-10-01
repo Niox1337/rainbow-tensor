@@ -43,4 +43,3 @@ visual.save("operation-origins.svg")
 Path("operation-origins.txt").write_text(visual.text, encoding="utf-8")
 assert Path("operation-origins.svg").read_text(encoding="utf-8") == visual.svg
 assert Path("operation-origins.txt").read_text(encoding="utf-8") == visual.text
-

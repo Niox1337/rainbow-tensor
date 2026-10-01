@@ -44,4 +44,3 @@ assert playground.visual.trace.output_coord == ()
 assert playground.visual.trace.term_count == 24
 assert x.sum() == 276
 display(playground)
-

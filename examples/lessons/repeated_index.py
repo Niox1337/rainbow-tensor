@@ -26,4 +26,3 @@ explorer.set_focus((1, 0))
 assert explorer.visual.trace.terms[0][0].coordinate == (0, 2)
 assert result[1, 0] == x[0, 2] == 3
 display(explorer)
-
