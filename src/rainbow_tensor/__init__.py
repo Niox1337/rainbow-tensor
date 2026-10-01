@@ -73,7 +73,7 @@ from .views import (
 from .visual import TensorVisual
 from .walkthrough import Walkthrough, walkthrough
 
-__version__ = "1.3.1"
+__version__ = "1.5.0"
 __all__ = [
     "shape",
     "memory",
