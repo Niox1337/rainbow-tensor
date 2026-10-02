@@ -196,3 +196,93 @@ def divide(
     return _elementwise(
         "divide", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
     )
+
+
+def greater(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a > b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "greater", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )
+
+
+def greater_equal(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a >= b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "greater_equal", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )
+
+
+def less(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a < b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "less", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )
+
+
+def less_equal(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a <= b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "less_equal", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )
+
+
+def equal(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a == b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "equal", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )
+
+
+def not_equal(
+    a, b, theme=None, precision=2, renderer=None, *, focus=None,
+    max_terms=DEFAULT_MAX_TERMS, max_total_terms=DEFAULT_MAX_TOTAL_TERMS,
+):
+    """Visualize broadcast ``a != b`` and each output's ordered source pair.
+
+    Inputs and budgets follow :func:`add`. Values use Python scalar comparison,
+    preserving boolean results and NaN comparison rules. Ordered comparisons
+    reject complex values when evaluated. Structural traces never read values.
+    """
+    return _elementwise(
+        "not_equal", a, b, theme, precision, renderer, focus, max_terms, max_total_terms,
+    )

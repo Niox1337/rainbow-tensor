@@ -23,7 +23,7 @@ class OperandRef:
 class BinaryExpression:
     """An ordered binary operation whose operands retain distinct source roles.
 
-    ``operator`` is add, subtract, multiply, or divide. Unlike a trace's
+    ``operator`` names an arithmetic or comparison operation. Unlike a trace's
     sum-of-products terms, this expression applies that operator directly to
     its left and right references, even when both reference the same element.
     """

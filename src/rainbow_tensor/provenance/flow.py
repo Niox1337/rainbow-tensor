@@ -310,6 +310,35 @@ class Flow:
         """
         return self._binary("divide", a, b, name)
 
+    def greater(self, a, b, *, name=None):
+        """Record broadcast ``a > b`` with ordered, value-free source references.
+
+        Inputs must belong to this Flow. Comparison follows Python scalar
+        rules, so ordered complex comparisons raise TypeError when evaluated.
+        NaN compares false, matching ordinary real NumPy comparisons.
+        """
+        return self._binary("greater", a, b, name)
+
+    def greater_equal(self, a, b, *, name=None):
+        """Record broadcast ``a >= b`` with the same rules as :meth:`greater`."""
+        return self._binary("greater_equal", a, b, name)
+
+    def less(self, a, b, *, name=None):
+        """Record broadcast ``a < b`` with the same rules as :meth:`greater`."""
+        return self._binary("less", a, b, name)
+
+    def less_equal(self, a, b, *, name=None):
+        """Record broadcast ``a <= b`` with the same rules as :meth:`greater`."""
+        return self._binary("less_equal", a, b, name)
+
+    def equal(self, a, b, *, name=None):
+        """Record broadcast equality, including complex values and false NaN equality."""
+        return self._binary("equal", a, b, name)
+
+    def not_equal(self, a, b, *, name=None):
+        """Record broadcast inequality, including a true result for NaN against itself."""
+        return self._binary("not_equal", a, b, name)
+
     def _reduce(self, array, axis, keepdims, operation, name):
         """Preserve reduction grouping and a mean's divisor as a separate recipe."""
         inputs = self._operands((array,))

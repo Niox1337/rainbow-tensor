@@ -9,7 +9,18 @@ in :mod:`rainbow_tensor.ops`.
 
 from .combining import broadcast, concatenate, repeat, stack, take
 from .einsum import einsum
-from .elementwise import add, divide, multiply, subtract
+from .elementwise import (
+    add,
+    divide,
+    equal,
+    greater,
+    greater_equal,
+    less,
+    less_equal,
+    multiply,
+    not_equal,
+    subtract,
+)
 from .reductions import matmul, mean, sum
 from .reshaping import expand_dims, moveaxis, reshape, squeeze, swapaxes, transpose
 from .shapes import index, shape
@@ -36,4 +47,10 @@ __all__ = [
     "subtract",
     "multiply",
     "divide",
+    "greater",
+    "greater_equal",
+    "less",
+    "less_equal",
+    "equal",
+    "not_equal",
 ]
