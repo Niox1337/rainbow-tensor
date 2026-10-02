@@ -4,10 +4,10 @@ from functools import partial
 from html import escape
 from json import JSONDecodeError, loads
 
-from ._svg.interaction import capture_cells, interactive_svg
-from .explanations import t
-from .tracing import _normalize_focus, _trace_explanation
-from .views import (
+from .._svg.interaction import capture_cells, interactive_svg
+from ..explanations import t
+from ..tracing import _normalize_focus, _trace_explanation
+from ..views import (
     add,
     broadcast,
     concatenate,
@@ -29,7 +29,7 @@ from .views import (
     take,
     transpose,
 )
-from .views.shapes import _index_visual
+from ..views.shapes import _index_visual
 
 
 def _own_widget(owned, widget):
@@ -250,7 +250,7 @@ def explore(operation, *args, **kwargs):
     )
     supported = (index, sum, mean, matmul, einsum, add, subtract, multiply, divide, *mapped)
     if operation not in supported:
-        from .provenance.model import TrackedTensor
+        from ..provenance.model import TrackedTensor
 
         if not isinstance(operation, TrackedTensor):
             raise ValueError("explore supports tensor operations and recorded flow tensors")
@@ -260,7 +260,7 @@ def explore(operation, *args, **kwargs):
     try:
         import ipywidgets as widgets
 
-        from ._widgets import ExplorerFigure
+        from .._widgets import ExplorerFigure
     except ImportError as exc:
         raise ImportError(
             "Notebook controls require ipywidgets and anywidget. "
@@ -270,7 +270,7 @@ def explore(operation, *args, **kwargs):
     if operation is index:
         operation = partial(_index_visual, focus_first=True)
     elif operation in mapped and kwargs.get("focus") is None:
-        from .views._focus import FIRST_OUTPUT
+        from ..views._focus import FIRST_OUTPUT
 
         kwargs["focus"] = FIRST_OUTPUT
     return FocusExplorer(operation, args, kwargs, widgets, ExplorerFigure)
