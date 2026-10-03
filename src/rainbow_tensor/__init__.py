@@ -15,6 +15,7 @@ Public API:
     rt.set_default_theme("dark")
 """
 
+from .capabilities import capabilities
 from .explanations import (
     available_languages,
     get_language,
@@ -81,6 +82,7 @@ from .walkthrough import Walkthrough, walkthrough
 
 __version__ = "1.5.0"
 __all__ = [
+    "capabilities",
     "shape",
     "memory",
     "index",
