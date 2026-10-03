@@ -1,6 +1,5 @@
 """Predict and inspect how reduction axes change an output's shape and sources."""
 
-from ast import literal_eval
 from functools import partial
 from html import escape
 
@@ -10,6 +9,7 @@ from ..shape import extract_shape
 from ..tracing import _normalize_focus
 from ..views import mean, shape, sum
 from .focus import _own_widget, explore
+from .prediction import diagnose_prediction, prediction_messages
 
 _UNCHANGED = object()
 
@@ -97,6 +97,7 @@ class ReductionPlayground:
         ))
         self.reveal_button = own(widgets.Button(description=t("playground.reveal")))
         self.status = own(widgets.Label())
+        self.feedback_view = own(widgets.HTML())
         self.expression_view = own(widgets.HTML())
         self.source_figure = own(widgets.HTML(value=self.input_visual.svg))
         self.result_box = own(widgets.VBox())
@@ -106,7 +107,7 @@ class ReductionPlayground:
         self._prediction_controls = own(widgets.HBox([self.prediction, self.reveal_button]))
         self.widget = own(widgets.VBox([
             self.source_figure, self._controls, self.expression_view,
-            self._prediction_controls, self.status, self.result_box,
+            self._prediction_controls, self.status, self.feedback_view, self.result_box,
         ]))
         self.axis_mode.observe(self._on_axis_mode, names="value")
         self.apply_button.on_click(self._on_apply)
@@ -136,6 +137,8 @@ class ReductionPlayground:
     def _prepare_result(self, explorer, revealed):
         """Format a result before replacing controls or opening its output panel."""
         return {
+            "feedback": None,
+            "feedback_html": "",
             "children": (explorer.widget,) if revealed else (),
             "description": t("playground.hide" if revealed else "playground.reveal"),
             "disabled": revealed,
@@ -150,6 +153,8 @@ class ReductionPlayground:
         self.reveal_button.description = display["description"]
         self.prediction.disabled = display["disabled"]
         self.status.value = display["status"]
+        self.feedback = display["feedback"]
+        self.feedback_view.value = display["feedback_html"]
 
     def set_parameters(self, *, axis=_UNCHANGED, keepdims=_UNCHANGED):
         """Apply a new recipe atomically, closing the old explorer only after success."""
@@ -183,23 +188,27 @@ class ReductionPlayground:
         return self.visual
 
     def reveal(self):
-        """Show the result and compare an optional tuple-shaped prediction."""
+        """Reveal the result and explain how source axes determine its shape.
+
+        ``feedback`` records the structural diagnosis of the optional prediction.
+        Malformed input is reported without executing it. All translated feedback
+        is prepared before replacing the previous successful display.
+        """
         if self._closed:
             raise RuntimeError("this reduction playground is closed")
         display = self._prepare_result(self.explorer, True)
-        if self.prediction.value.strip():
-            try:
-                predicted = literal_eval(self.prediction.value)
-            except (ValueError, SyntaxError):
-                predicted = None
-            valid = isinstance(predicted, tuple) and all(
-                isinstance(size, int) and not isinstance(size, bool) and size >= 0
-                for size in predicted
-            )
-            key = "playground.matches" if valid and predicted == self.explorer.result_shape else (
-                "playground.differs"
-            )
-            display["status"] += " " + t(key)
+        feedback = diagnose_prediction(
+            self.prediction.value, self.source_shape,
+            normalize_reduction_axes(self.axis, len(self.source_shape)), self.keepdims,
+        )
+        display["feedback"] = feedback
+        messages = prediction_messages(feedback)
+        if feedback.code != "missing":
+            display["status"] += " " + messages[0]
+            messages = messages[1:]
+        display["feedback_html"] = "<ul>" + "".join(
+            "<li>" + escape(message) + "</li>" for message in messages
+        ) + "</ul>"
         self.revealed = True
         self._show_result(display)
         return self.visual
