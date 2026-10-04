@@ -41,6 +41,17 @@ assembles teaching panels. A tracked tensor describes a logical result and has
 its own `shape`. Rendering it creates a separate `TensorVisual`, so operation
 history does not depend on a particular SVG or notebook widget.
 
+The `interactive` package owns focus controls, walkthroughs, and reduction
+playgrounds in separate modules. Public factories remain available directly
+from `rainbow_tensor`. The historical `walkthrough` and `playground` modules
+re-export the same controller objects for import compatibility. Keep numerical
+and coordinate rules below this layer so static figures and notebook controls
+share their meaning. Shape prediction diagnostics operate only on shapes.
+
+The capability reference reads the public view registry and callable signatures.
+The explorer uses the same operation inventory. Documentation exports that
+contract at build time, so contributors do not maintain a second API list.
+
 Every graph reference includes an operation ID, an output port and a coordinate.
 Broadcast outputs can therefore share one recorded operation while retaining
 their separate values. Traversal records occurrences rather than collapsing all

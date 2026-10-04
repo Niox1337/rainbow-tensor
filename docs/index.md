@@ -109,5 +109,6 @@ guide/provenance
 
 api
 guide/llm-prompts
+guide/teaching-contract
 guide/architecture
 ```

@@ -132,3 +132,8 @@ Language and translations
 .. autofunction:: get_resolved_language
 .. autofunction:: available_languages
 .. autofunction:: load_translations
+
+Teaching capabilities
+---------------------
+
+.. autofunction:: capabilities

@@ -1,13 +1,13 @@
 """Sphinx configuration for the rainbow-tensor documentation."""
 
-import os
+import json
 import sys
 from datetime import date
 from importlib import import_module
+from pathlib import Path
 
-# The package is pure standard library at import time, so adding the source
-# tree to the path is enough for autodoc; no install step is needed.
-sys.path.insert(0, os.path.abspath("../src"))
+# Resolve this checkout independently of the directory used to start Sphinx.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 project = "rainbow-tensor"
 author = "Zhixiang Feng"
@@ -43,3 +43,23 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "furo"
 html_title = "rainbow-tensor"
 html_static_path = ["_static"]
+
+
+def write_capability_reference(app, exception):
+    """Publish the installed operation contract beside a successful HTML build."""
+    if exception is not None or app.builder.format != "html":
+        return
+    from rainbow_tensor import capabilities
+
+    target = Path(app.outdir) / "_static" / "capabilities.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(capabilities(), ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def setup(app):
+    """Generate the machine reference from the same package used by autodoc."""
+    app.connect("build-finished", write_capability_reference)
+    return {"parallel_read_safe": True, "parallel_write_safe": True}
