@@ -47,7 +47,7 @@ from .theme import (
     set_default_axis_colors,
     set_default_theme,
 )
-from .tracing import BinaryExpression, OperandRef, OutputTrace
+from .tracing import BinaryExpression, OperandRef, OutputTrace, SelectionExpression
 from .views import (
     add,
     broadcast,
@@ -76,6 +76,7 @@ from .views import (
     swapaxes,
     take,
     transpose,
+    where,
 )
 from .visual import TensorVisual
 from .walkthrough import Walkthrough, walkthrough
@@ -103,6 +104,7 @@ __all__ = [
     "less_equal",
     "equal",
     "not_equal",
+    "where",
     "sum",
     "mean",
     "concatenate",
@@ -117,6 +119,7 @@ __all__ = [
     "ValueBudgetExceeded",
     "OperandRef",
     "BinaryExpression",
+    "SelectionExpression",
     "OutputTrace",
     "explore",
     "FocusExplorer",

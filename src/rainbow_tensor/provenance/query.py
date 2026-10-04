@@ -20,6 +20,8 @@ class TraceStep:
     Binary operations instead use ``binary_operator`` and ordered ``operands``.
     Their terms are empty, so subtraction and division cannot be mistaken for
     a sum of products. All child numbers refer to this trace's occurrence tuple.
+    Selection recipes use ``selection_operator`` and ordered ``candidates``.
+    They describe possible dependencies without reading or choosing a value.
     """
 
     reference: ElementRef
@@ -31,6 +33,40 @@ class TraceStep:
     complete: bool = False
     binary_operator: str | None = None
     operands: tuple[int, ...] = ()
+    selection_operator: str | None = None
+    candidates: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SelectedSource:
+    """Record a value-dependent choice after a complete bounded evaluation.
+
+    Structural candidates remain unchanged. ``position`` indexes the ordered
+    candidate dependencies. It is one or two for a conditional's selected
+    branch. The output and source references belong to the evaluated Flow.
+    """
+
+    output: ElementRef
+    source: ElementRef
+    operation: str
+    position: int
+    candidate_count: int
+    reason: str
+
+
+def serialize_selected_sources(evaluation):
+    """Return JSON-compatible records without retaining live arrays or values."""
+    def reference_dict(reference):
+        return {
+            "node_id": reference.node_id, "output_port": reference.output_port,
+            "coordinate": reference.coordinate,
+        }
+
+    return tuple({
+        "output": reference_dict(item.output), "source": reference_dict(item.source),
+        "operation": item.operation, "position": item.position,
+        "candidate_count": item.candidate_count, "reason": item.reason,
+    } for item in evaluation.get("selected_sources", ()))
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +116,8 @@ def trace_output(node, focus=None, *, max_depth=6, max_nodes=80, max_edges=120):
         return ProvenanceTrace(None, (), (), True, (), 0)
     root = node.ref(coordinate)
     steps = [TraceStep(root, node.operation, 0, node.term_count, node.divisor,
-                       binary_operator=node.binary_operator)]
+                       binary_operator=node.binary_operator,
+                       selection_operator=node.selection_operator)]
     roots = Counter()
     reasons = set()
     edge_count = 0
@@ -121,6 +158,7 @@ def trace_output(node, focus=None, *, max_depth=6, max_nodes=80, max_edges=120):
                         reference, child.operation, step.depth + 1,
                         child.term_count, child.divisor,
                         binary_operator=child.binary_operator,
+                        selection_operator=child.selection_operator,
                     ))
                     edge_count += 1
                 if children:
@@ -129,8 +167,10 @@ def trace_output(node, focus=None, *, max_depth=6, max_nodes=80, max_edges=120):
                     break
             steps[position] = replace(
                 step, complete=finished,
-                terms=() if current.binary_operator else tuple(terms),
+                terms=() if current.binary_operator or current.selection_operator else tuple(terms),
                 operands=terms[0] if current.binary_operator and terms else (),
+                candidates=tuple(child for term in terms for child in term)
+                if current.selection_operator else (),
             )
         position += 1
     return ProvenanceTrace(
@@ -155,6 +195,8 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
     This bounds work even for many-operand products and long identity chains.
     Shared elements cost once per call. A depth limit of 64 protects recursive
     recipes, while graph tracing has its own independent display limits.
+    Conditional recipes plan and evaluate both alternatives. Immutable choice
+    records appear in ``selected_sources`` only after evaluation completes.
     """
     per_limit = validate_max_terms(max_terms)
     total_limit = validate_max_terms(max_total_terms, "max_total_terms")
@@ -197,6 +239,7 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
     for reference in references:
         plan(reference, 0)
     values = {}
+    selected_sources = []
     for reference in order:
         node = _node(flow, reference)
         if node.operation == "input":
@@ -204,6 +247,16 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
         elif node.binary_operator is not None:
             left, right = planned[reference][0]
             value = evaluate_binary(node.binary_operator, values[left], values[right])
+        elif node.selection_operator == "where":
+            candidates = planned[reference][0]
+            condition = bool(values[candidates[0]])
+            position = 1 if condition else 2
+            selected = candidates[position]
+            value = values[selected]
+            selected_sources.append(SelectedSource(
+                reference, selected, "where", position, 3,
+                "condition_true" if condition else "condition_false",
+            ))
         elif node.operation not in {"sum", "mean", "matmul", "einsum"}:
             value = values[planned[reference][0][0]]
         elif node.divisor == 0:
@@ -223,4 +276,5 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
         "status": "evaluated", "reason": None, "total_terms": total,
         "max_terms": per_limit, "max_total_terms": total_limit,
         "scope": "recursive_terms_factors_and_inputs",
+        "selected_sources": tuple(selected_sources),
     }

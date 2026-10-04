@@ -33,6 +33,22 @@ class BinaryExpression:
 
 
 @dataclass(frozen=True, slots=True)
+class SelectionExpression:
+    """Describe candidate dependencies without claiming which value is selected.
+
+    A conditional lists condition, true branch and false branch in that order.
+    An extremum lists a bounded row-major prefix of its source candidates.
+    ``candidate_count`` records the full number before truncation. Evaluation
+    reports the chosen source separately and never mutates this structural
+    expression.
+    """
+
+    operator: str
+    operands: tuple[OperandRef, ...]
+    candidate_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class OutputTrace:
     """Describe the sum of products that produces one normalized output coordinate.
 
@@ -56,6 +72,8 @@ class OutputTrace:
     Binary arithmetic uses ``expression`` and leaves ``terms`` empty. Its
     ``term_count`` is one operation. This preserves the existing meaning of
     terms while keeping subtraction and division explicitly ordered.
+    Conditional and extrema expressions likewise leave terms empty. Their
+    operands are structural candidates, not evaluated winning sources.
     """
 
     operation: str
@@ -64,7 +82,7 @@ class OutputTrace:
     terms: tuple[tuple[OperandRef, ...], ...]
     complete: bool
     divisor: int = 1
-    expression: BinaryExpression | None = None
+    expression: BinaryExpression | SelectionExpression | None = None
 
 
 def _normalize_focus(focus, result_shape):
@@ -109,6 +127,18 @@ def _trace_explanation(trace):
     """Explain a focus using source coordinates without reading numeric values."""
     if trace is None:
         return [t("trace.empty")]
+    if isinstance(trace.expression, SelectionExpression):
+        candidates = [
+            f"{t('trace.operand', operand=ref.operand)}[{ref.coordinate}]"
+            for ref in trace.expression.operands
+        ]
+        if not trace.complete:
+            candidates.append("...")
+        expression = f"{trace.expression.operator}({', '.join(candidates)})"
+        return [
+            t("selection.candidates", count=trace.expression.candidate_count),
+            t("trace.equation", coordinate=trace.output_coord, expression=expression),
+        ]
     if trace.expression is not None:
         from .ops.elementwise import BINARY_SYMBOLS
 

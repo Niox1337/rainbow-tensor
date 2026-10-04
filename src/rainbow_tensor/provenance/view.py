@@ -6,9 +6,15 @@ from ..numerics import numeric_explanation
 from ..ops.elementwise import BINARY_SYMBOLS
 from ..renderers import resolve_renderer
 from ..theme import resolve_theme
-from ..tracing import BinaryExpression, OperandRef, OutputTrace
+from ..tracing import BinaryExpression, OperandRef, OutputTrace, SelectionExpression
 from ..visual import _preview_explanation, _shape_caption_parts, _visual
-from .query import ValueBudgetExceeded, _limit, _node, evaluate_values
+from .query import (
+    ValueBudgetExceeded,
+    _limit,
+    _node,
+    evaluate_values,
+    serialize_selected_sources,
+)
 
 
 def _label(flow, reference):
@@ -25,6 +31,18 @@ def _equations(flow, trace):
         if step.reference in seen or step.operation == "input":
             continue
         seen.add(step.reference)
+        if step.selection_operator is not None:
+            candidates = [_label(flow, trace.steps[child].reference) for child in step.candidates]
+            if not step.complete:
+                candidates.append("...")
+            lines.append(t(
+                "flow.equation", output=_label(flow, step.reference), operation=step.operation,
+                expression=f"{step.selection_operator}({', '.join(candidates)})",
+            ))
+            lines.append(t("selection.candidates", count=(
+                3 if step.selection_operator == "where" else step.term_count
+            )))
+            continue
         if step.binary_operator is not None:
             expression = "..."
             if step.operands:
@@ -61,6 +79,19 @@ def _immediate_trace(node, provenance):
     if provenance.root is None:
         return None
     coordinate = provenance.root.coordinate
+    if node.selection_operator is not None:
+        step = provenance.steps[0]
+        candidates = tuple(
+            OperandRef(position if node.selection_operator == "where" else 0,
+                       provenance.steps[child].reference.coordinate)
+            for position, child in enumerate(step.candidates[:8])
+        )
+        count = 3 if node.selection_operator == "where" else node.term_count
+        return OutputTrace(
+            node.operation, coordinate, node.term_count, (),
+            step.complete and len(candidates) == count,
+            expression=SelectionExpression(node.selection_operator, candidates, count),
+        )
     if node.binary_operator is not None:
         step = provenance.steps[0]
         expression = None
@@ -91,6 +122,15 @@ def _immediate_trace(node, provenance):
     return OutputTrace(
         node.operation, coordinate, node.term_count, tuple(terms),
         len(terms) == node.term_count, node.divisor,
+    )
+
+
+def selected_source_explanation(flow, decision):
+    """Explain an evaluated choice separately from the structural candidate list."""
+    return t(
+        "selection.chosen", output=_label(flow, decision.output),
+        source=_label(flow, decision.source),
+        reason=t(f"selection.reason.{decision.reason}"),
     )
 
 
@@ -149,6 +189,14 @@ def render_flow(
     for source, panel in zip(displayed, panels):
         panel["value_fn"] = lambda coord, source=source: values.get(source.ref(coord), "?")
     explanation = [t("flow.heading", name=node.name)]
+    if any(step.selection_operator == "where" for step in trace.steps):
+        explanation.append(t("selection.where_eager"))
+    reached_references = {step.reference for step in trace.steps}
+    explanation.extend(
+        selected_source_explanation(node.flow, decision)
+        for decision in evaluation.get("selected_sources", ())
+        if decision.output in reached_references
+    )
     if any(step.binary_operator == "divide" for step in trace.steps):
         explanation.append(t("elementwise.divide_zero"))
     if trace.root is None:
@@ -191,7 +239,10 @@ def render_flow(
         output_panel_indices=(len(panels) - 1,),
         focused_output_panel=len(panels) - 1 if trace.root else None,
         trace_in_explanation=True,
-        value_evaluation=evaluation,
+        value_evaluation={
+            key: value for key, value in evaluation.items() if key != "selected_sources"
+        },
+        evaluated_selections=serialize_selected_sources(evaluation),
         numeric_semantics=semantics,
         provenance={
             "complete": trace.complete, "truncated_reasons": trace.truncated_reasons,

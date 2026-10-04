@@ -94,14 +94,14 @@ class Flow:
         return f"n{sequence}", names
 
     def _node(self, operation, inputs, shape, terms, term_count=1, *, divisor=1,
-              name=None, source=None, origin=None, binary_operator=None):
+              name=None, source=None, origin=None, binary_operator=None, selection_operator=None):
         """Register one immutable recipe after all operation validation succeeds."""
         node_id, names = self._identity(operation, name)
         node = TrackedTensor(
             flow=self, node_id=node_id, output_port=0, name=names[0],
             operation=operation, shape=tuple(shape), inputs=inputs,
             term_count=term_count, divisor=divisor, term_factory=terms, source=source,
-            origin=origin, binary_operator=binary_operator,
+            origin=origin, binary_operator=binary_operator, selection_operator=selection_operator,
         )
         self._nodes[(node_id, 0)] = node
         return node
@@ -338,6 +338,26 @@ class Flow:
     def not_equal(self, a, b, *, name=None):
         """Record broadcast inequality, including a true result for NaN against itself."""
         return self._binary("not_equal", a, b, name)
+
+    def where(self, condition, x, y, *, name=None):
+        """Record a broadcast conditional with all three structural candidates.
+
+        The condition and both alternatives must be tracked in this Flow.
+        Structural tracing never reads them or claims which branch wins.
+        Numerical queries conservatively plan and evaluate both branches,
+        including an unused branch that may fail, then record the selected
+        source separately. Values retain their Python scalar type rather than
+        undergoing NumPy's common dtype promotion.
+        """
+        inputs = self._operands((condition, x, y))
+        shape = broadcast_result_shape(tuple(array.shape for array in inputs))
+
+        def candidates(coordinate):
+            yield tuple(array.ref(broadcast_source_coord(coordinate, array.shape))
+                        for array in inputs)
+
+        return self._node("where", inputs, shape, candidates, name=name,
+                          selection_operator="where")
 
     def _reduce(self, array, axis, keepdims, operation, name):
         """Preserve reduction grouping and a mean's divisor as a separate recipe."""

@@ -23,6 +23,7 @@ from .elementwise import (
 )
 from .reductions import matmul, mean, sum
 from .reshaping import expand_dims, moveaxis, reshape, squeeze, swapaxes, transpose
+from .selection import where
 from .shapes import index, shape
 
 __all__ = [
@@ -53,4 +54,5 @@ __all__ = [
     "less_equal",
     "equal",
     "not_equal",
+    "where",
 ]

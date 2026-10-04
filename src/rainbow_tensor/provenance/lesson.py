@@ -42,11 +42,20 @@ class LessonSnapshot:
     @property
     def available_terms(self):
         """Count selectable terms without treating an omitted prefix as complete."""
+        return len(lesson_groups(self.step))
+
+    @property
+    def selection_operator(self):
+        """Identify a selection recipe without reading its candidate values."""
+        return None if self.step is None else self.step.selection_operator
+
+    @property
+    def selected_source(self):
+        """Return the evaluated choice for this occurrence, or None if unavailable."""
         if self.step is None:
-            return 0
-        if self.binary_operator is not None:
-            return int(bool(getattr(self.step, "operands", ())))
-        return len(self.step.terms)
+            return None
+        return next((item for item in self.evaluation.get("selected_sources", ())
+                     if item.output == self.step.reference), None)
 
     @property
     def numeric_complete(self):
@@ -60,6 +69,19 @@ def _position(value, size, name):
     if not 0 <= result < size:
         raise IndexError(f"{name} {result} is outside the available range of {size}")
     return result
+
+
+def lesson_groups(step):
+    """Group inspectable operands without treating selection as multiplication."""
+    if step is None:
+        return ()
+    if step.binary_operator is not None:
+        return (step.operands,) if step.operands else ()
+    if step.selection_operator == "where":
+        return (step.candidates,) if step.candidates else ()
+    if step.selection_operator is not None:
+        return tuple((candidate,) for candidate in step.candidates)
+    return step.terms
 
 
 def _product(values):
@@ -96,10 +118,7 @@ def build_lesson(
         selected = _position(occurrence, len(trace.steps), "occurrence")
         step = trace.steps[selected]
     binary = getattr(step, "binary_operator", None)
-    groups = () if step is None else step.terms
-    if binary is not None:
-        operands = getattr(step, "operands", ())
-        groups = (operands,) if operands else ()
+    groups = lesson_groups(step)
     position = 0 if term is None and groups else term
     if position is not None:
         position = _position(position, len(groups), "term")
@@ -124,6 +143,10 @@ def build_lesson(
         if position is not None:
             if binary is not None:
                 term_value = evaluate_binary(binary, *factor_values)
+            elif step.selection_operator == "where":
+                term_value = output_value
+            elif step.selection_operator is not None:
+                term_value = factor_values[0]
             else:
                 term_value = _product(factor_values)
                 subtotal = sum(
