@@ -32,6 +32,8 @@ LESSONS = {
     "guided-terms": "guided_terms.py",
     "row-normalization": "row_normalization.py",
     "reduction-axes": "reduction_axes.py",
+    "runtime-contract": "runtime_contract.py",
+    "numeric-semantics": "numeric_semantics.py",
 }
 
 
