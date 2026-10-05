@@ -8,23 +8,15 @@ from .._svg.interaction import capture_cells, interactive_svg
 from ..explanations import t
 from ..tracing import _normalize_focus, _trace_explanation
 from ..views import (
-    add,
     broadcast,
     concatenate,
-    divide,
-    einsum,
     expand_dims,
     index,
-    matmul,
-    mean,
     moveaxis,
-    multiply,
     repeat,
     reshape,
     squeeze,
     stack,
-    subtract,
-    sum,
     swapaxes,
     take,
     transpose,
@@ -244,11 +236,13 @@ def explore(operation, *args, **kwargs):
     imported only here to keep static rendering free of widget initialization.
     Live controls need a running notebook kernel and widget support in its host.
     """
+    from ..capabilities import explorable_operations
+
     mapped = (
         reshape, transpose, swapaxes, moveaxis, squeeze, expand_dims,
         concatenate, stack, repeat, take, broadcast,
     )
-    supported = (index, sum, mean, matmul, einsum, add, subtract, multiply, divide, *mapped)
+    supported = explorable_operations()
     if operation not in supported:
         from ..provenance.model import TrackedTensor
 

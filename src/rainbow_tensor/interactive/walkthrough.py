@@ -1,22 +1,61 @@
 """Notebook lessons that isolate one contribution within a recorded expression."""
 
 from functools import partial
+from html import escape
 
 from ..explanations import t
 from ..layout import build_layout
 from ..numerics import numeric_explanation
 from ..ops.elementwise import BINARY_SYMBOLS
 from ..provenance.flow import Flow
-from ..provenance.lesson import _position, build_lesson
+from ..provenance.lesson import _position, build_lesson, lesson_groups
 from ..provenance.model import TrackedTensor
-from ..provenance.query import _limit, _node
-from ..provenance.view import _immediate_trace, _label
+from ..provenance.query import _limit, _node, serialize_selected_sources
+from ..provenance.view import _immediate_trace, _label, selected_source_explanation
 from ..renderers import resolve_renderer
 from ..theme import resolve_theme
 from ..tracing import _normalize_focus
 from ..views import matmul, mean, sum
 from ..visual import _preview_explanation, _shape_caption_parts, _visual
 from .focus import FocusExplorer, _own_widget
+from .paths import calculation_paths
+
+
+def _path_role(path):
+    """Translate a structural edge without confusing candidates with contributors."""
+    return t(
+        f"lesson.role.{path.role}", number=(path.term or 0) + 1,
+        term=(path.term or 0) + 1, factor=(path.factor or 0) + 1,
+    )
+
+
+def _path_breadcrumb(node, trace, paths, occurrence):
+    """Follow one occurrence to the output, retaining every repeated path."""
+    chain = []
+    current = paths[occurrence]
+    while current.parent is not None:
+        chain.extend([
+            _label(node.flow, trace.steps[current.occurrence].reference), _path_role(current),
+        ])
+        current = paths[current.parent]
+    chain.append(_label(node.flow, trace.steps[current.occurrence].reference))
+    return " ← ".join(reversed(chain))
+
+
+def _path_options(node, trace, paths):
+    """Build native selection labels that identify both role and occurrence."""
+    result = []
+    for path in paths:
+        label = _label(node.flow, trace.steps[path.occurrence].reference)
+        if path.parent is None:
+            text = t("lesson.path_root", label=label, occurrence=path.occurrence)
+        else:
+            text = t(
+                "lesson.path_item", parent=_label(node.flow, trace.steps[path.parent].reference),
+                role=_path_role(path), source=label, occurrence=path.occurrence,
+            )
+        result.append((text, path.occurrence))
+    return tuple(result)
 
 
 def _lesson_text(node, snapshot):
@@ -28,7 +67,28 @@ def _lesson_text(node, snapshot):
         "lesson.selected", number=snapshot.occurrence,
         label=_label(node.flow, step.reference), operation=step.operation,
     )]
-    if snapshot.term is not None:
+    lines.append(t(
+        "lesson.path", path=_path_breadcrumb(
+            node, snapshot.trace, calculation_paths(snapshot.trace), snapshot.occurrence,
+        ),
+    ))
+    if snapshot.selection_operator is not None:
+        lines.append(t("selection.candidates", count=(
+            3 if snapshot.selection_operator == "where" else step.term_count
+        )))
+        for index, occurrence in enumerate(snapshot.factor_occurrences):
+            lines.append(t(
+                "lesson.result",
+                label=_label(node.flow, snapshot.trace.steps[occurrence].reference),
+                value=snapshot.factor_values[index] if snapshot.numeric_complete else "?",
+            ))
+        if snapshot.selected_source is not None:
+            lines.append(selected_source_explanation(node.flow, snapshot.selected_source))
+        if snapshot.selection_operator == "where":
+            lines.append(t("selection.where_eager"))
+        else:
+            lines.append(t("selection.extrema_rule"))
+    elif snapshot.term is not None:
         lines.append(t("lesson.term", number=snapshot.term + 1, total=step.term_count))
         references = [snapshot.trace.steps[i].reference for i in snapshot.factor_occurrences]
         separator = f" {BINARY_SYMBOLS[snapshot.binary_operator]} " if (
@@ -77,7 +137,7 @@ def _render_lesson(node, focus, occurrence, term, *, theme=None, precision=2, re
     if trace.steps:
         index = _position(occurrence, len(trace.steps), "occurrence")
         step = trace.steps[index]
-        groups = (step.operands,) if step.binary_operator and step.operands else step.terms
+        groups = lesson_groups(step)
         chosen = 0 if term is None and groups else term
         if chosen is not None:
             chosen = _position(chosen, len(groups), "term")
@@ -140,7 +200,10 @@ def _render_lesson(node, focus, occurrence, term, *, theme=None, precision=2, re
         interaction_description="\n".join(_lesson_text(node, snapshot)),
         focused_output_panel=len(panels) - 1 if trace.root else None,
         output_panel_indices=(len(panels) - 1,),
-        value_evaluation=dict(snapshot.evaluation),
+        value_evaluation={
+            key: value for key, value in snapshot.evaluation.items() if key != "selected_sources"
+        },
+        evaluated_selections=serialize_selected_sources(snapshot.evaluation),
         numeric_semantics=semantics,
         panel_nodes=tuple((source.node_id, source.output_port) for source in displayed),
     )
@@ -193,12 +256,20 @@ class Walkthrough:
             self.previous_button = own(widgets.Button())
             self.next_button = own(widgets.Button())
             self.term_label = own(widgets.Label())
+            self.calculation_paths = own(widgets.Select(
+                rows=6, layout=own(widgets.Layout(width="100%")),
+                style={"description_width": "initial"},
+            ))
+            self.path_description = own(widgets.HTML())
             self._controls = own(widgets.HBox([
                 self.occurrences, self.previous_button, self.next_button, self.term_label,
             ], layout=own(widgets.Layout(flex_flow="row wrap"))))
             self.explorer = _LessonFocusExplorer(self, widgets, ExplorerFigure, focus)
-            self.widget = own(widgets.VBox([self._controls, self.explorer.widget]))
+            self.widget = own(widgets.VBox([
+                self._controls, self.calculation_paths, self.path_description, self.explorer.widget,
+            ]))
             self.occurrences.observe(self._on_occurrence, names="value")
+            self.calculation_paths.observe(self._on_path, names="value")
             self.previous_button.on_click(self._on_previous)
             self.next_button.on_click(self._on_next)
             self._callbacks = True
@@ -221,6 +292,11 @@ class Walkthrough:
         """Return the selected final output coordinate, or None for an empty output."""
         return self.explorer.focus
 
+    @property
+    def paths(self):
+        """Return immutable role-labelled paths for this snapshot's occurrences."""
+        return calculation_paths(self.snapshot.trace)
+
     def _render(self, focus=None):
         normalized = _normalize_focus(focus, self.node.shape)
         occurrence, term = self._selection
@@ -230,13 +306,31 @@ class Walkthrough:
 
     def _prepare_sync(self, snapshot):
         """Resolve lesson labels before committing a candidate explorer snapshot."""
-        if snapshot.term is not None:
+        if snapshot.term is not None and snapshot.selection_operator is not None:
+            term_label = (
+                t("lesson.role.condition") if snapshot.selection_operator == "where" else
+                t("lesson.role.candidate", number=snapshot.term + 1)
+            )
+        elif snapshot.term is not None:
             term_label = t("lesson.term", number=snapshot.term + 1, total=snapshot.step.term_count)
         elif snapshot.step is not None and snapshot.step.term_count:
             term_label = t("lesson.prefix", shown=0, total=snapshot.step.term_count)
         else:
             term_label = t("lesson.no_terms")
+        paths = calculation_paths(snapshot.trace)
+        path_lines = [] if snapshot.occurrence is None else [t(
+            "lesson.path", path=_path_breadcrumb(
+                self.node, snapshot.trace, paths, snapshot.occurrence,
+            ),
+        )]
+        if not snapshot.trace.complete:
+            path_lines.append(t("lesson.path_partial"))
         return {
+            "path_description": t("lesson.paths"),
+            "path_options": _path_options(self.node, snapshot.trace, paths),
+            "path_html": '<div role="status" aria-live="polite">' + "<br>".join(
+                escape(line) for line in path_lines
+            ) + "</div>",
             "selection": (snapshot.occurrence or 0, snapshot.term),
             "description": t("lesson.occurrence"),
             "options": tuple(
@@ -260,6 +354,11 @@ class Walkthrough:
             self.occurrences.options = display["options"]
             self.occurrences.value = display["occurrence"]
             self.occurrences.disabled = display["occurrence"] is None
+            self.calculation_paths.description = display["path_description"]
+            self.calculation_paths.options = display["path_options"]
+            self.calculation_paths.value = display["occurrence"]
+            self.calculation_paths.disabled = display["occurrence"] is None
+            self.path_description.value = display["path_html"]
             self.previous_button.description = display["previous"]
             self.next_button.description = display["next"]
             self.previous_button.disabled = display["previous_disabled"]
@@ -290,6 +389,15 @@ class Walkthrough:
         """Choose one trace occurrence without collapsing repeated references."""
         return self._select(occurrence, None)
 
+    def select_path(self, occurrence):
+        """Select one current occurrence path, including repeated source uses.
+
+        Read occurrence IDs from ``paths`` after each output change. This method
+        follows the same bounded refresh as the native keyboard-accessible path
+        selector and leaves the final output focus unchanged.
+        """
+        return self.select_occurrence(occurrence)
+
     def select_term(self, term):
         """Select a zero-based available term, preserving prior state on failure."""
         _position(term, self.snapshot.available_terms, "term")
@@ -318,6 +426,10 @@ class Walkthrough:
         if not self._syncing and not self._closed and change["new"] is not None:
             self._handle(lambda: self.select_occurrence(change["new"]))
 
+    def _on_path(self, change):
+        if not self._syncing and not self._closed and change["new"] is not None:
+            self._handle(lambda: self.select_path(change["new"]))
+
     def _on_previous(self, button):
         if not self._closed and not button.disabled:
             self._handle(self.previous_term)
@@ -338,6 +450,7 @@ class Walkthrough:
         self._closed = True
         if self._callbacks:
             self.occurrences.unobserve(self._on_occurrence, names="value")
+            self.calculation_paths.unobserve(self._on_path, names="value")
             self.previous_button.on_click(self._on_previous, remove=True)
             self.next_button.on_click(self._on_next, remove=True)
         if hasattr(self, "explorer"):
