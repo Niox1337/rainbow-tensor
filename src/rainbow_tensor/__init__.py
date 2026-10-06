@@ -24,6 +24,7 @@ from .explanations import (
     set_language,
 )
 from .interactive import FocusExplorer, explore
+from .lessons import LessonRecording, capture_lesson
 from .memory import memory
 from .playground import ReductionPlayground, reduction_playground
 from .provenance import Flow, TrackedTensor, ValueBudgetExceeded
@@ -84,6 +85,8 @@ from .walkthrough import Walkthrough, walkthrough
 __version__ = "1.5.0"
 __all__ = [
     "capabilities",
+    "capture_lesson",
+    "LessonRecording",
     "shape",
     "memory",
     "index",

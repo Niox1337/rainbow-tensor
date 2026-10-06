@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from math import isfinite
+from pathlib import Path
 
 DEFAULT_MAX_STATES = 64
 DEFAULT_MAX_BYTES = 5_000_000
@@ -177,7 +178,7 @@ def _invalid_constant(value):
     raise ValueError(f"lesson recording contains non-finite JSON constant {value}")
 
 
-@dataclass(frozen=True, slots=True, init=False)
+@dataclass(frozen=True, slots=True, init=False, repr=False)
 class LessonRecording:
     """Immutable, versioned presentations of explicitly captured lesson states.
 
@@ -192,6 +193,9 @@ class LessonRecording:
 
     def __init__(self):
         raise TypeError("create a lesson recording with capture_lesson or from_json")
+
+    def __repr__(self):
+        return f"LessonRecording(states={self.state_count}, version=1)"
 
     @classmethod
     def _from_document(cls, document, *, max_states=DEFAULT_MAX_STATES,
@@ -232,3 +236,20 @@ class LessonRecording:
     def to_json(self):
         """Return deterministic version-one JSON with captured text and SVG intact."""
         return self._json
+
+    def to_html(self):
+        """Build an offline player for this finite recording without a running kernel."""
+        from ._html import render_html
+
+        return render_html(self)
+
+    def save(self, path):
+        """Save standalone HTML as UTF-8 and return the supplied path-like object.
+
+        Parent directories must exist. An existing destination is overwritten.
+        Use :meth:`to_json` when a separate machine-readable snapshot is wanted.
+        The resulting HTML is larger than the bounded JSON because SVG images
+        are encoded for inert browser display and the player is embedded.
+        """
+        Path(path).write_text(self.to_html(), encoding="utf-8")
+        return path
