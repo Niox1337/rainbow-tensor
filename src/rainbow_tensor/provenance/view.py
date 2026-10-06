@@ -4,6 +4,7 @@ from ..explanations import t
 from ..layout import build_layout
 from ..numerics import numeric_explanation
 from ..ops.elementwise import BINARY_SYMBOLS
+from ..ops.selection import EXTREMA
 from ..renderers import resolve_renderer
 from ..theme import resolve_theme
 from ..tracing import BinaryExpression, OperandRef, OutputTrace, SelectionExpression
@@ -191,6 +192,8 @@ def render_flow(
     explanation = [t("flow.heading", name=node.name)]
     if any(step.selection_operator == "where" for step in trace.steps):
         explanation.append(t("selection.where_eager"))
+    if any(step.selection_operator in EXTREMA for step in trace.steps):
+        explanation.append(t("selection.extrema_rule"))
     reached_references = {step.reference for step in trace.steps}
     explanation.extend(
         selected_source_explanation(node.flow, decision)

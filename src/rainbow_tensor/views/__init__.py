@@ -23,7 +23,7 @@ from .elementwise import (
 )
 from .reductions import matmul, mean, sum
 from .reshaping import expand_dims, moveaxis, reshape, squeeze, swapaxes, transpose
-from .selection import where
+from .selection import argmax, argmin, max, min, where
 from .shapes import index, shape
 
 __all__ = [
@@ -55,4 +55,8 @@ __all__ = [
     "equal",
     "not_equal",
     "where",
+    "min",
+    "max",
+    "argmin",
+    "argmax",
 ]

@@ -25,6 +25,7 @@ def test_where_matches_numpy_values_and_three_way_broadcasting(condition, left, 
     visual = where(condition, left, right, renderer=renderer)
     expected = np.where(condition, left, right)
     assert visual.result_shape == expected.shape
+    assert visual.shape == condition.shape
     for coordinate in np.ndindex(expected.shape):
         assert renderer.panels[-1]["value_fn"](coordinate) == expected[coordinate]
     json.dumps(visual.metadata["evaluated_selections"])

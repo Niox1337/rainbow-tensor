@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 
 from ..evaluation import validate_max_terms
 from ..ops.elementwise import evaluate_binary
+from ..ops.selection import EXTREMA, extremum_choice
 from ..shape import _as_integer, extract_shape
 from ..tracing import _normalize_focus
 from ..visual import _source_value
@@ -256,6 +257,15 @@ def evaluate_values(flow, references, *, max_terms=10_000, max_total_terms=100_0
             selected_sources.append(SelectedSource(
                 reference, selected, "where", position, 3,
                 "condition_true" if condition else "condition_false",
+            ))
+        elif node.selection_operator in EXTREMA:
+            candidates = tuple(term[0] for term in planned[reference])
+            value, position, reason = extremum_choice(
+                node.selection_operator, (values[source] for source in candidates),
+            )
+            selected_sources.append(SelectedSource(
+                reference, candidates[position], node.selection_operator,
+                position, len(candidates), reason,
             ))
         elif node.operation not in {"sum", "mean", "matmul", "einsum"}:
             value = values[planned[reference][0][0]]

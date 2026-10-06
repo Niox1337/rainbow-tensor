@@ -38,6 +38,7 @@ from ..ops.einsum import (
 )
 from ..ops.elementwise import normalize_operand
 from ..ops.reductions import iter_matmul_source_terms
+from ..ops.selection import extrema_spec
 from ..shape import _check_axis, extract_shape
 from ..visual import TensorVisual
 from .model import TrackedTensor
@@ -358,6 +359,45 @@ class Flow:
 
         return self._node("where", inputs, shape, candidates, name=name,
                           selection_operator="where")
+
+    def _extremum(self, array, axis, keepdims, operation, name):
+        """Record real-valued candidate groups without choosing a winning source."""
+        inputs = self._operands((array,))
+        axes, keepdims, shape, count = extrema_spec(array.shape, axis, keepdims, operation)
+
+        def candidates(coordinate):
+            for source in reduce_source_coords(coordinate, array.shape, axes, keepdims=keepdims):
+                yield (array.ref(source),)
+
+        return self._node(operation, inputs, shape, candidates, count, name=name,
+                          selection_operator=operation)
+
+    def min(self, array, axis=None, *, keepdims=False, name=None):
+        """Record a minimum over real scalar candidates with an explicit first winner.
+
+        Axis may be None, one integer, or a tuple of distinct axes. Empty
+        reduced groups are rejected. Structural traces list candidates only.
+        Evaluation keeps the first equal minimum or the first NaN if present.
+        It preserves scalar values rather than executing a backend kernel.
+        """
+        return self._extremum(array, axis, keepdims, "min", name)
+
+    def max(self, array, axis=None, *, keepdims=False, name=None):
+        """Record a maximum using the shape and first-occurrence rules of :meth:`min`."""
+        return self._extremum(array, axis, keepdims, "max", name)
+
+    def argmin(self, array, axis=None, *, keepdims=False, name=None):
+        """Record the first minimum's integer position along one axis.
+
+        Axis is None or one integer. None returns a flattened row-major
+        position. The first NaN wins if present. Structural candidate traces
+        stay value-free, while an evaluated choice identifies the source cell.
+        """
+        return self._extremum(array, axis, keepdims, "argmin", name)
+
+    def argmax(self, array, axis=None, *, keepdims=False, name=None):
+        """Record the first maximum's position using the rules of :meth:`argmin`."""
+        return self._extremum(array, axis, keepdims, "argmax", name)
 
     def _reduce(self, array, axis, keepdims, operation, name):
         """Preserve reduction grouping and a mean's divisor as a separate recipe."""
