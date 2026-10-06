@@ -34,6 +34,11 @@ LESSONS = {
     "reduction-axes": "reduction_axes.py",
     "runtime-contract": "runtime_contract.py",
     "numeric-semantics": "numeric_semantics.py",
+    "axis-diagnosis": "axis_diagnosis.py",
+    "calculation-paths": "calculation_paths.py",
+    "conditional-choices": "conditional_choices.py",
+    "extrema-positions": "extrema_positions.py",
+    "portable-recording": "portable_recording.py",
 }
 
 
