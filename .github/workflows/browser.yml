@@ -28,6 +28,8 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Check browser messages and keyboard navigation
         run: python scripts/check_browser.py
+      - name: Check standalone lessons offline
+        run: python scripts/check_lesson_html.py --screenshot "${{ runner.temp }}/rainbow-offline.png"
       - name: Check a live JupyterLab kernel
         run: python scripts/check_jupyter.py --screenshot "${{ runner.temp }}/rainbow-jupyter.png"
       - name: Save notebook screenshots
@@ -38,4 +40,5 @@ jobs:
           path: |-
             ${{ runner.temp }}/rainbow-jupyter*.png
             ${{ runner.temp }}/rainbow-jupyter*.txt
+            ${{ runner.temp }}/rainbow-offline*.png
           if-no-files-found: ignore
