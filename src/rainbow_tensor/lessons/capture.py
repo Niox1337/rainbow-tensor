@@ -7,6 +7,7 @@ from math import isfinite
 from numbers import Integral, Real
 
 from ..explanations import get_resolved_language, t
+from ..provenance.lesson import LessonSnapshot
 from ..visual import TensorVisual
 from .recording import (
     _FORMAT,
@@ -61,21 +62,33 @@ def _plain(value, budget, depth=0):
         return str(integer) if abs(integer) > 2**53 - 1 else integer
     if isinstance(value, Real):
         number = float(value)
-        return number if isfinite(number) else {"kind": "nonfinite", "value": str(number)}
+        if isfinite(number):
+            budget.consume(len(str(number)))
+            return number
+        marker = {"kind": "nonfinite", "value": str(number)}
+        budget.consume(len(_encoded(marker, budget.remaining).encode("utf-8")))
+        return marker
     if isinstance(value, (tuple, list)):
         return [_plain(item, budget, depth + 1) for item in value]
     if isinstance(value, Mapping):
         result = {}
         for key, item in value.items():
             if not isinstance(key, str):
-                return {"status": "unknown", "type": type(value).__name__}
+                return _unknown(value, budget)
             budget.consume(len(key.encode("utf-8")))
             result[key] = _plain(item, budget, depth + 1)
         return result
     if is_dataclass(value) and not isinstance(value, type):
         return _plain({field.name: getattr(value, field.name) for field in fields(value)},
                       budget, depth + 1)
-    return {"status": "unknown", "type": type(value).__name__}
+    return _unknown(value, budget)
+
+
+def _unknown(value, budget):
+    """Charge the replacement marker so unsupported metadata cannot bypass limits."""
+    marker = {"status": "unknown", "type": type(value).__name__}
+    budget.consume(len(_encoded(marker, budget.remaining).encode("utf-8")))
+    return marker
 
 
 def _shape(shape):
@@ -119,6 +132,8 @@ def _capture(source, max_bytes):
     budget = _CopyBudget(max_bytes)
     metadata = {}
     for key, value in visual.metadata.items():
+        if not isinstance(key, str):
+            raise ValueError("visual metadata keys must be strings")
         if key != "lesson":
             budget.consume(len(key.encode("utf-8")))
             metadata[key] = _plain(value, budget)
@@ -128,7 +143,7 @@ def _capture(source, max_bytes):
     metadata["provenance"] = _plain(visual.provenance, budget)
     lesson = None
     snapshot = visual.metadata.get("lesson")
-    if snapshot is not None:
+    if isinstance(snapshot, LessonSnapshot):
         lesson = _plain({
             "occurrence": snapshot.occurrence, "term": snapshot.term,
             "available_terms": snapshot.available_terms,
@@ -137,7 +152,11 @@ def _capture(source, max_bytes):
             "subtotal": snapshot.subtotal, "output_value": snapshot.output_value,
             "binary_operator": snapshot.binary_operator,
         }, budget)
+    elif snapshot is not None:
+        metadata["lesson"] = _plain(snapshot, budget)
     evaluation = visual.metadata.get("value_evaluation", {})
+    if not isinstance(evaluation, Mapping):
+        evaluation = {}
     value_status = {"evaluated": "complete", "skipped": "truncated"}.get(
         evaluation.get("status"), "unknown",
     )

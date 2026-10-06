@@ -158,3 +158,31 @@ def test_capture_rejects_non_svg_renderers_and_non_string_title():
         capture_lesson([visual])
     with pytest.raises(TypeError, match="title"):
         capture_lesson([], title=1)
+
+
+def test_custom_lesson_and_evaluation_metadata_stay_inspectable_without_claiming_values():
+    visual = TensorVisual("<svg/>", (), metadata={
+        "lesson": {"custom": "a separate application"}, "value_evaluation": ["unavailable"],
+    })
+    state = capture_lesson([visual]).to_dict()["states"][0]
+    assert state["lesson"] is None
+    assert state["metadata"]["lesson"] == {"custom": "a separate application"}
+    assert state["completeness"]["values"] == "unknown"
+    visual.metadata[1] = "not a JSON object key"
+    with pytest.raises(ValueError, match="metadata keys"):
+        capture_lesson([visual])
+
+
+def test_unknown_markers_stop_large_metadata_traversal_within_the_byte_budget():
+    visited = []
+
+    class RepeatedUnknowns(list):
+        def __iter__(self):
+            for _ in range(100_000):
+                visited.append(1)
+                yield object()
+
+    visual = TensorVisual("<svg/>", (), metadata={"items": RepeatedUnknowns()})
+    with pytest.raises(ValueError, match="max_bytes"):
+        capture_lesson([visual], max_bytes=5_000)
+    assert len(visited) < 200
