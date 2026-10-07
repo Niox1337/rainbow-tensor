@@ -104,7 +104,7 @@ def _render_legend(items, x, y, theme):
     return "".join(parts)
 
 
-def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
+def _render_cell(cell, has_selection, theme, precision, hover, tint=None, winner=False):
     """Render one cell, its surface, value, and optional hover title.
 
     ``tint`` is an optional ``(fill, border)`` pair that colours a resting cell,
@@ -121,27 +121,42 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
         )
 
     selected = has_selection and cell.selected
-    if selected:
+    if winner:
+        fill = theme.surface_selected
+        border = theme.heading
+        text_color = theme.text_selected
+        weight = "700"
+        stroke_width = 3
+        dash = ' stroke-dasharray="5 2"'
+    elif selected:
         fill = theme.surface_selected
         border = theme.selected_border
         text_color = theme.text_selected
         weight = "700"
+        stroke_width = 1
+        dash = ""
     elif tint is not None:
         # A group tint marks context cells, so it takes precedence over the
         # muted fill used for unselected cells in a selection view.
         fill, border = tint
         text_color = theme.text
         weight = "500"
+        stroke_width = 1
+        dash = ""
     elif has_selection:
         fill = theme.surface_muted
         border = theme.cell_border
         text_color = theme.text_muted
         weight = "400"
+        stroke_width = 1
+        dash = ""
     else:
         fill = theme.surface
         border = theme.cell_border
         text_color = theme.text
         weight = "500"
+        stroke_width = 1
+        dash = ""
 
     display = format_value(cell.value, precision)
     if _is_numeric(cell.value):
@@ -156,7 +171,7 @@ def _render_cell(cell, has_selection, theme, precision, hover, tint=None):
         f'<rect x="{cell.x:.0f}" y="{cell.y:.0f}" '
         f'width="{cell.width:.0f}" height="{cell.height:.0f}" '
         f'rx="{theme.cell_radius:.0f}" {_paint_attributes(fill=fill, stroke=border)} '
-        f'stroke-width="1"/>'
+        f'stroke-width="{stroke_width}"{dash}/>'
     )
     text = (
         f'<text x="{tx:.0f}" y="{ty:.0f}" text-anchor="{anchor}" '
@@ -180,7 +195,8 @@ def _selection_for_render(selected):
     return selected if isinstance(selected, CompactSelection) else list(selected or [])
 
 
-def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_tint=None):
+def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_tint=None,
+                 winners=()):
     """Render the frames and cells of one tensor in local coordinates.
 
     Returns ``(body_svg, width, height, theme)``. The cells may grow to fit a
@@ -189,6 +205,7 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
     so a panel renderer can translate the whole body by an offset. ``cell_tint``
     is an optional function mapping a coordinate to a ``(fill, border)`` pair,
     used to colour each result cell by the operand it came from.
+    ``winners`` contains coordinates with an emphasized selected-source border.
     """
     layout = build_layout(shape, selected=selected_list, value_fn=value_fn, theme=theme)
     if layout.empty:
@@ -214,9 +231,11 @@ def _render_body(shape, selected_list, value_fn, theme, precision, hover, cell_t
             f'stroke-width="{theme.frame_width}"/>'
         )
     captured = [] if capturing_cells() else None
+    winner_set = set(winners or ())
     for cell in layout.cells:
         tint = cell_tint(cell.coord) if cell_tint and cell.coord is not None else None
-        fragment = _render_cell(cell, has_selection, theme, precision, hover, tint)
+        winner = cell.coord in winner_set if cell.coord is not None else False
+        fragment = _render_cell(cell, has_selection, theme, precision, hover, tint, winner)
         parts.append(fragment)
         if captured is not None and not cell.ellipsis and cell.coord is not None:
             captured.append((fragment, cell.coord))

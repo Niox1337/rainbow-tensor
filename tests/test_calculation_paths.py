@@ -162,3 +162,67 @@ def test_closing_path_controls_releases_widgets_and_rejects_python_navigation(le
     assert all(widget.comm is None for widget in lesson._owned_widgets)
     with pytest.raises(RuntimeError, match="closed"):
         lesson.select_path(1)
+
+
+@pytest.mark.parametrize("operation, expected, selected", [
+    ("min", 2, 1), ("max", 9, 0), ("argmin", 1, 1), ("argmax", 0, 0),
+])
+def test_extrema_candidate_navigation_keeps_the_selected_result_independent(
+    operation, expected, selected, lessons,
+):
+    flow = rt.Flow()
+    source = flow.input(np.array([9, 2, 2]), name="Candidates")
+    result = getattr(flow, operation)(source, name="Winner")
+    lesson = lessons(result)
+    assert [path.role for path in lesson.paths] == ["result", "candidate", "candidate", "candidate"]
+    lesson.select_term(2)
+    assert lesson.snapshot.term_value == 2
+    assert lesson.snapshot.output_value == expected
+    assert lesson.snapshot.subtotal is None
+    assert lesson.snapshot.selected_source.position == selected
+    assert f"Winner[()] selects Candidates[{selected}]" in lesson.visual.text
+    assert 'stroke-dasharray="5 2"' in lesson.visual.svg
+    assert "Running numerator" not in lesson.visual.text
+    assert "candidate 3" in lesson.term_label.value
+
+
+def test_budgeted_selection_paths_do_not_invent_a_chosen_candidate(lessons):
+    flow = rt.Flow()
+    result = flow.max(flow.input(np.array([3, 9, 9])))
+    lesson = lessons(result, max_terms=1)
+    assert not lesson.snapshot.numeric_complete
+    assert lesson.snapshot.selected_source is None
+    assert lesson.visual.metadata["evaluated_selections"] == ()
+    assert len(lesson.paths) == 4
+    assert " selects " not in lesson.visual.text
+    lesson.select_term(2)
+    assert lesson.snapshot.term_value is None
+    assert lesson.snapshot.evaluation["max_terms"] == 1
+
+
+def test_truncated_extrema_visuals_pin_and_highlight_the_evaluated_winner(lessons):
+    """A bounded structural trace still marks the source chosen by full evaluation."""
+    from xml.etree import ElementTree as ET
+
+    flow = rt.Flow()
+    values = np.arange(20)
+    values[-1] = 999
+    source = flow.input(values, name="Candidates")
+    result = flow.argmax(source, name="Position")
+
+    visual = result.visualize(focus=(), max_edges=1)
+    assert not visual.provenance.complete
+    choice = visual.metadata["evaluated_selections"][0]
+    assert choice["source"]["coordinate"] == (19,)
+    assert (source.node_id, source.output_port) in visual.metadata["provenance"]["panel_nodes"]
+    svg = ET.fromstring(visual.svg)
+    namespace = "{http://www.w3.org/2000/svg}"
+    winners = [cell for cell in svg.iter(namespace + "rect")
+               if cell.get("stroke-dasharray") == "5 2"]
+    assert len(winners) == 1
+    assert "999" in visual.svg
+
+    lesson = lessons(result, max_edges=1)
+    assert lesson.snapshot.selected_source.source.coordinate == (19,)
+    assert 'stroke-dasharray="5 2"' in lesson.visual.svg
+    assert "thick dashed outline" in lesson.visual.text

@@ -187,9 +187,10 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
     """Render several tensors side by side in one SVG.
 
     Each panel is a dict with a ``shape``, an optional ``value_fn`` and
-    ``selected`` iterable, an optional ``theme`` override used to tint an
-    operand, an optional ``cell_tint`` function colouring each cell by its
-    origin, and optional ``caption_parts`` drawn under the panel as coloured
+    ``selected`` iterable, optional winner coordinates with a stronger outline,
+    an optional ``theme`` override used to tint an operand, an optional
+    ``cell_tint`` function colouring each cell by its origin, and optional
+    ``caption_parts`` drawn under the panel as coloured
     ``(text, colour)`` pairs. ``connectors`` is a list of glyph strings drawn
     between consecutive panels, for example ``"->"`` or ``"+"``. ``explanation``
     is accepted for renderer interface compatibility, but plain explanation
@@ -220,6 +221,7 @@ def render_panels(panels, connectors=None, explanation=None, theme=None, precisi
             precision,
             hover,
             panel.get("cell_tint"),
+            panel.get("winner", ()),
         )
         caption = panel.get("caption_parts")
         if not panel["shape"] or 0 in panel["shape"]:
