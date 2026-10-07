@@ -242,7 +242,7 @@ def check_notebook(page, base, token):
     lesson.get_by_role("button", name="Next term", exact=True).click()
     expect(lesson).to_contain_text("Term 2 of 3")
     expect(lesson).to_contain_text("Running numerator through this term: 9")
-    lesson.locator("select").select_option(index=1)
+    lesson.get_by_role("combobox", name="Occurrence", exact=True).select_option(index=1)
     expect(lesson).to_contain_text("Occurrence 1:")
     expect(lesson).to_contain_text("T[0, 0] = 6")
 

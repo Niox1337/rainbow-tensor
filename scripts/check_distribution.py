@@ -277,7 +277,7 @@ def check_distribution(directory):
         _run(
             [
                 str(python), "-I", "-B", "-m", "pytest", str(validation / "tests"),
-                "-q", "--import-mode=importlib", "-p", "no:cacheprovider",
+                "-q", "--import-mode=prepend", "-p", "no:cacheprovider",
             ],
             cwd=working,
             env=env,
