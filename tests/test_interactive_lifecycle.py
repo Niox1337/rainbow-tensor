@@ -65,7 +65,11 @@ def lesson_state(lesson):
         explorer_state(lesson.explorer), lesson.snapshot, lesson._selection,
         lesson.occurrences.options, lesson.occurrences.value, lesson.occurrences.description,
         lesson.previous_button.description, lesson.previous_button.disabled,
-        lesson.next_button.description, lesson.next_button.disabled, lesson.term_label.value,
+        lesson.next_button.description, lesson.next_button.disabled,
+        lesson.calculation_paths.options, lesson.calculation_paths.value,
+        lesson.calculation_paths.description, lesson.calculation_paths.disabled,
+        lesson.path_description.value,
+        lesson.term_label.value,
     )
 
 
@@ -78,6 +82,7 @@ def playground_state(playground):
         playground.expression_view.value, playground.prediction.value,
         playground.prediction.disabled, playground.revealed,
         playground.result_box.children, playground.reveal_button.description,
+        playground.feedback, playground.feedback_view.value,
         playground.status.value,
     )
 
@@ -87,6 +92,8 @@ def playground_state(playground):
     ("playground", "Button", 2),
     ("explorer", "HBox", 1), ("walkthrough", "HBox", 1),
     ("playground", "HBox", 2),
+    ("walkthrough", "HTML", 1),
+    ("playground", "HTML", 1),
 ])
 def test_partial_allocation_closes_controls_styles_and_explicit_layouts(
     kind, widget_type, fail_at, monkeypatch, widget_models,

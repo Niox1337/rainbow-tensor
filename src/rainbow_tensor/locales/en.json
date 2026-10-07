@@ -192,7 +192,7 @@
   "selection.candidates": "This structural trace lists {count} candidate dependencies. It does not identify the value selected during evaluation.",
   "selection.where_eager": "Conditional previews plan and evaluate the condition and both branch dependencies before reporting which branch supplies the result.",
   "selection.extrema_rule": "Extrema compare real scalar values in source row-major order. The first equal value wins. The first NaN wins if any candidate is NaN.",
-  "selection.chosen": "{output} selects {source}: {reason}.",
+  "selection.chosen": "{output} selects {source}: {reason}. The chosen source has a thick dashed outline.",
   "selection.reason.condition_true": "the condition is true",
   "selection.reason.condition_false": "the condition is false",
   "selection.reason.first_nan": "the first NaN propagates",

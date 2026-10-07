@@ -163,19 +163,13 @@ def render_flow(
     ordered = sorted(
         reached.values(), key=lambda source: (int(source.node_id[1:]), source.output_port)
     )
-    omitted_panels = max(0, len(ordered) - panel_limit)
     displayed = ordered[-panel_limit:]
     planned = []
-    panels = []
     for source in displayed:
         key = (source.node_id, source.output_port)
-        selected = sorted(selections.get(key, ()))
+        selected = selections.get(key, ())
         layout = build_layout(source.shape, selected=selected, theme=theme)
         planned.extend(source.ref(cell.coord) for cell in layout.cells if not cell.ellipsis)
-        panels.append({
-            "shape": source.shape, "selected": selected,
-            "caption_parts": _shape_caption_parts(source.name, source.shape, theme),
-        })
     try:
         values, evaluation = evaluate_values(
             node.flow, planned, max_terms=max_terms, max_total_terms=max_total_terms
@@ -187,18 +181,64 @@ def render_flow(
             "max_terms": max_terms, "max_total_terms": max_total_terms,
             "scope": "recursive_terms_factors_and_inputs",
         }
-    for source, panel in zip(displayed, panels):
-        panel["value_fn"] = lambda coord, source=source: values.get(source.ref(coord), "?")
+    reached_references = {step.reference for step in trace.steps}
+    decisions = tuple(
+        decision for decision in evaluation.get("selected_sources", ())
+        if decision.output in reached_references
+    )
+    winners = {}
+    winner_sources = {}
+    for decision in decisions:
+        key = (decision.source.node_id, decision.source.output_port)
+        winners.setdefault(key, set()).add(decision.source.coordinate)
+        winner_sources[key] = _node(node.flow, decision.source)
+
+    # Keep the result and its evaluated sources visible even when a winner is
+    # outside the bounded structural trace or ordinary panel tail.
+    root_key = (node.node_id, node.output_port)
+    priority = [node]
+    priority_keys = {root_key}
+    for decision in reversed(decisions):
+        key = (decision.source.node_id, decision.source.output_port)
+        if key not in priority_keys and len(priority) < panel_limit:
+            priority.append(winner_sources[key])
+            priority_keys.add(key)
+    remaining = [
+        source for source in ordered
+        if (source.node_id, source.output_port) not in priority_keys
+    ]
+    slots = panel_limit - len(priority)
+    if slots:
+        priority.extend(remaining[-slots:])
+    displayed = sorted(
+        priority, key=lambda source: (int(source.node_id[1:]), source.output_port),
+    )
+    known_keys = {
+        (source.node_id, source.output_port) for source in ordered
+    } | set(winner_sources)
+    displayed_keys = {
+        (source.node_id, source.output_port) for source in displayed
+    }
+    omitted_panels = len(known_keys - displayed_keys)
+    panels = []
+    for source in displayed:
+        key = (source.node_id, source.output_port)
+        selected = sorted(set(selections.get(key, ())) | winners.get(key, set()))
+        layout = build_layout(source.shape, selected=selected, theme=theme)
+        panels.append({
+            "shape": source.shape, "selected": selected,
+            "winner": sorted(winners.get(key, ())),
+            "caption_parts": _shape_caption_parts(source.name, source.shape, theme),
+            "value_fn": lambda coord, source=source: values.get(source.ref(coord), "?"),
+        })
     explanation = [t("flow.heading", name=node.name)]
     if any(step.selection_operator == "where" for step in trace.steps):
         explanation.append(t("selection.where_eager"))
     if any(step.selection_operator in EXTREMA for step in trace.steps):
         explanation.append(t("selection.extrema_rule"))
-    reached_references = {step.reference for step in trace.steps}
     explanation.extend(
         selected_source_explanation(node.flow, decision)
-        for decision in evaluation.get("selected_sources", ())
-        if decision.output in reached_references
+        for decision in decisions
     )
     if any(step.binary_operator == "divide" for step in trace.steps):
         explanation.append(t("elementwise.divide_zero"))

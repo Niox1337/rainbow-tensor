@@ -151,7 +151,6 @@ def _render_lesson(node, focus, occurrence, term, *, theme=None, precision=2, re
     ordered = sorted(reached.values(), key=lambda item: (int(item.node_id[1:]), item.output_port))
     displayed = ordered[-panel_limit:]
     planned = []
-    panels = []
     for source in displayed:
         coordinates = sorted(
             reference.coordinate for reference in selected
@@ -161,17 +160,59 @@ def _render_lesson(node, focus, occurrence, term, *, theme=None, precision=2, re
             coordinates.append(trace.root.coordinate)
         layout = build_layout(source.shape, selected=coordinates, theme=theme)
         planned.extend(source.ref(cell.coord) for cell in layout.cells if not cell.ellipsis)
-        panels.append({
-            "shape": source.shape, "selected": coordinates,
-            "caption_parts": _shape_caption_parts(source.name, source.shape, theme),
-        })
     snapshot = build_lesson(
         node, focus, occurrence=occurrence, term=term, preview_references=planned, **limits,
     )
-    for source, panel in zip(displayed, panels):
-        panel["value_fn"] = lambda coord, source=source: snapshot.values.get(source.ref(coord), "?")
+    winners = {}
+    winner_sources = {}
+    if snapshot.selected_source is not None:
+        reference = snapshot.selected_source.source
+        key = (reference.node_id, reference.output_port)
+        winners[key] = {reference.coordinate}
+        winner_sources[key] = _node(node.flow, reference)
+        selected.add(reference)
+    root_key = (node.node_id, node.output_port)
+    priority = [node]
+    priority_keys = {root_key}
+    for key, source in winner_sources.items():
+        if key not in priority_keys and len(priority) < panel_limit:
+            priority.append(source)
+            priority_keys.add(key)
+    remaining = [
+        source for source in ordered
+        if (source.node_id, source.output_port) not in priority_keys
+    ]
+    slots = panel_limit - len(priority)
+    if slots:
+        priority.extend(remaining[-slots:])
+    displayed = sorted(
+        priority, key=lambda source: (int(source.node_id[1:]), source.output_port),
+    )
+    known_keys = {
+        (source.node_id, source.output_port) for source in ordered
+    } | set(winner_sources)
+    displayed_keys = {
+        (source.node_id, source.output_port) for source in displayed
+    }
+    panels = []
+    for source in displayed:
+        key = (source.node_id, source.output_port)
+        coordinates = sorted(
+            reference.coordinate for reference in selected
+            if (reference.node_id, reference.output_port) == key
+        )
+        if source is node and trace.root is not None and trace.root.coordinate not in coordinates:
+            coordinates.append(trace.root.coordinate)
+        coordinates = sorted(set(coordinates) | winners.get(key, set()))
+        layout = build_layout(source.shape, selected=coordinates, theme=theme)
+        panels.append({
+            "shape": source.shape, "selected": coordinates,
+            "winner": sorted(winners.get(key, ())),
+            "caption_parts": _shape_caption_parts(source.name, source.shape, theme),
+            "value_fn": lambda coord, source=source: snapshot.values.get(source.ref(coord), "?"),
+        })
     explanation = _lesson_text(node, snapshot)
-    omitted = len(ordered) - len(displayed)
+    omitted = len(known_keys - displayed_keys)
     if omitted:
         explanation.append(t("flow.panels_omitted", count=omitted))
     explanation.extend(_preview_explanation([source.shape for source in displayed], theme))
@@ -241,7 +282,7 @@ class Walkthrough:
     def __init__(self, node, focus=None, **options):
         import ipywidgets as widgets
 
-        from .._widgets import ExplorerFigure
+        from .._widgets import ExplorerFigure, PathSelector
 
         self.node = node
         self._options = options
@@ -256,10 +297,7 @@ class Walkthrough:
             self.previous_button = own(widgets.Button())
             self.next_button = own(widgets.Button())
             self.term_label = own(widgets.Label())
-            self.calculation_paths = own(widgets.Select(
-                rows=6, layout=own(widgets.Layout(width="100%")),
-                style={"description_width": "initial"},
-            ))
+            self.calculation_paths = own(PathSelector())
             self.path_description = own(widgets.HTML())
             self._controls = own(widgets.HBox([
                 self.occurrences, self.previous_button, self.next_button, self.term_label,
