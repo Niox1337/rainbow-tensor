@@ -45,4 +45,3 @@ assert normalization_lesson.snapshot.occurrence == 0
 assert normalization_lesson.snapshot.binary_operator == "divide"
 assert normalized.value((0, 0)) == 2 / 12
 display(normalization_lesson)
-

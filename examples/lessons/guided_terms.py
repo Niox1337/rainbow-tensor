@@ -40,4 +40,3 @@ assert product_lesson.snapshot.factor_values == (2, 4)
 assert product_lesson.snapshot.term_value == 8
 assert product_lesson.snapshot.subtotal == (a @ b)[0, 0] == 11
 display(product_lesson)
-

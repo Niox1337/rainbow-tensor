@@ -38,6 +38,7 @@ from ..ops.einsum import (
 )
 from ..ops.elementwise import normalize_operand
 from ..ops.reductions import iter_matmul_source_terms
+from ..ops.selection import extrema_spec
 from ..shape import _check_axis, extract_shape
 from ..visual import TensorVisual
 from .model import TrackedTensor
@@ -94,14 +95,14 @@ class Flow:
         return f"n{sequence}", names
 
     def _node(self, operation, inputs, shape, terms, term_count=1, *, divisor=1,
-              name=None, source=None, origin=None, binary_operator=None):
+              name=None, source=None, origin=None, binary_operator=None, selection_operator=None):
         """Register one immutable recipe after all operation validation succeeds."""
         node_id, names = self._identity(operation, name)
         node = TrackedTensor(
             flow=self, node_id=node_id, output_port=0, name=names[0],
             operation=operation, shape=tuple(shape), inputs=inputs,
             term_count=term_count, divisor=divisor, term_factory=terms, source=source,
-            origin=origin, binary_operator=binary_operator,
+            origin=origin, binary_operator=binary_operator, selection_operator=selection_operator,
         )
         self._nodes[(node_id, 0)] = node
         return node
@@ -309,6 +310,94 @@ class Flow:
         a keepdims sum in the denominator without flattening either expression.
         """
         return self._binary("divide", a, b, name)
+
+    def greater(self, a, b, *, name=None):
+        """Record broadcast ``a > b`` with ordered, value-free source references.
+
+        Inputs must belong to this Flow. Comparison follows Python scalar
+        rules, so ordered complex comparisons raise TypeError when evaluated.
+        NaN compares false, matching ordinary real NumPy comparisons.
+        """
+        return self._binary("greater", a, b, name)
+
+    def greater_equal(self, a, b, *, name=None):
+        """Record broadcast ``a >= b`` with the same rules as :meth:`greater`."""
+        return self._binary("greater_equal", a, b, name)
+
+    def less(self, a, b, *, name=None):
+        """Record broadcast ``a < b`` with the same rules as :meth:`greater`."""
+        return self._binary("less", a, b, name)
+
+    def less_equal(self, a, b, *, name=None):
+        """Record broadcast ``a <= b`` with the same rules as :meth:`greater`."""
+        return self._binary("less_equal", a, b, name)
+
+    def equal(self, a, b, *, name=None):
+        """Record broadcast equality, including complex values and false NaN equality."""
+        return self._binary("equal", a, b, name)
+
+    def not_equal(self, a, b, *, name=None):
+        """Record broadcast inequality, including a true result for NaN against itself."""
+        return self._binary("not_equal", a, b, name)
+
+    def where(self, condition, x, y, *, name=None):
+        """Record a broadcast conditional with all three structural candidates.
+
+        The condition and both alternatives must be tracked in this Flow.
+        Structural tracing never reads them or claims which branch wins.
+        Numerical queries conservatively plan and evaluate both branches,
+        including an unused branch that may fail, then record the selected
+        source separately. Values retain their Python scalar type rather than
+        undergoing NumPy's common dtype promotion.
+        """
+        inputs = self._operands((condition, x, y))
+        shape = broadcast_result_shape(tuple(array.shape for array in inputs))
+
+        def candidates(coordinate):
+            yield tuple(array.ref(broadcast_source_coord(coordinate, array.shape))
+                        for array in inputs)
+
+        return self._node("where", inputs, shape, candidates, name=name,
+                          selection_operator="where")
+
+    def _extremum(self, array, axis, keepdims, operation, name):
+        """Record real-valued candidate groups without choosing a winning source."""
+        inputs = self._operands((array,))
+        axes, keepdims, shape, count = extrema_spec(array.shape, axis, keepdims, operation)
+
+        def candidates(coordinate):
+            for source in reduce_source_coords(coordinate, array.shape, axes, keepdims=keepdims):
+                yield (array.ref(source),)
+
+        return self._node(operation, inputs, shape, candidates, count, name=name,
+                          selection_operator=operation)
+
+    def min(self, array, axis=None, *, keepdims=False, name=None):
+        """Record a minimum over real scalar candidates with an explicit first winner.
+
+        Axis may be None, one integer, or a tuple of distinct axes. Empty
+        reduced groups are rejected. Structural traces list candidates only.
+        Evaluation keeps the first equal minimum or the first NaN if present.
+        It preserves scalar values rather than executing a backend kernel.
+        """
+        return self._extremum(array, axis, keepdims, "min", name)
+
+    def max(self, array, axis=None, *, keepdims=False, name=None):
+        """Record a maximum using the shape and first-occurrence rules of :meth:`min`."""
+        return self._extremum(array, axis, keepdims, "max", name)
+
+    def argmin(self, array, axis=None, *, keepdims=False, name=None):
+        """Record the first minimum's integer position along one axis.
+
+        Axis is None or one integer. None returns a flattened row-major
+        position. The first NaN wins if present. Structural candidate traces
+        stay value-free, while an evaluated choice identifies the source cell.
+        """
+        return self._extremum(array, axis, keepdims, "argmin", name)
+
+    def argmax(self, array, axis=None, *, keepdims=False, name=None):
+        """Record the first maximum's position using the rules of :meth:`argmin`."""
+        return self._extremum(array, axis, keepdims, "argmax", name)
 
     def _reduce(self, array, axis, keepdims, operation, name):
         """Preserve reduction grouping and a mean's divisor as a separate recipe."""

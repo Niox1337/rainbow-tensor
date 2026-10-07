@@ -31,4 +31,3 @@ except rt.ValueBudgetExceeded as error:
     assert error.reason == "max_terms"
 else:
     raise AssertionError("The value query must preserve its requested budget")
-

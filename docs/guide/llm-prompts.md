@@ -53,6 +53,13 @@ are required dependencies. Missing widget packages indicate an incomplete
 installation. Widget imports alone do not prove that a notebook host can
 display live controls.
 
+Read `rt.capabilities()` before selecting an operation. Compare its package
+version with this reference and use its actual signatures and controller lists.
+The <a href="../_static/capabilities.json">capability reference</a> describes the docs build.
+The [teaching contract](teaching-contract.md) includes runnable positive and
+deliberately incorrect specimens. It verifies API usage and selected-source
+claims without claiming to grade arbitrary prose.
+
 | Object | Role | Public interface |
 | --- | --- | --- |
 | NumPy array | Execute native computation | Indexing, NumPy methods, `.shape` |

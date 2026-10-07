@@ -42,6 +42,7 @@ class TrackedTensor:
     source: Any = field(default=None, repr=False)
     origin: Callable | None = field(default=None, repr=False)
     binary_operator: str | None = None
+    selection_operator: str | None = None
     numeric_sources: frozenset[str] = field(init=False)
 
     def __post_init__(self):

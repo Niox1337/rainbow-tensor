@@ -2,10 +2,18 @@
 
 from dataclasses import dataclass
 from numbers import Number
-from operator import add, mul, sub, truediv
+from operator import add, eq, ge, gt, le, lt, mul, ne, sub, truediv
 
-BINARY_SYMBOLS = {"add": "+", "subtract": "-", "multiply": "*", "divide": "/"}
-_BINARY_OPERATORS = {"add": add, "subtract": sub, "multiply": mul, "divide": truediv}
+BINARY_SYMBOLS = {
+    "add": "+", "subtract": "-", "multiply": "*", "divide": "/",
+    "greater": ">", "greater_equal": ">=", "less": "<", "less_equal": "<=",
+    "equal": "==", "not_equal": "!=",
+}
+_BINARY_OPERATORS = {
+    "add": add, "subtract": sub, "multiply": mul, "divide": truediv,
+    "greater": gt, "greater_equal": ge, "less": lt, "less_equal": le,
+    "equal": eq, "not_equal": ne,
+}
 
 
 @dataclass(frozen=True, slots=True)

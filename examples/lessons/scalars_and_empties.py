@@ -32,4 +32,3 @@ assert means.shape == (2, 3)
 assert np.isnan(means.value((1, 2)))
 assert means.trace((1, 2)).steps[0].term_count == 0
 display(means.visualize(focus=(1, 2)))
-

@@ -15,6 +15,7 @@ Public API:
     rt.set_default_theme("dark")
 """
 
+from .capabilities import capabilities
 from .explanations import (
     available_languages,
     get_language,
@@ -23,6 +24,7 @@ from .explanations import (
     set_language,
 )
 from .interactive import FocusExplorer, explore
+from .lessons import LessonRecording, capture_lesson
 from .memory import memory
 from .playground import ReductionPlayground, reduction_playground
 from .provenance import Flow, TrackedTensor, ValueBudgetExceeded
@@ -46,19 +48,29 @@ from .theme import (
     set_default_axis_colors,
     set_default_theme,
 )
-from .tracing import BinaryExpression, OperandRef, OutputTrace
+from .tracing import BinaryExpression, OperandRef, OutputTrace, SelectionExpression
 from .views import (
     add,
+    argmax,
+    argmin,
     broadcast,
     concatenate,
     divide,
     einsum,
+    equal,
     expand_dims,
+    greater,
+    greater_equal,
     index,
+    less,
+    less_equal,
     matmul,
+    max,
     mean,
+    min,
     moveaxis,
     multiply,
+    not_equal,
     repeat,
     reshape,
     shape,
@@ -69,12 +81,16 @@ from .views import (
     swapaxes,
     take,
     transpose,
+    where,
 )
 from .visual import TensorVisual
 from .walkthrough import Walkthrough, walkthrough
 
-__version__ = "1.3.1"
+__version__ = "1.5.0"
 __all__ = [
+    "capabilities",
+    "capture_lesson",
+    "LessonRecording",
     "shape",
     "memory",
     "index",
@@ -89,6 +105,17 @@ __all__ = [
     "subtract",
     "multiply",
     "divide",
+    "greater",
+    "greater_equal",
+    "less",
+    "less_equal",
+    "equal",
+    "not_equal",
+    "where",
+    "min",
+    "max",
+    "argmin",
+    "argmax",
     "sum",
     "mean",
     "concatenate",
@@ -103,6 +130,7 @@ __all__ = [
     "ValueBudgetExceeded",
     "OperandRef",
     "BinaryExpression",
+    "SelectionExpression",
     "OutputTrace",
     "explore",
     "FocusExplorer",

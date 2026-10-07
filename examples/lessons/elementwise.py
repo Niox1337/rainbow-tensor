@@ -38,4 +38,3 @@ assert flow.add(left, right).value((1, 2)) == (a + b)[1, 2] == 23
 assert flow.subtract(left, right).value((1, 2)) == (a - b)[1, 2] == 17
 assert flow.multiply(left, right).value((1, 2)) == (a * b)[1, 2] == 60
 assert flow.divide(left, two).value((1, 0)) == (a / 2)[1, 0] == 10
-

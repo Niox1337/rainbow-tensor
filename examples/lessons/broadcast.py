@@ -32,4 +32,3 @@ display(right)
 
 # The broadcast views explain expansion. NumPy performs the addition above.
 display(rt.shape(result))
-
