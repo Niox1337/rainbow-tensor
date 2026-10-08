@@ -55,6 +55,10 @@ notebooks in the `examples` folder.
   checked answers, source mappings, and a second output to explore
 - [Guided lessons](guide/guided-lessons) follows ordered arithmetic and running
   subtotals, then asks the learner to predict reduction shapes
+- [Conditions and extrema](guide/conditions-and-extrema) separates candidate
+  dependencies from the value or position selected by a calculation
+- [Portable lessons](guide/portable-lessons) captures selected states for
+  interactive playback in a browser without a live notebook
 - [Shapes](guide/shapes) draws a tensor and explains the colour scheme, float
   precision, saving, scalar and empty tensors, and big tensor previews
 - [Indexing](guide/indexing) covers integers, slices, ellipsis, new axes,
@@ -89,6 +93,8 @@ notebooks in the `examples` folder.
 guide/learning-path
 guide/verified-lessons
 guide/guided-lessons
+guide/conditions-and-extrema
+guide/portable-lessons
 guide/shapes
 guide/indexing
 guide/reshaping

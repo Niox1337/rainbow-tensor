@@ -37,9 +37,8 @@ Install into the Python environment used by your notebook kernel. PyTorch,
 JAX and TensorFlow are optional and installed separately. Live controls need
 a notebook host with widget support. Static SVG figures also work in scripts.
 
-The guided examples below target the 1.5.0 source checkout. To try them before
-that version is published, run `python -m pip install -e .` from the repository
-root in your notebook's Python environment.
+The guided examples target rainbow-tensor 1.8.0. Install the package in the
+same Python environment as your notebook kernel.
 
 ## Your first visualization
 
@@ -172,6 +171,49 @@ The [guided lessons](https://rainbow-tensor.zhixiangfeng.com/guide/guided-lesson
 connect elementwise arithmetic, subtotals and row normalization with executable
 examples.
 
+## Compare, select and find extrema
+
+`Flow` keeps a comparison and its conditional choice as separate operations.
+The structural trace shows possible candidates. The evaluated choice is shown
+with a thick dashed outline, so learners can distinguish the winning source
+from the other dependencies.
+
+```python
+flow = rt.Flow()
+scores = flow.input(np.array([2, 8, 8]), name="Scores")
+threshold = flow.input(4, name="Threshold")
+condition = flow.greater(scores, threshold, name="Above threshold")
+filtered = flow.where(condition, scores, flow.input(0, name="Zero"), name="Filtered")
+display(filtered.visualize(focus=(1,)))
+
+position = flow.argmax(scores, name="Best position")
+lesson = rt.walkthrough(position)
+display(lesson)
+assert lesson.snapshot.selected_source.source.coordinate == (1,)
+lesson.close()
+```
+
+`where` preserves condition, true branch, and false branch as distinct roles.
+For a tie in `[2, 8, 8]`, `argmax` returns position `1` and marks the first
+maximum as its source. See the
+[conditions and extrema guide](https://rainbow-tensor.zhixiangfeng.com/guide/conditions-and-extrema.html).
+
+## Share a portable lesson
+
+Capture states that you have already prepared, then save them for offline
+playback. Recipients need only a browser.
+
+```python
+lesson = rt.explore(rt.sum, x, axis=1)
+recording = rt.capture_lesson([lesson])
+recording.save("row-sums.html")
+lesson.close()
+```
+
+The recording contains only the states you captured. It does not run Python or
+calculate uncaptured results. See the
+[portable lessons guide](https://rainbow-tensor.zhixiangfeng.com/guide/portable-lessons.html).
+
 ## Supported operations
 
 | What you want to understand | Public views |
@@ -181,7 +223,9 @@ examples.
 | Reshaping and axis movement | `reshape`, `transpose`, `swapaxes`, `moveaxis`, `squeeze`, `expand_dims` |
 | Joining and broadcasting | `concatenate`, `stack`, `broadcast` |
 | Elementwise arithmetic | `add`, `subtract`, `multiply`, `divide` |
+| Comparisons and conditional selection | `greater`, `greater_equal`, `less`, `less_equal`, `equal`, `not_equal`, `where` |
 | Reductions and contractions | `sum`, `mean`, `matmul`, `einsum` |
+| Minimum, maximum and their positions | `min`, `max`, `argmin`, `argmax` |
 | Storage metadata | `memory` |
 
 Operation views support `focus=` to explain one result element. The same
@@ -257,6 +301,8 @@ and [translations](https://rainbow-tensor.zhixiangfeng.com/guide/translations.ht
 | [Learning path](https://rainbow-tensor.zhixiangfeng.com/guide/learning-path.html) | Small exercises that connect shapes, output coordinates and source values |
 | [Verified lessons](https://rainbow-tensor.zhixiangfeng.com/guide/verified-lessons.html) | Canonical teaching examples whose assertions and focus changes run in CI |
 | [Guided lessons](https://rainbow-tensor.zhixiangfeng.com/guide/guided-lessons.html) | Binary arithmetic, contribution walkthroughs, row normalization and axis prediction |
+| [Conditions and extrema](https://rainbow-tensor.zhixiangfeng.com/guide/conditions-and-extrema.html) | Trace comparison candidates, conditional choices, and winning values or positions |
+| [Portable lessons](https://rainbow-tensor.zhixiangfeng.com/guide/portable-lessons.html) | Capture bounded notebook states in an offline HTML player |
 | [Notebook collection](https://github.com/Niox1337/rainbow-tensor/tree/main/examples) | Runnable examples from basic shapes through cross-operation tracing |
 | [API reference](https://rainbow-tensor.zhixiangfeng.com/api.html) | Function signatures, parameters and result objects |
 | [Agent instructions](https://rainbow-tensor.zhixiangfeng.com/guide/llm-prompts.html) | Instructions and runnable patterns for agents generating visual NumPy explanations |

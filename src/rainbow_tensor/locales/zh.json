@@ -192,7 +192,7 @@
   "selection.candidates": "此结构追踪列出 {count} 个候选依赖。它不标识求值时选中的值。",
   "selection.where_eager": "条件预览会先规划并计算条件及两个分支的依赖，再说明哪个分支提供结果。",
   "selection.extrema_rule": "极值按输入的行优先顺序比较实数标量。相等时选择最先出现的值。若有 NaN，则选择最先出现的 NaN。",
-  "selection.chosen": "{output} 选择 {source}：{reason}。",
+  "selection.chosen": "{output} 选择 {source}：{reason}。图中以粗虚线边框标出所选来源。",
   "selection.reason.condition_true": "条件为真",
   "selection.reason.condition_false": "条件为假",
   "selection.reason.first_nan": "传播最先出现的 NaN",

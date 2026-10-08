@@ -1,8 +1,8 @@
-"""rainbow-tensor.
+"""Visualise tensor operations and trace where each result element comes from.
 
-A small package for IPython and Jupyter notebooks that visualises tensor
-shape, indexing, and slicing as SVG. It is meant for people learning how a
-tensor is structured and how an indexing expression selects elements.
+Rainbow Tensor renders shapes, indexing, arithmetic, reductions, and recorded
+operation chains as SVG for IPython and Jupyter. Its interactive lessons help
+learners connect output coordinates to source elements and intermediate steps.
 
 Public API:
 
@@ -86,7 +86,7 @@ from .views import (
 from .visual import TensorVisual
 from .walkthrough import Walkthrough, walkthrough
 
-__version__ = "1.5.0"
+__version__ = "1.8.1"
 __all__ = [
     "capabilities",
     "capture_lesson",

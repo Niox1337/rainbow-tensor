@@ -19,6 +19,8 @@ job.
 | [Recorded flows](../../src/rainbow_tensor/provenance/flow.py) | Capture explicit operation recipes and assign stable input, operation and output-port identities without materialising intermediate arrays. |
 | [Provenance queries](../../src/rainbow_tensor/provenance/query.py) | Traverse a bounded occurrence tree and plan shared recursive value work before reading an input. Preserve repeated paths and each operation's arithmetic grouping. |
 | [Flow presentation](../../src/rainbow_tensor/provenance/view.py) | Render reached tensors, local equations and input contribution counts as a regular result object. |
+| [Notebook controllers](../../src/rainbow_tensor/interactive/__init__.py) | Keep focus, calculation walkthroughs, and reduction prediction controls in separate modules. |
+| [Portable lessons](../../src/rainbow_tensor/lessons/__init__.py) | Capture bounded prepared states as immutable JSON data and a self-contained offline HTML player. |
 | [SVG elements](../../src/rainbow_tensor/_svg/elements.py) | Escape text, format values, measure text, produce paint attributes and wrap a complete SVG document. Adaptive colours carry literal light fallbacks. |
 | [Tensor drawing](../../src/rainbow_tensor/_svg/tensor.py) | Draw one tensor body, its frames, cells, empty marker and legend from the layout. |
 | [SVG facade](../../src/rainbow_tensor/render_svg.py) | Compose single-tensor and multi-panel figures, captions and connectors. Historical rendering entry points and helper imports remain available here. |
@@ -47,6 +49,11 @@ from `rainbow_tensor`. The historical `walkthrough` and `playground` modules
 re-export the same controller objects for import compatibility. Keep numerical
 and coordinate rules below this layer so static figures and notebook controls
 share their meaning. Shape prediction diagnostics operate only on shapes.
+
+The `lessons` package captures visuals and controller snapshots that are
+already prepared. It does not evaluate a tensor again or add uncaptured states
+to the recording. Its HTML player navigates those saved states without Python
+or network access.
 
 The capability reference reads the public view registry and callable signatures.
 The explorer uses the same operation inventory. Documentation exports that
@@ -122,6 +129,11 @@ on the next request, while a changed input shape is rejected. Operation
 parameters, including copied index arrays, stay fixed after recording.
 Numerical work uses Python scalars and does not dispatch tensor backend kernels.
 See [the provenance guide](provenance.md) for the public contract and defaults.
+
+Conditional and extrema traces list structural candidates separately from the
+source chosen by numerical evaluation. A winner can be found even when its
+candidate path is outside the bounded trace. The visual highlights that source
+without adding invented edges to the trace.
 
 ## Reproducing the index workload
 

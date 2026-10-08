@@ -1,7 +1,7 @@
 # Agent instructions: teach NumPy with Rainbow Tensor
 
 This page is a working reference for an LLM agent using the **rainbow-tensor
-1.5.0 source checkout**. Read it directly when a user supplies this URL.
+1.8.1 source checkout**. Read it directly when a user supplies this URL.
 Generate runnable code that answers their NumPy question with a useful
 visualization and a checked explanation. The user does not need to copy a
 prompt or fill in a template.
@@ -55,10 +55,10 @@ display live controls.
 
 Read `rt.capabilities()` before selecting an operation. Compare its package
 version with this reference and use its actual signatures and controller lists.
-The <a href="../_static/capabilities.json">capability reference</a> describes the docs build.
-The [teaching contract](teaching-contract.md) includes runnable positive and
-deliberately incorrect specimens. It verifies API usage and selected-source
-claims without claiming to grade arbitrary prose.
+The <a href="../_static/capabilities.json">capability reference</a> describes
+the docs build. The [teaching contract](teaching-contract.md) includes runnable
+positive and deliberately incorrect specimens. It verifies API usage and
+selected-source claims without claiming to grade arbitrary prose.
 
 | Object | Role | Public interface |
 | --- | --- | --- |
@@ -101,8 +101,11 @@ the example. Check the input and output shapes before choosing a coordinate.
 | Operand expansion | `rt.explore(rt.broadcast, a, b, focus=focus, focus_operand=0)` |
 | `a + b`, `a - b` | `rt.explore(rt.add, a, b, focus=focus)` or `rt.explore(rt.subtract, a, b, focus=focus)` |
 | `a * b`, `a / b` | `rt.explore(rt.multiply, a, b, focus=focus)` or `rt.explore(rt.divide, a, b, focus=focus)` |
+| `a > b` and related comparisons | `rt.explore(rt.greater, a, b, focus=focus)` or the matching comparison function |
+| `np.where(condition, x, y)` | `rt.explore(rt.where, condition, x, y, focus=focus)` |
 | `x.sum(axis=1, keepdims=True)` | `rt.explore(rt.sum, x, axis=1, keepdims=True, focus=focus)` |
 | `x.mean(axis=1)` | `rt.explore(rt.mean, x, axis=1, focus=focus)` |
+| `x.max(axis=1)`, `x.argmax(axis=1)` | `rt.explore(rt.max, x, axis=1, focus=focus)` or `rt.explore(rt.argmax, x, axis=1, focus=focus)` |
 | `a @ b` | `rt.explore(rt.matmul, a, b, focus=focus)` |
 | `np.einsum("ij,jk->ik", a, b)` | `rt.explore(rt.einsum, "ij,jk->ik", a, b, focus=focus)` |
 | Physical array storage | `rt.memory(x)` |
@@ -267,6 +270,47 @@ The hidden result remains accessible through `playground.visual`.
 Predict mode hides the answer in the interface, not its numerical evaluation.
 Calculation limits remain in force.
 
+## Pattern 9: keep a comparison and its choice connected
+
+When the comparison itself is part of the lesson, record it in a `Flow` and
+pass that tracked result to `flow.where`. Do not turn the comparison into a
+plain NumPy mask if the learner needs to inspect how the condition was formed.
+
+```{literalinclude} ../../examples/lessons/conditional_choices.py
+:language: python
+```
+
+The trace lists the condition, true branch, and false branch as candidates.
+The evaluated choice is separate. The thick dashed border marks the branch
+that supplied the focused output. Explain that Flow evaluates both recorded
+branches within its shared budget.
+
+## Pattern 10: distinguish an extreme value from its position
+
+Use `rt.explore` for a direct operation. Use `Flow` and `walkthrough` when the
+learner should inspect candidate values and the source of the winner.
+
+```{literalinclude} ../../examples/lessons/extrema_positions.py
+:language: python
+```
+
+For `[2, 8, 8]`, `max` returns 8 and `argmax` returns position 1. The first
+maximum wins the tie, and its source cell gets the thick dashed border. Extrema
+accept real scalar values and follow the row-major first-tie rule described in
+the [conditions and extrema guide](conditions-and-extrema.md).
+
+## Pattern 11: save only prepared lesson states
+
+Capture prepared views or controller states for playback outside a live
+notebook. The recording cannot calculate an output that was not captured.
+
+```{literalinclude} ../../examples/lessons/portable_recording.py
+:language: python
+```
+
+Use the offline file when live controls are unavailable. Tell the learner that
+its navigation changes captured states only, not tensor inputs or parameters.
+
 ## Delivery and numerical boundaries
 
 All patterns above use the canonical files run by
@@ -280,6 +324,8 @@ and [guided lessons](guided-lessons.md) for exercises and checked answers.
 - **Static output.** `visual.save("lesson.svg")` saves the figure only.
   Save `visual.text` separately when its explanation is needed outside the
   notebook. SVG export does not produce PNG or retain live Python controls.
+- **Portable output.** `rt.capture_lesson` saves prepared states as HTML or JSON.
+  Its bounded offline player does not run Python or calculate new results.
 - **Numerical semantics.** Preview arithmetic uses Python scalars. Native
   accumulation dtype, rounding, and overflow can differ. In particular,
   `divide` raises `ZeroDivisionError` for any zero denominator, including

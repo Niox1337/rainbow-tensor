@@ -55,6 +55,13 @@ show("empty", empty_explorer)
 
 lesson = rt.walkthrough(result)
 show("lesson", lesson)
+condition = flow.greater(source, flow.input(4, name="Threshold"), name="Above")
+filtered = flow.where(condition, source, flow.input(0, name="Zero"), name="Filtered")
+selection_lesson = rt.walkthrough(filtered, focus=(1, 2))
+show("selection", selection_lesson)
+winner = flow.argmax(flow.input(np.array([3., 9., 9.]), name="Candidates"), name="Winner")
+extrema_lesson = rt.walkthrough(winner)
+show("extrema", extrema_lesson)
 playground = rt.reduction_playground(rt.mean, np.arange(24).reshape(2, 3, 4), axis=1)
 show("playground", playground)
 print("RAINBOW_WIDGETS_READY")
@@ -73,12 +80,22 @@ assert empty_explorer.update_button.disabled
 assert lesson.snapshot.occurrence == 1
 assert lesson.snapshot.step.reference.coordinate == (0, 0)
 assert lesson.snapshot.output_value == 6
+assert lesson.calculation_paths.value == 1
+assert selection_lesson.focus == (0, 0)
+assert selection_lesson.snapshot.output_value == 0
+assert selection_lesson.snapshot.selected_source.reason == "condition_false"
+assert extrema_lesson.snapshot.term == 2
+assert extrema_lesson.snapshot.term_value == 9
+assert extrema_lesson.snapshot.output_value == 1
+assert extrema_lesson.snapshot.selected_source.position == 1
+assert extrema_lesson.snapshot.subtotal is None
 assert playground.axis == (0, 2)
 assert playground.keepdims is True
 assert playground.explorer.result_shape == (1, 3, 1)
 assert playground.revealed
 assert playground.explorer.visual.trace.divisor == 8
 assert playground.explorer.focus == (0, 1, 0)
+assert playground.feedback.code == "matches"
 print("RAINBOW_JUPYTER_CHECKS_PASSED")
 '''
 CLEANUP = '''for view in views:
@@ -245,11 +262,44 @@ def check_notebook(page, base, token):
     lesson.get_by_role("combobox", name="Occurrence", exact=True).select_option(index=1)
     expect(lesson).to_contain_text("Occurrence 1:")
     expect(lesson).to_contain_text("T[0, 0] = 6")
+    paths = lesson.get_by_role("listbox", name="Calculation paths", exact=True)
+    paths.select_option(index=0)
+    expect(lesson).to_contain_text("Occurrence 0:")
+    paths.focus()
+    expect(paths).to_be_focused()
+    paths.press("ArrowDown")
+    expect(paths).to_have_value("1")
+    expect(lesson).to_contain_text("Occurrence 1:")
+    expect(lesson).to_contain_text("Y[0] ← summand 1 ← T[0, 0]")
+    paths.press("ArrowDown")
+    expect(lesson).to_contain_text("Occurrence 2:")
+    paths.press("ArrowUp")
+    expect(lesson).to_contain_text("Occurrence 1:")
+
+    selection = page.locator(".rt-smoke-selection")
+    expect(selection).to_contain_text("the condition is true")
+    selection_paths = selection.get_by_role("listbox", name="Calculation paths", exact=True)
+    selection_paths.select_option(index=1)
+    expect(selection).to_contain_text("(greater)")
+    expect(selection).to_contain_text("condition ← Above[1, 2]")
+    selection_paths.select_option(index=0)
+    expect(selection).to_contain_text("Occurrence 0:")
+    cell(selection, (0, 0)).click()
+    expect(selection).to_contain_text("the condition is false")
+    expect(selection).to_contain_text("candidate dependencies")
+
+    extrema = page.locator(".rt-smoke-extrema")
+    expect(extrema).to_contain_text("the first maximum wins")
+    extrema.get_by_role("button", name="Next term", exact=True).click()
+    expect(extrema).to_contain_text("candidate 2")
+    extrema.get_by_role("button", name="Next term", exact=True).click()
+    expect(extrema).to_contain_text("candidate 3")
+    expect(extrema).to_contain_text("Winner[()] selects Candidates[1]")
 
     playground = page.locator(".rt-smoke-playground")
     expect(playground.locator(".rt-focus-explorer")).to_have_count(0)
     prediction = playground.get_by_role("textbox", name="Your prediction", exact=True)
-    prediction.fill("(2, 4)")
+    prediction.fill("(2, 9)")
     label_sizes = prediction.evaluate("""input => Array.from(input.labels, label => ({
         width: label.clientWidth, content: label.scrollWidth,
     }))""")
@@ -257,6 +307,11 @@ def check_notebook(page, base, token):
         label["width"] > 0 and label["width"] + 1 >= label["content"]
         for label in label_sizes
     ), f"Prediction label is clipped: {label_sizes}"
+    playground.get_by_role("button", name="Reveal result", exact=True).click()
+    expect(playground).to_contain_text("Compare output axis 1: predicted 9, expected 4")
+    expect(playground).to_contain_text("Source axis 2 becomes output axis 1 with length 4")
+    playground.get_by_role("button", name="Predict again", exact=True).click()
+    prediction.fill("(2, 4)")
     playground.get_by_role("button", name="Reveal result", exact=True).click()
     expect(playground).to_contain_text("Your predicted shape matches.")
     expect(playground.locator(".rt-focus-explorer")).to_have_count(1)
@@ -266,6 +321,10 @@ def check_notebook(page, base, token):
     playground.get_by_role("button", name="Apply parameters", exact=True).click()
     expect(playground.locator(".rt-focus-explorer")).to_have_count(0)
     expect(playground).to_contain_text("axis=(0, 2), keepdims=True")
+    playground.get_by_role("textbox", name="Your prediction", exact=True).fill("(3,)")
+    playground.get_by_role("button", name="Reveal result", exact=True).click()
+    expect(playground).to_contain_text("Compare keepdims: reduced source axes (0, 2)")
+    playground.get_by_role("button", name="Predict again", exact=True).click()
     playground.get_by_role("textbox", name="Your prediction", exact=True).fill("(1, 3, 1)")
     playground.get_by_role("button", name="Reveal result", exact=True).click()
     expect(playground).to_contain_text("Result shape: (1, 3, 1)")
@@ -308,7 +367,7 @@ def main():
                             check_notebook(page, base, token)
                             if args.screenshot:
                                 page.screenshot(path=str(args.screenshot), full_page=True)
-                                for name in ("lesson", "playground"):
+                                for name in ("lesson", "playground", "selection", "extrema"):
                                     page.locator(".rt-smoke-" + name).scroll_into_view_if_needed()
                                     page.screenshot(path=str(args.screenshot.with_name(
                                         args.screenshot.stem + "-" + name + ".png"

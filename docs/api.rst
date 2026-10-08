@@ -41,6 +41,25 @@ Reductions and contractions
 .. autofunction:: matmul
 .. autofunction:: einsum
 
+Comparisons and conditional selection
+-------------------------------------
+
+.. autofunction:: greater
+.. autofunction:: greater_equal
+.. autofunction:: less
+.. autofunction:: less_equal
+.. autofunction:: equal
+.. autofunction:: not_equal
+.. autofunction:: where
+
+Extrema and their positions
+---------------------------
+
+.. autofunction:: min
+.. autofunction:: max
+.. autofunction:: argmin
+.. autofunction:: argmax
+
 Result object
 -------------
 
@@ -54,6 +73,9 @@ Result object
    :members:
 
 .. autoclass:: BinaryExpression
+   :members:
+
+.. autoclass:: SelectionExpression
    :members:
 
 Notebook controls
@@ -137,3 +159,11 @@ Teaching capabilities
 ---------------------
 
 .. autofunction:: capabilities
+
+Portable lesson recordings
+--------------------------
+
+.. autofunction:: capture_lesson
+
+.. autoclass:: LessonRecording
+   :members:
