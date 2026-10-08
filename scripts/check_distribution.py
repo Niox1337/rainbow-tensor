@@ -31,10 +31,14 @@ package_path = Path(rt.__file__).resolve()
 assert package_path.is_relative_to(Path(sys.prefix).resolve()), package_path
 assert importlib.metadata.version("rainbow-tensor") == sys.argv[1]
 assert rt.__version__ == sys.argv[1]
+assert rt.capabilities()["package"]["version"] == sys.argv[1]
 assert "ipywidgets" not in sys.modules
 assert "anywidget" not in sys.modules
 assert "export default { render }" in files("rainbow_tensor").joinpath(
     "_widgets/explorer.js"
+).read_text(encoding="utf-8")
+assert "document.getElementById" in files("rainbow_tensor").joinpath(
+    "_widgets/lesson_player.js"
 ).read_text(encoding="utf-8")
 assert rt.get_language() == "auto"
 assert rt.get_default_theme().name == "auto"
@@ -143,6 +147,31 @@ try:
     assert empty_explorer.visual.trace is None
 finally:
     empty_explorer.close()
+comparison = rt.explore(rt.greater, array, 2)
+try:
+    assert comparison.visual.trace.expression.operator == "greater"
+finally:
+    comparison.close()
+choices = flow.where(flow.greater(source, flow.input(3)), source, flow.input(0))
+maximum = flow.argmax(choices, axis=1)
+lesson = rt.walkthrough(maximum, focus=(1,))
+try:
+    assert lesson.snapshot.output_value == 2
+    assert lesson.snapshot.selected_source.source.coordinate == (1, 2)
+    assert any(path.role == "candidate" for path in lesson.paths)
+    recording = rt.capture_lesson([lesson], max_states=1)
+    assert rt.LessonRecording.from_json(recording.to_json()).state_count == 1
+    assert "lesson-player" in recording.to_html()
+    assert recording.to_dict()["states"][0]["focus"] == ["1"]
+finally:
+    lesson.close()
+prediction = rt.reduction_playground(rt.sum, cube, axis=(0, 2), keepdims=True)
+try:
+    prediction.prediction.value = "(3,)"
+    prediction.reveal()
+    assert prediction.feedback.code == "keepdims"
+finally:
+    prediction.close()
 print(f"Installed package smoke passed: {package_path}")
 """
 
@@ -277,7 +306,7 @@ def check_distribution(directory):
         _run(
             [
                 str(python), "-I", "-B", "-m", "pytest", str(validation / "tests"),
-                "-q", "--import-mode=importlib", "-p", "no:cacheprovider",
+                "-q", "--import-mode=prepend", "-p", "no:cacheprovider",
             ],
             cwd=working,
             env=env,
