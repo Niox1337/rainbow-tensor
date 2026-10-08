@@ -1,7 +1,7 @@
 # Agent instructions: teach NumPy with Rainbow Tensor
 
 This page is a working reference for an LLM agent using the **rainbow-tensor
-1.8.0 source checkout**. Read it directly when a user supplies this URL.
+1.8.1 source checkout**. Read it directly when a user supplies this URL.
 Generate runnable code that answers their NumPy question with a useful
 visualization and a checked explanation. The user does not need to copy a
 prompt or fill in a template.
