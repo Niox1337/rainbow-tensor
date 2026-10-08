@@ -117,8 +117,38 @@ Call `playground.close()` when finished. For a static lesson, use the current
 
 ## Check the lessons
 
+### Understand an incorrect prediction
+
+The playground explains which source axes disappear and which survive in the
+output. A prediction can be malformed, have the wrong rank, miss retained
+dimensions, or contain incorrect axis lengths. `playground.feedback.code`
+identifies that structural diagnosis after `reveal()`. Hidden or reset answers
+have `feedback=None`.
+
+```{literalinclude} ../../examples/lessons/axis_diagnosis.py
+:language: python
+```
+
+### Follow a named calculation path
+
+The Calculation paths control labels dependencies as a numerator, denominator,
+summand, factor, broadcast source, condition, or candidate. Selecting a path
+changes the inspected occurrence without changing the final output focus.
+The figure and text retain a breadcrumb for the selected path.
+
+```{literalinclude} ../../examples/lessons/calculation_paths.py
+:language: python
+```
+
+`lesson.paths` contains immutable occurrence records. Pass a record's
+`occurrence` to `select_path`. Read the list again after changing focus because
+occurrence numbers belong to the current trace. Repeated uses of a source
+retain separate entries, and omitted branches are explicitly marked.
+
+### Run the examples
+
 ```bash
-python scripts/check_lessons.py elementwise guided-terms row-normalization reduction-axes
+python scripts/check_lessons.py elementwise guided-terms row-normalization reduction-axes axis-diagnosis calculation-paths
 ```
 
 Each lesson checks NumPy values, tensor shapes, selected sources, and at least
