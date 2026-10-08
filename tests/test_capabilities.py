@@ -44,3 +44,20 @@ def test_controller_scope_and_numeric_boundaries_are_explicit():
     assert document["semantics"]["structural_trace_reads_values"] is False
     assert document["semantics"]["backend_kernels"] is False
     assert document["semantics"]["divide_by_zero"] == "raises_ZeroDivisionError"
+
+
+def test_selection_rules_and_recording_limits_match_the_runtime():
+    """Portable output and data-dependent choices carry their own explicit limits."""
+    from rainbow_tensor.lessons.recording import DEFAULT_MAX_BYTES, DEFAULT_MAX_STATES
+
+    document = capabilities()
+    assert document["operations"]["where"]["explore"]
+    assert not document["operations"]["where"]["walkthrough"]
+    assert document["operations"]["argmax"]["flow_signature"] is not None
+    assert document["semantics"]["where_evaluation"] == "condition_and_both_branches"
+    assert document["semantics"]["extrema_nan"] == "first_nan"
+    recording = document["exports"]["lesson"]
+    assert recording["max_bytes"] == DEFAULT_MAX_BYTES
+    assert recording["max_states"] == DEFAULT_MAX_STATES
+    assert recording["save_format"] == "html"
+    assert recording["requires_live_kernel"] is False

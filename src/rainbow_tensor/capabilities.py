@@ -44,6 +44,7 @@ def capabilities():
     change public operations, controller dispatch, or a later capability document.
     """
     from . import __version__, views
+    from .lessons.recording import DEFAULT_MAX_BYTES, DEFAULT_MAX_STATES
     from .memory import memory
     from .provenance import Flow
 
@@ -85,6 +86,19 @@ def capabilities():
                 "requires_live_kernel": True,
             },
         },
+        "exports": {
+            "svg": {"call": "TensorVisual.save", "includes_explanation": False},
+            "lesson": {
+                "call": "rainbow_tensor.capture_lesson",
+                "formats": ["html", "json"],
+                "save_format": "html",
+                "scope": "captured_states_only",
+                "requires_live_kernel": False,
+                "max_states": DEFAULT_MAX_STATES,
+                "max_bytes": DEFAULT_MAX_BYTES,
+                "byte_limit_scope": "utf8_json_before_html_encoding",
+            },
+        },
         "semantics": {
             "arithmetic": "python_scalars",
             "backend_kernels": False,
@@ -99,5 +113,14 @@ def capabilities():
             "input_shapes": "fixed_after_recording",
             "truncated_trace": "reached_paths_only",
             "over_budget_values": "unknown_never_partial_results",
+            "selection_trace": "candidate_dependencies_not_evaluated_choices",
+            "where_evaluation": "condition_and_both_branches",
+            "where_dtype": "selected_python_scalar_without_common_dtype_promotion",
+            "extrema_values": "real_scalars_only",
+            "extrema_ties": "first_row_major_occurrence_including_signed_zero",
+            "extrema_nan": "first_nan",
+            "extrema_axes": {
+                "min_max": "none_integer_or_tuple", "argmin_argmax": "none_or_integer",
+            },
         },
     }
