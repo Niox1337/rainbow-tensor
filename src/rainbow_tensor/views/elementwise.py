@@ -84,23 +84,52 @@ def _elementwise(operation, a, b, theme, precision, renderer, focus, max_terms, 
     ])
     if operation == "divide":
         explanation.append(t("elementwise.divide_zero"))
-    panels = [
-        {
+    panels = []
+    connectors = []
+    for operand, (label, array, shape, selected) in enumerate(
+        zip(("A", "B"), arrays, shapes, selected_sources)
+    ):
+        if panels:
+            connectors.append(symbol)
+        panels.append({
             "shape": shape,
             "value_fn": _value_fn_for(array),
             "selected": selected,
             "caption_parts": _shape_caption_parts(label, shape, theme),
-        }
-        for label, array, shape, selected in zip(("A", "B"), arrays, shapes, selected_sources)
-    ]
+        })
+        stretched = set(broadcast_stretched_axes(shape, result))
+        if stretched:
+            def stretched_value(coordinate, _value=source_values[operand], _shape=shape):
+                return _value(broadcast_source_coord(coordinate, _shape))
+
+            def color_for(axis, _stretched=stretched):
+                if axis in _stretched:
+                    return theme.surface_selected
+                return theme.axis_color(axis) if axis < len(result) - 1 else theme.text_muted
+
+            stretched_theme = theme.variant(
+                axis_colors=tuple(color_for(axis) for axis in range(len(result)))
+            )
+            panels.append({
+                "shape": result,
+                "value_fn": stretched_value,
+                "selected": selected_result,
+                "theme": stretched_theme,
+                "caption_parts": _shape_caption_parts(
+                    f"{label} {t('label.stretched')}", result, theme, color_for=color_for,
+                ),
+            })
+            connectors.append("->")
     panels.append({
         "shape": result,
         "value_fn": result_value,
         "selected": selected_result,
         "caption_parts": _shape_caption_parts(operation, result, theme),
     })
+    connectors.append("->")
+    output_panel = len(panels) - 1
     content = renderer.render_panels(
-        panels=panels, connectors=[symbol, "->"], explanation=explanation,
+        panels=panels, connectors=connectors, explanation=explanation,
         theme=theme, precision=precision,
     )
     visual = _visual(
@@ -109,7 +138,8 @@ def _elementwise(operation, a, b, theme, precision, renderer, focus, max_terms, 
     )
     visual.trace = trace
     visual.metadata.update(
-        output_panel_indices=(2,), focused_output_panel=2 if trace is not None else None,
+        output_panel_indices=(output_panel,),
+        focused_output_panel=output_panel if trace is not None else None,
         trace_in_explanation=trace is not None, value_evaluation=evaluation,
         numeric_semantics=semantics,
     )
@@ -128,7 +158,8 @@ def add(
     placeholder values, while a numeric literal is a zero-dimensional value.
     Both operand coordinates are retained, even when the same input is used twice.
 
-    The three panels show both inputs and the output. ``focus`` selects one
+    The panels show both inputs, any broadcast expansion, and the output.
+    ``focus`` selects one
     output and pins its corresponding source in each input. Omit it to select
     the first output. Scalars use ``()`` and empty results have no trace.
     The trace's binary expression preserves the ordered operands without

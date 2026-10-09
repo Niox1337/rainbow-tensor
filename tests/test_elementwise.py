@@ -149,10 +149,12 @@ def test_static_binary_focus_keeps_broadcast_sources_and_ordered_roles(operation
         (0, (1, 0)), (1, (2,)),
     ]
     assert renderer.panels[0]["selected"] == [(1, 0)]
-    assert renderer.panels[1]["selected"] == [(2,)]
-    assert renderer.panels[2]["selected"] == [(1, 2)]
-    assert visual.metadata["output_panel_indices"] == (2,)
-    assert visual.metadata["focused_output_panel"] == 2
+    assert renderer.panels[1]["selected"] == [(1, 2)]
+    assert renderer.panels[2]["selected"] == [(2,)]
+    assert renderer.panels[3]["selected"] == [(1, 2)]
+    assert renderer.panels[4]["selected"] == [(1, 2)]
+    assert visual.metadata["output_panel_indices"] == (4,)
+    assert visual.metadata["focused_output_panel"] == 4
     assert left.reads == right.reads == []
 
 
