@@ -58,6 +58,7 @@
   "label.index_expression": "索引 ({index})",
   "label.operand": "输入 {i}",
   "label.stretched": "广播后",
+  "label.unchanged": "未扩展",
   "label.output": "输出",
   "label.scalar": "标量",
   "label.not_applicable": "不适用",

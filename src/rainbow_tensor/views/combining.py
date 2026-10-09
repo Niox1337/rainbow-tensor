@@ -385,7 +385,8 @@ def broadcast(a, b, theme=None, precision=2, renderer=None, *, focus=None, focus
                 "value_fn": stretched_value,
                 "theme": stretched_theme,
                 "caption_parts": _shape_caption_parts(
-                    t("label.stretched"), result, theme, color_for=color_for
+                    t("label.stretched" if stretched else "label.unchanged"),
+                    result, theme, color_for=color_for,
                 ),
             }
         )

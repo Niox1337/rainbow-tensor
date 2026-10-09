@@ -226,6 +226,36 @@ def test_public_broadcast_renders_and_reports_shape():
     assert visual.svg.startswith("<svg")
 
 
+@pytest.mark.parametrize("language,labels", [
+    ("en", ("unchanged", "stretched")),
+    ("zh", ("未扩展", "广播后")),
+])
+@pytest.mark.parametrize("shapes,expanded", [
+    (((2, 3), (2, 3)), (False, False)),
+    (((2, 3), (2, 1)), (False, True)),
+    (((2, 1), (2, 3)), (True, False)),
+    (((2, 1), (1, 3)), (True, True)),
+    (((2, 3), (3,)), (False, True)),
+    (((2, 3), ()), (False, True)),
+    (((), ()), (False, False)),
+    (((0, 3), (1, 3)), (False, True)),
+])
+def test_broadcast_captions_only_label_expanded_operands_as_stretched(
+    language, labels, shapes, expanded,
+):
+    rt.set_language(language)
+    root = ET.fromstring(rt.broadcast(*shapes).svg)
+    svg_ns = "{http://www.w3.org/2000/svg}"
+    captions = [
+        "".join(text.itertext())
+        for text in root.findall(f"{svg_ns}text")
+        if text.findall(f"{svg_ns}tspan")
+    ]
+    result = np.broadcast_shapes(*shapes)
+    shape_label = ", ".join(str(size) for size in result)
+    assert captions[1::2] == [f"{labels[changed]} ({shape_label})" for changed in expanded]
+
+
 def test_broadcast_stretched_axis_frame_matches_caption():
     root = ET.fromstring(rt.broadcast((1, 3, 4), (2, 3, 4)).svg)
     svg_ns = "{http://www.w3.org/2000/svg}"

@@ -58,6 +58,7 @@
   "label.index_expression": "Index ({index})",
   "label.operand": "operand {i}",
   "label.stretched": "stretched",
+  "label.unchanged": "unchanged",
   "label.output": "output",
   "label.scalar": "scalar",
   "label.not_applicable": "n/a",
